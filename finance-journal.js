@@ -138,10 +138,10 @@ function saveJournalEntry() {
       type: 'journal', method: 'journal', status: 'pending-ed', ref: groupRef
     };
     d.journalEntries.push(entry);
-    // Push audit directly — do NOT call auditLog() here as it calls saveData() internally
-    d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
-      action:'create', entity:'journal', entityId:entry.id,
-      description:'Journal entry ('+l.type+'): '+memo, before:null, after:entry});
+    // Real audit row (fire-and-forget POST — safe inside this loop, unlike the
+    // legacy auditLog() helper which called saveData() internally).
+    writeAuditEntry({action:'post_journal_entry', entity_type:'journal', entity_id:entry.id,
+      summary:'Journal entry ('+l.type+'): '+memo, detail:{after:entry}});
   });
   saveData(d);
   closeModal('modalJournalEntry');
@@ -164,9 +164,8 @@ function saveOpeningBalance() {
     desc:'Opening Balance'+(notes?' \u2014 '+notes:''),
     charge:amount,payment:0,type:'opening',method:'',status:'approved',ref:'OB-'+tid.slice(-4)};
   d.rentLedger.push(entry);
-  d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',
-    entity:'opening-balance',entityId:entry.id,
-    description:'Opening balance: '+(t?tenantName(t):tid)+' \u2014 '+fmt(amount),before:null,after:entry});
+  writeAuditEntry({action:'post_opening_balance',entity_type:'opening-balance',entity_id:entry.id,
+    summary:'Opening balance: '+(t?tenantName(t):tid)+' \u2014 '+fmt(amount),detail:{after:entry}});
   saveData(d);
   closeModal('modalOpeningBalance');
   renderDashboard();
@@ -275,7 +274,7 @@ function renderPeriodSummary() {
 
   el.innerHTML =
     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">'+
-    ''+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance &mdash; '+periodLabel+'</div>'+
+    ''+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing Finance &mdash; '+periodLabel+'</div>'+
     summaryHtml+
     '<div class="std-table-card">'+
       '<div class="std-table-hdr">'+
@@ -306,7 +305,7 @@ function renderPeriodSummary() {
       '</tbody></table>'+
     '</div>'+
     '<div style="margin-top:12px;font-size:11px;color:var(--muted);">'+
-    'Generated: '+new Date().toLocaleString('en-CA')+' &nbsp;|&nbsp; Period: '+periodLabel+' &nbsp;|&nbsp; '+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance Module</div>';
+    'Generated: '+new Date().toLocaleString('en-CA')+' &nbsp;|&nbsp; Period: '+periodLabel+' &nbsp;|&nbsp; '+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing Finance Module</div>';
 }
 
 function renderReconciliation() {
@@ -356,7 +355,7 @@ function renderReconciliation() {
 
   el.innerHTML =
     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:16px;">'+
-    ''+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance &mdash; Monthly Reconciliation &mdash; '+periodLabel+'</div>'+
+    ''+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing Finance &mdash; Monthly Reconciliation &mdash; '+periodLabel+'</div>'+
 
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'+
 
@@ -424,6 +423,6 @@ function renderReconciliation() {
       '</div>'+
     '</div>'+
 
-    '<div style="margin-top:12px;font-size:11px;color:var(--muted);">Generated: '+new Date().toLocaleString('en-CA')+' | '+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance Module</div>';
+    '<div style="margin-top:12px;font-size:11px;color:var(--muted);">Generated: '+new Date().toLocaleString('en-CA')+' | '+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing Finance Module</div>';
 }
 

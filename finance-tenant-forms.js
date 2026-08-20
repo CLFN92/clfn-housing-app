@@ -263,11 +263,9 @@ function saveCollectionsFlag() {
     agency:agency,notes:notes,status:'approved'};
   d.collections = d.collections||[];
   d.collections.push(entry);
-  d.auditLog = d.auditLog||[];
-  d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',
-    entity:'collection',entityId:entry.id,
-    description:'Collections flag: '+(getTenant(tid)?tenantName(getTenant(tid)):tid)+' \u2014 '+fmt(amount),
-    before:null,after:entry});
+  writeAuditEntry({action:'flag_collections',entity_type:'collection',entity_id:entry.id,
+    summary:'Collections flag: '+(getTenant(tid)?tenantName(getTenant(tid)):tid)+' \u2014 '+fmt(amount),
+    detail:{after:entry}});
   saveData(d);
   closeModal('modalFlagCollections');
   renderDashboard();
@@ -372,9 +370,8 @@ function saveArrPayment() {
       method:method,type:type,ref:'',notes:notes};
     if (denoms) { entry.denominations=denoms; entry.receivedBy=receivedBy; }
     d.arrPayments.push(entry);
-    d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',
-      entity:'arrPayment',entityId:entry.id,
-      description:'Arrangement payment: '+(t?tenantName(t):tid)+' \u2014 '+fmt(finalAmt),before:null,after:entry});
+    writeAuditEntry({action:'post_arr_payment',entity_type:'arrPayment',entity_id:entry.id,
+      summary:'Arrangement payment: '+(t?tenantName(t):tid)+' \u2014 '+fmt(finalAmt),detail:{after:entry}});
     saveData(d);
     closeModal('modalArrPayment');
     renderDashboard();
@@ -474,9 +471,8 @@ function saveLoanPayment() {
       method:method,notes:notes,status:'posted'};
     if (denoms) { entry.denominations=denoms; entry.receivedBy=receivedBy; }
     d.loanPayments.push(entry);
-    d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',
-      entity:'loanPayment',entityId:entry.id,
-      description:'Loan payment: '+(t?tenantName(t):tid)+' \u2014 '+fmt(finalAmt),before:null,after:entry});
+    writeAuditEntry({action:'post_loan_payment',entity_type:'loanPayment',entity_id:entry.id,
+      summary:'Loan payment: '+(t?tenantName(t):tid)+' \u2014 '+fmt(finalAmt),detail:{after:entry}});
     saveData(d);
     closeModal('modalLoanPayment');
     renderDashboard();
@@ -602,14 +598,12 @@ function approveLoan(loanId) {
     });
   }
 
-  d.auditLog = d.auditLog || [];
-  d.auditLog.push({
-    id: uid(), ts: new Date().toISOString(), user: CURRENT_USER,
-    action: 'update', entity: 'loan', entityId: loanId,
-    description: 'Loan approved: ' + fmt(l.principal) +
+  writeAuditEntry({
+    action: 'approve_loan', entity_type: 'loan', entity_id: loanId,
+    summary: 'Loan approved: ' + fmt(l.principal) +
       (retroInterest > 0 ? ' + ' + fmt(retroInterest) + ' accrued interest (' + daysToApproval + ' days)' : '') +
       (firstPaymentOverdue ? ' | First payment was overdue' : ''),
-    before: {status: 'pending-ed'}, after: {status: 'approved', approvedDate: approvalDate}
+    detail: { before: {status: 'pending-ed'}, after: {status: 'approved', approvedDate: approvalDate} }
   });
 
   saveData(d);

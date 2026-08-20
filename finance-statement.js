@@ -271,7 +271,7 @@ function printTenantStatement() {
   var generatedOn = today.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
 
   var logoSrc    = sessionStorage.getItem('clfn_logo_cache') || window.HLH_LOGO_DATA_URL || window.CLFN_LOGO_DATA_URL || '';
-  var nationName = nc.display_name || nc.short_name || '';
+  var nationName = nc.display_name || nc.short || '';
   var nationAddr = nc.mailing_address || '';
   var nationPhone = nc.phone || '';
   var nationEmail = nc.email || '';
@@ -298,11 +298,19 @@ function printTenantStatement() {
   var loanTotal  = loanRows.reduce(function(s, r){ return s + r.balance; }, 0);
   var grandTotal = rentOwing + arrOwing + loanTotal;
 
-  var outstandingCharges = (d.rentLedger || []).filter(function(r) {
-    return r.tenantId === tid && (r.charge || 0) > 0
-      && r.status !== 'reversed' && r.status !== 'paid';
-  }).slice().sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
-  var chargeTotal = outstandingCharges.reduce(function(s, r){ return s + (r.charge || 0); }, 0);
+  // Outstanding = per-invoice REMAINDER after FIFO payment matching, not every
+  // charge ever posted. The old filter keyed on a status ('paid') nothing ever
+  // sets, so this tenant-facing document listed fully-paid historical invoices
+  // as "Outstanding" with an inflated total while the summary above showed the
+  // correct balance. Voided rows are excluded by the matcher.
+  var outstandingCharges = matchInvoicesToPayments(tid, d)
+    .filter(function(ib){ return ib.remaining > 0.005; })
+    .map(function(ib){
+      return { date: ib.inv.date, desc: ib.inv.desc, charge: ib.remaining,
+               ref: ib.inv.ref, status: ib.payments.length ? 'partial' : 'unpaid' };
+    })
+    .sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  var chargeTotal = Math.round(outstandingCharges.reduce(function(s, r){ return s + (r.charge || 0); }, 0) * 100) / 100;
 
   var monthPayments = [];
   (d.rentLedger || []).filter(function(r){

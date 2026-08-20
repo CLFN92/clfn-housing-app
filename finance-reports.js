@@ -129,7 +129,7 @@ function printReport(type) {
   if (!el) return;
   var w = window.open('','_blank','width=900,height=700');
   if (!w) { toast('Print popup blocked. Please allow popups for this site.'); return; }
-  w.document.write('<!DOCTYPE html><html><head><title>'+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Finance \u2014 '+titleMap[type]+'</title><style>'+
+  w.document.write('<!DOCTYPE html><html><head><title>'+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Finance \u2014 '+titleMap[type]+'</title><style>'+
     'body{font-family:Georgia,serif;max-width:900px;margin:20px auto;padding:0 20px;font-size:12px;}'+
     'h2{font-size:18px;}table{width:100%;border-collapse:collapse;margin:10px 0;}'+
     'th{background:#111;color:#fff;padding:7px 10px;text-align:left;font-size:11px;}'+
@@ -173,7 +173,7 @@ function exportPeriodCSV() {
   var csv = rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var blob = new Blob([csv],{type:'text/csv'});
   var a = document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+'-Period-'+ym+'.csv'; a.click();
+  a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+'-Period-'+ym+'.csv'; a.click();
 }
 
 function exportAgingCSV() {
@@ -182,14 +182,15 @@ function exportAgingCSV() {
   d.tenants.forEach(function(t){
     var v=totals[t.id]||{}; var bal=Math.max(0,v.rent||0);
     if (bal<=0) return;
-    var invoices=d.rentLedger.filter(function(r){return r.tenantId===t.id&&r.type==='invoice'&&r.status!=='reversed';}).sort(function(a,b){return a.date.localeCompare(b.date);});
-    var oldest=invoices[0]; var days=oldest?Math.floor((now-new Date(oldest.date))/86400000):0;
+    // Age by the oldest invoice with a REMAINING balance (see renderAging).
+    var _oldestUnpaid=matchInvoicesToPayments(t.id, d).find(function(ib){ return ib.remaining > 0.005; });
+    var oldest=_oldestUnpaid?_oldestUnpaid.inv:null; var days=oldest?Math.floor((now-new Date(oldest.date))/86400000):0;
     var c=days<=30?bal:0, b31=days<=60&&days>30?bal:0, b61=days<=90&&days>60?bal:0, b90=days>90?bal:0;
     rows.push([tenantName(t),t.unit,c,b31,b61,b90,bal]);
   });
   var csv = rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var blob = new Blob([csv],{type:'text/csv'}); var a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+'-Aging-'+today()+'.csv'; a.click();
+  a.href=URL.createObjectURL(blob); a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+'-Aging-'+today()+'.csv'; a.click();
 }
 
 function exportLoanCSV() {
@@ -202,7 +203,7 @@ function exportLoanCSV() {
   });
   var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var blob=new Blob([csv],{type:'text/csv'}); var a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+'-Loans-'+today()+'.csv'; a.click();
+  a.href=URL.createObjectURL(blob); a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+'-Loans-'+today()+'.csv'; a.click();
 }
 
 function exportAnnualCSV() {
@@ -221,7 +222,7 @@ function exportAnnualCSV() {
   });
   var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var blob=new Blob([csv],{type:'text/csv'}); var a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+'-Annual-FY'+year+'.csv'; a.click();
+  a.href=URL.createObjectURL(blob); a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+'-Annual-FY'+year+'.csv'; a.click();
 }
 
 
@@ -232,10 +233,11 @@ function renderAging() {
     var v = totals[t.id]||{};
     var balance = Math.max(0,(v.rent||0));
     if (balance <= 0) return;
-    // Find oldest unpaid invoice
-    var invoices = d.rentLedger.filter(function(r){return r.tenantId===t.id&&r.type==='invoice'&&r.status!=='reversed';})
-      .sort(function(a,b){return a.date.localeCompare(b.date);});
-    var oldest = invoices[0];
+    // Oldest invoice WITH A REMAINING BALANCE (FIFO payment matching) — the
+    // old code aged the entire balance by the tenant's first invoice EVER, so
+    // anyone with history instantly reported as 90+ days.
+    var _oldestUnpaid = matchInvoicesToPayments(t.id, d).find(function(ib){ return ib.remaining > 0.005; });
+    var oldest = _oldestUnpaid ? _oldestUnpaid.inv : null;
     var days = oldest ? Math.floor((new Date() - new Date(oldest.date))/86400000) : 0;
     var bucket = days<=30?'Current':days<=60?'31-60':days<=90?'61-90':'90+';
     buckets[bucket].push({tid:t.id,name:tenantName(t),unit:t.unit||'',balance:balance,days:days,oldest:oldest?oldest.date:''});

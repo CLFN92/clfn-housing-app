@@ -70,7 +70,10 @@ function openVoucher(txn) {
 //   clearVoucherSig / clearSig
 //   lockVoucherSignatures
 //   _sigMode     legacy global read by printVoucherWithSigs \u2014 derived getter
-var _AUTHORIZING_ROLES = ['housing_manager', 'executive_director'];
+// Canonical role strings (shared-config.js ROLE enum). 'executive_director'
+// was never a real value — _currentRole normalizes to 'ed', so the ED could
+// never countersign a voucher. super_user is the ED tier; CFO signs too.
+var _AUTHORIZING_ROLES = ['housing_manager', 'ed', 'super_user', 'cfo'];
 window._voucherSig = null;  // the pair controller
 
 function _canAuthorize() {
@@ -227,7 +230,7 @@ function printVoucherWithSigs(){
   // Nation branding
   var nc = window.NATION_CONFIG || {};
   var logoSrc    = sessionStorage.getItem('clfn_logo_cache') || window.HLH_LOGO_DATA_URL || window.CLFN_LOGO_DATA_URL || '';
-  var nationName = nc.display_name || nc.short_name || '';
+  var nationName = nc.display_name || nc.short || '';
   var nationAddr = nc.mailing_address || '';
   var nationPhone = nc.phone || '';
   var nationEmail = nc.email || '';
@@ -390,7 +393,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function emailVoucher() {
   if (!currentVoucherData) return;
-  var email = (document.getElementById('voucher-email')||{}).value || 'finance@clfn.ca';
+  // Fallback comes from the nation's config — never a hardcoded CLFN mailbox
+  // (multi-tenant hard rule). No address at all → ask, don't guess.
+  var email = (document.getElementById('voucher-email')||{}).value
+    || (window.NATION_CONFIG && NATION_CONFIG.housing_email) || '';
+  if (!email) { toast('Enter an email address for the voucher.'); return; }
   var notes = (document.getElementById('voucher-notes')||{}).value || '';
   var tn = getTenant(currentVoucherData.tenantId);
   var subject = 'Transaction Voucher \u2014 '+(tn?tenantName(tn):currentVoucherData.tenantId)+' \u2014 '+currentVoucherData.date;
@@ -401,7 +408,7 @@ function emailVoucher() {
     '\nMethod: '+methodLabel(currentVoucherData.method)+
     (notes?'\n\nNotes: '+notes:'')+
     '\n\nGenerated: '+new Date().toLocaleString('en-CA')+
-    '\n'+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance Module';
+    '\n'+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing Finance Module';
   window.location.href = 'mailto:'+email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
 }
 

@@ -125,6 +125,81 @@ function nextProjectNumber(unitId){
   return prefix + seq;
 }
 
+// ─── Duplicate project-number reconciliation (boot-time, one-shot) ─────────
+// The pre-fix nextProjectNumber rolled over at 100 ('SOW-YYYY-00') and then
+// minted that SAME number for every later request that year, so production
+// data contains duplicate project numbers. Numbers are the lookup key
+// (getSowByProjectNumber / upsertSowInList / RFQ links), so duplicates on the
+// same unit overwrite each other and cross-unit ones are ambiguous in every
+// list. This reconciler — called once per session from loadHousingData after
+// the SOW + RFQ caches hydrate, management sessions only — keeps the OLDEST
+// record on each duplicated number and renumbers the rest to fresh sequential
+// numbers, re-pointing any linked RFQ (sow_unit_id + sow_project_number) and
+// auditing every rename. Mirrors the boot-time reconcileAssignments() pattern.
+function reconcileSowNumbers(){
+  if (window._sowNumbersReconciled) return 0;
+  window._sowNumbersReconciled = true;
+  var role = window._realRole || window.currentRole || '';
+  if (!(typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(role))) return 0;
+  var cache = window._sowCache || {};
+  // Capture each unit's list ONCE and reuse the same array for mutation and
+  // save — legacy flat-shape entries get a fresh migrated array per
+  // getUnitSowList call, so re-reading would drop the mutation.
+  var listsByUid = {};
+  var byPn = {};
+  Object.keys(cache).forEach(function(uid){
+    var list = getUnitSowList(uid);
+    listsByUid[uid] = list;
+    list.forEach(function(s){
+      var pn = String((s && s.project_number) || '');
+      if (!/^SOW-\d{4}-\d+$/.test(pn)) return;
+      (byPn[pn] = byPn[pn] || []).push({ uid: uid, sow: s });
+    });
+  });
+  var dirtyUnits = {};
+  var renamed = 0;
+  Object.keys(byPn).forEach(function(pn){
+    var entries = byPn[pn];
+    if (entries.length < 2) return;
+    // Oldest keeps the number (most likely to be externally referenced).
+    entries.sort(function(a,b){ return String(a.sow.created_at||'').localeCompare(String(b.sow.created_at||'')); });
+    for (var i = 1; i < entries.length; i++) {
+      var e = entries[i];
+      var oldPn = e.sow.project_number;
+      // nextProjectNumber rescans the live cache, which already reflects the
+      // renames applied so far — so sequential calls stay unique.
+      var newPn = nextProjectNumber(e.uid);
+      e.sow.project_number = newPn;
+      dirtyUnits[e.uid] = true;
+      renamed++;
+      if (typeof auditEntry === 'function') {
+        auditEntry('SOW:'+e.uid, 'sow_renumbered', 'Duplicate project number ' + oldPn + ' renumbered to ' + newPn, role);
+      }
+      // Keep any linked RFQ pointing at the renamed request.
+      var rfqs = window._rfqCache || {};
+      Object.keys(rfqs).forEach(function(rid){
+        var r = rfqs[rid];
+        if (r && r.sow_unit_id === e.uid && r.sow_project_number === oldPn) {
+          r.sow_project_number = newPn;
+          try {
+            fetch(SUPABASE_URL + '/rest/v1/housing_rfq?id=eq.' + encodeURIComponent(rid), {
+              method: 'PATCH',
+              headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
+              body: JSON.stringify({ sow_project_number: newPn, updated_at: new Date().toISOString() })
+            }).catch(function(err){ console.warn('[sow renumber] RFQ relink failed:', err); });
+          } catch(err){ console.warn('[sow renumber] RFQ relink threw:', err); }
+        }
+      });
+    }
+  });
+  Object.keys(dirtyUnits).forEach(function(uid){ saveSowList(uid, listsByUid[uid]); });
+  if (renamed && typeof showToast === 'function') {
+    showToast('✓ Renumbered ' + renamed + ' duplicate maintenance-request number' + (renamed === 1 ? '' : 's'), { type: 'info' });
+  }
+  return renamed;
+}
+window.reconcileSowNumbers = reconcileSowNumbers;
+
 // ─── SOW archive lifecycle ────────────────────────────────────────────────
 // archiveSow / unarchiveSow flip the per-SOW `archived` flag inside the
 // unit's SOW list and persist via upsertSowInList. The Reno Approvals view

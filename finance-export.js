@@ -31,7 +31,7 @@ function exportStdCSV(reportName, headers, rows){
   // Prepend a BOM so Excel opens UTF-8 files correctly
   var csv = '﻿' + headerLine + '\n' + bodyLines.join('\n');
   var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  var prefix = (window.NATION_CONFIG && window.NATION_CONFIG.short_name) ? window.NATION_CONFIG.short_name + '-' : '';
+  var prefix = (window.NATION_CONFIG && window.NATION_CONFIG.short) ? window.NATION_CONFIG.short + '-' : '';
   var fname = prefix + 'Finance-' + reportName + '-' + today() + '.csv';
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -392,5 +392,5 @@ function exportAudit() {
       .map(function(v){return '"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var blob = new Blob([csv],{type:'text/csv'});
   var a = document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short_name || '')+'-Audit-Log-'+today()+'.csv'; a.click();
+  a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short || '')+'-Audit-Log-'+today()+'.csv'; a.click();
 }

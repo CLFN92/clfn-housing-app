@@ -168,7 +168,7 @@ function _rentLedgerToRow(e){
   else if (Number(e.payment||0) > 0) { amt = -Number(e.payment); etype = 'adjustment_credit'; }
   var tenantId = e.tenantId && e.tenantId !== '' ? e.tenantId : null;
   var entryDate = e.date || new Date().toISOString().slice(0,10);
-  return {
+  var row = {
     id: e.id, nation_id: _NATION(),
     tenant_id: tenantId, unit_id: e.unitId || null,
     entry_type: etype, amount: amt,
@@ -176,6 +176,14 @@ function _rentLedgerToRow(e){
     voids_id: e.voidsId || null, void_reason: e.voidReason || null,
     created_by: e.createdBy || _ACTOR()
   };
+  // method/reference columns exist only after the optional
+  // 20260820_finance_ledger_method migration — feature-detected at boot.
+  // Writing them unconditionally would 400 every ledger save pre-migration.
+  if (window._finLedgerHasMethod) {
+    row.method    = e.method || null;
+    row.reference = e.ref || null;
+  }
+  return row;
 }
 function _rentLedgerFromRow(r){
   var charge = 0, payment = 0, type = 'invoice';
@@ -184,12 +192,26 @@ function _rentLedgerFromRow(r){
   else if (r.entry_type === 'payment') { payment = -Number(r.amount); type = 'payment'; }
   else if (r.entry_type === 'adjustment_debit') { charge = Number(r.amount); type = 'invoice'; }
   else if (r.entry_type === 'adjustment_credit') { payment = -Number(r.amount); type = 'payment'; }
-  else if (r.entry_type === 'void') { type = 'void'; }
+  else if (r.entry_type === 'void') {
+    // Reversal row: the signed amount encodes the direction (toRow stored
+    // charge as +amount, payment as -amount). The old mapper left BOTH at 0,
+    // so after any reload the reversal contributed nothing to balances while
+    // the voided original counted fully — every void silently un-did itself.
+    if (Number(r.amount) >= 0) charge = Number(r.amount); else payment = -Number(r.amount);
+    type = 'void';
+  }
   return {
     id: r.id, tenantId: r.tenant_id, unitId: r.unit_id,
     date: r.entry_date, desc: r.description || '',
     charge: charge, payment: payment, type: type,
-    method: '', status: 'posted', ref: '',
+    // method/reference persist only where the optional migration added the
+    // columns (see _finLedgerHasMethod) — absent columns read as undefined.
+    method: r.method || '',
+    // Reversal rows carry status 'void' (mirrors _makeReversalEntry); voided
+    // ORIGINALS are re-marked post-load by _finDeriveVoidedOriginals from the
+    // voids_id backrefs — status itself has no column.
+    status: (r.entry_type === 'void' || r.voids_id) ? 'void' : 'posted',
+    ref: r.reference || '',
     voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
   };
 }
@@ -398,29 +420,59 @@ function _arrPaymentFromRow(r){
   };
 }
 
+// Collections mappers — the UI writes {dateFlagged, amountAtReferral, agency,
+// status:'approved'|'resolved'} (saveCollectionsFlag / resolveCollection),
+// which the old mappers didn't know: every reload zeroed the referral amount,
+// dropped the agency, and reset status to 'flagged' (isInCollections then
+// returned false — the Collections KPI/banners vanished), and "Mark Resolved"
+// produced no mapped change so the diff never fired an upsert.
+// finance_collections.stage has a CHECK constraint (flagged/letter_1/letter_2/
+// final_notice/legal_referral/written_off/resolved/closed) — 'approved' is a
+// UI-only status, so it maps to a valid stage and back. `agency` has no
+// column; it round-trips on an 'Agency: <name>' first line inside notes.
+var _COLLECTION_STAGES = ['flagged','letter_1','letter_2','final_notice','legal_referral','written_off','resolved','closed'];
 function _collectionToRow(c){
+  var stage;
+  if (c.status === 'resolved') stage = 'resolved';
+  else if (_COLLECTION_STAGES.indexOf(c.stage) >= 0 && c.stage !== 'resolved' && c.stage !== 'closed') stage = c.stage;
+  else if (c.status === 'approved' || c.status === 'pending-ed' || !c.status) stage = (_COLLECTION_STAGES.indexOf(c.stage) >= 0) ? c.stage : 'flagged';
+  else stage = (_COLLECTION_STAGES.indexOf(c.stage) >= 0) ? c.stage : 'flagged';
+  var notes = c.notes || '';
+  if (c.agency) notes = 'Agency: ' + c.agency + (notes ? '\n' + notes : '');
   return {
     id: c.id, nation_id: _NATION(),
     tenant_id: c.tenantId,
-    opened_date: c.openedDate || c.date || today(),
-    closed_date: c.closedDate || null,
-    stage: c.stage || 'flagged',
-    amount_at_open: Number(c.amountAtOpen || c.amount || 0),
+    opened_date: c.openedDate || c.dateFlagged || c.date || today(),
+    closed_date: c.closedDate || (c.status === 'resolved' ? today() : null),
+    stage: stage,
+    amount_at_open: Number(c.amountAtOpen || c.amountAtReferral || c.amount || 0),
     amount_current: c.amountCurrent != null ? Number(c.amountCurrent) : null,
-    notes: c.notes || null,
+    notes: notes || null,
     archived: !!c.archived,
     created_by: c.createdBy || _ACTOR(),
     updated_by: _ACTOR()
   };
 }
 function _collectionFromRow(r){
+  var rawNotes = r.notes || '';
+  var agency = '';
+  var m = /^Agency: ([^\n]*)\n?/.exec(rawNotes);
+  if (m) { agency = m[1]; rawNotes = rawNotes.slice(m[0].length); }
+  var terminal = (r.stage === 'resolved' || r.stage === 'closed' || r.stage === 'written_off');
+  var amt = Number(r.amount_at_open||0);
   return {
     id: r.id, tenantId: r.tenant_id,
     openedDate: r.opened_date, closedDate: r.closed_date,
+    dateFlagged: r.opened_date,
     stage: r.stage,
-    amountAtOpen: Number(r.amount_at_open||0),
+    amountAtOpen: amt,
+    amountAtReferral: amt,
     amountCurrent: r.amount_current != null ? Number(r.amount_current) : null,
-    status: r.stage, notes: r.notes || '',
+    // UI status: active cases read as 'approved' (what isInCollections and the
+    // KPI/banners key on), terminal stages as 'resolved'.
+    status: terminal ? 'resolved' : 'approved',
+    agency: agency,
+    notes: rawNotes,
     archived: !!r.archived,
     createdBy: r.created_by
   };
@@ -453,7 +505,10 @@ function _journalFromRow(r){
   var rawRef = r.reference || '';
   var pipeIdx = rawRef.indexOf('|');
   var status, groupRef;
-  var knownStatuses = ['pending-ed','pending','posted','approved','reversed','declined'];
+  // 'void' was missing here, so a voided journal original reloaded as
+  // status 'posted' with its group ref corrupted to 'void|<ref>' — the void
+  // silently un-did itself and the group link broke.
+  var knownStatuses = ['pending-ed','pending','posted','approved','reversed','declined','void'];
   if (pipeIdx >= 0) {
     var maybeStatus = rawRef.slice(0, pipeIdx);
     if (knownStatuses.indexOf(maybeStatus) >= 0) {
@@ -571,6 +626,55 @@ function _fetchFromSupabase(path, opts){
 // Fetches every finance table in parallel, maps to in-memory shape, and
 // populates _memStore. Called once at page load. Returns a promise so the
 // DOMContentLoaded handler can await it before the first render.
+// Re-mark voided ORIGINALS after a reload. voidLedgerEntry sets
+// original.status='void' in memory, but most tables have no status column —
+// only the reversal row's voids_id backref survives the round-trip. Without
+// this pass, a reloaded original tested as not-voided (finIsVoided false):
+// it counted fully in balances, showed as live in every table, and could be
+// voided a second time. Runs across every collection generically.
+function _finDeriveVoidedOriginals(store){
+  try {
+    Object.keys(store || {}).forEach(function(key){
+      var arr = store[key];
+      if (!Array.isArray(arr) || !arr.length) return;
+      var voidedIds = {};
+      var hasAny = false;
+      arr.forEach(function(e){ if (e && e.voidsId) { voidedIds[e.voidsId] = true; hasAny = true; } });
+      if (!hasAny) return;
+      arr.forEach(function(e){
+        if (e && voidedIds[e.id] && e.status !== 'void' && e.status !== 'reversed') e.status = 'void';
+      });
+    });
+  } catch(e) { console.warn('[finance] void derivation failed:', e); }
+}
+
+// Derive client-side fields the tables don't store, right after hydration:
+// - loan/arrangement payments reload with tenantId:'' ("derived via lookup at
+//   render", said the mapper comment — but no lookup existed anywhere), which
+//   zeroed per-tenant Period Summary / Transactions / reconciliation rows.
+// - loan.payment ("client-computed") was never recomputed, so loan detail,
+//   the record-payment prefill, and unified-payment allocation all read $0.00
+//   after any reload (finance-batch worked around it locally).
+function _finBackfillDerivedFields(store){
+  try {
+    var loanById = {}; (store.loanList     || []).forEach(function(l){ if (l && l.id) loanById[l.id] = l; });
+    var arrById  = {}; (store.arrangements || []).forEach(function(a){ if (a && a.id) arrById[a.id]  = a; });
+    (store.loanPayments || []).forEach(function(p){
+      if (p && !p.tenantId) { var l = loanById[p.loanId]; if (l) p.tenantId = l.tenantId || ''; }
+    });
+    (store.arrPayments || []).forEach(function(p){
+      if (p && !p.tenantId) { var a = arrById[p.arrId]; if (a) p.tenantId = a.tenantId || ''; }
+    });
+    if (typeof calcPaymentAmt === 'function') {
+      (store.loanList || []).forEach(function(l){
+        if (l && !l.payment && Number(l.principal) > 0) {
+          l.payment = calcPaymentAmt(Number(l.principal), Number(l.rate || 0), Number(l.term || 0), l.freq || 'monthly') || 0;
+        }
+      });
+    }
+  } catch(e) { console.warn('[finance] derived-field backfill failed:', e); }
+}
+
 async function _bootLoadFinanceData(){
   var nation = _NATION();
   var results = {};
@@ -592,8 +696,18 @@ async function _bootLoadFinanceData(){
     });
     await Promise.all(fetches);
     _memStore = Object.assign(_emptyStore(), results);
+    _finDeriveVoidedOriginals(_memStore);
+    _finBackfillDerivedFields(_memStore);
     if (window.CLFN_DEBUG) console.log('[finance] hydrated:',
       _FIN_TABLES.map(function(s){ return s.key + '=' + (results[s.key]||[]).length; }).join(', '));
+
+    // Feature-detect the optional method/reference columns on the rent ledger
+    // (migration 20260820_finance_ledger_method). Pre-migration, the probe
+    // 400s and the mapper simply keeps omitting the columns.
+    try {
+      var _mr = await _fetchFromSupabase('finance_rent_ledger?select=method,reference&limit=1');
+      window._finLedgerHasMethod = !!(_mr && _mr.ok);
+    } catch(e) { window._finLedgerHasMethod = false; }
 
     // Load housing_settings so APPROVAL_AUTHORITY overrides are respected on this page
     try {

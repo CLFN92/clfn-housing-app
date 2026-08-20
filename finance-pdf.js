@@ -115,9 +115,9 @@ function previewArrangementAgreement(arr) {
     html += '<li>The Tenant agrees to pay <strong>$' + monthly.toFixed(2) + ' per month</strong> toward outstanding ' + ledgerLabel + ' of <strong>$' + total.toFixed(2) + '</strong>, commencing ' + startDate + '.</li>';
     html += '<li>Payments are due on the same date each month. Failure to pay within 15 days of the due date constitutes default of this arrangement.</li>';
     html += '<li>The Tenant must also maintain current rent payments. This arrangement does not suspend regular rent obligations.</li>';
-    html += '<li>In the event of default, '+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' may pursue all available remedies including deduction from band payments and termination of tenancy.</li>';
+    html += '<li>In the event of default, '+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' may pursue all available remedies including deduction from band payments and termination of tenancy.</li>';
     html += '<li>This arrangement becomes active only upon written approval of the Executive Director of '+(window.NATION_CONFIG && window.NATION_CONFIG.display_name || "")+'.</li>';
-    html += '<li>'+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' may review and renegotiate this arrangement if the Tenant\u2019s financial circumstances change materially.</li>';
+    html += '<li>'+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' may review and renegotiate this arrangement if the Tenant\u2019s financial circumstances change materially.</li>';
     html += '</ol>';
 
     // Signatures
@@ -131,7 +131,7 @@ function previewArrangementAgreement(arr) {
     html += sigBlock('Witness', '');
     html += '</div>';
 
-    html += '<div style="border-top:1px solid #ccc;padding-top:8px;font-size:10px;color:#999;text-align:center;">'+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance | Ref: ' + ref + ' | Generated: ' + todayStr + ' | PENDING ED APPROVAL</div>';
+    html += '<div style="border-top:1px solid #ccc;padding-top:8px;font-size:10px;color:#999;text-align:center;">'+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing Finance | Ref: ' + ref + ' | Generated: ' + todayStr + ' | PENDING ED APPROVAL</div>';
     html += '</div>';
 
     document.getElementById('arrAgreementContent').innerHTML = html;
@@ -151,7 +151,7 @@ function printAgreement(contentId) {
   var w = window.open('', '_blank', 'width=800,height=600');
   if (!w) { toast('Print popup blocked. Please allow popups for this site.'); return; }
   w.document.write(
-    '<html><head><title>'+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Agreement</title>' +
+    '<html><head><title>'+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Agreement</title>' +
     '<style>body{font-family:Georgia,serif;margin:24px;font-size:13px;line-height:1.6;}' +
     '@media print{body{margin:0;}}</style></head><body>' +
     content.innerHTML +
@@ -399,9 +399,9 @@ function _previewLoanAgreementInner(loan) {
   html += ' in ' + freqLabel.toLowerCase() + ' instalments of <strong>$' + payment.toFixed(2) + '</strong>.</li>';
   html += '<li>Payments are due on the same date each ' + (freq === 'monthly' ? 'month' : 'period') + ' commencing ' + startDate + '.</li>';
   html += '<li>The Borrower may prepay all or part of this loan at any time without penalty.</li>';
-  html += '<li>In the event of default (missed payment exceeding 30 days), '+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' may deduct outstanding amounts from any band payments or benefits owed to the Borrower.</li>';
+  html += '<li>In the event of default (missed payment exceeding 30 days), '+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' may deduct outstanding amounts from any band payments or benefits owed to the Borrower.</li>';
   html += '<li>This loan becomes active only upon written approval of the Executive Director of '+(window.NATION_CONFIG && window.NATION_CONFIG.display_name || "")+'.</li>';
-  html += '<li>'+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' may assign housing staff to assist with financial planning if the account falls into arrears.</li>';
+  html += '<li>'+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' may assign housing staff to assist with financial planning if the account falls into arrears.</li>';
   html += '<li>This agreement is governed by the laws of Ontario and applicable federal legislation.</li>';
   html += '</ol>';
 
@@ -418,7 +418,7 @@ function _previewLoanAgreementInner(loan) {
 
   // Footer
   html += '<div style="border-top:1px solid #ccc;padding-top:8px;font-size:10px;color:#999;text-align:center;">';
-  html += ''+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance | Ref: ' + ref + ' | Generated: ' + todayStr + ' | PENDING ED APPROVAL';
+  html += ''+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing Finance | Ref: ' + ref + ' | Generated: ' + todayStr + ' | PENDING ED APPROVAL';
   html += '</div>';
   html += '</div>';
 

@@ -15,6 +15,15 @@ function calcAllTotals(d){
     var paid=d.arrPayments.filter(function(p){return p.arrId===arr.id;}).reduce(function(s,p){return s+p.amount;},0);
     result[arr.tenantId].arrangement+=Math.max(0,arr.totalOwing-paid);
   });
+  // Round to cents at the boundary — raw float accumulation leaves 1e-16
+  // residue (0.10+0.20-0.30), which made fully-paid accounts fail the
+  // "Accounts Clear" <= 0 test and render a danger-styled $0.00.
+  Object.keys(result).forEach(function(tid){
+    var v = result[tid];
+    v.rent = Math.round(v.rent*100)/100;
+    v.loan = Math.round(v.loan*100)/100;
+    v.arrangement = Math.round(v.arrangement*100)/100;
+  });
   return result;
 }
 
@@ -62,7 +71,7 @@ function renderFinanceWorklist() {
         ? (d.journalEntries||[]).filter(function(x){ return x.ref === j.ref; })
         : [j];
       var t = getTenant(j.tenantId);
-      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      var tName = t ? tenantName(t) : 'No tenant';
       var totalDR = 0;
       groupLines.forEach(function(x){ totalDR += (x.debit||x.charge||0); });
       items.push({
@@ -83,7 +92,7 @@ function renderFinanceWorklist() {
     (d.loanList || []).forEach(function(l) {
       if (l.status !== 'pending-ed') return;
       var t = getTenant(l.tenantId);
-      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      var tName = t ? tenantName(t) : 'No tenant';
       items.push({
         icon: '💰', label: 'Loan Approval',
         sub: tName + ' · $' + (l.principal||0).toFixed(2),
@@ -98,7 +107,7 @@ function renderFinanceWorklist() {
     (d.arrangements || []).forEach(function(a) {
       if (a.status !== 'pending-ed' && a.status !== 'pending') return;
       var t = getTenant(a.tenantId);
-      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      var tName = t ? tenantName(t) : 'No tenant';
       items.push({
         icon: '📋', label: 'Payment Arrangement',
         sub: tName + ' · $' + (a.totalOwing||a.amount||0).toFixed(2),
@@ -110,7 +119,7 @@ function renderFinanceWorklist() {
     (d.rentLedger || []).forEach(function(r) {
       if (r.status !== 'pending-reversal') return;
       var t = getTenant(r.tenantId);
-      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      var tName = t ? tenantName(t) : 'No tenant';
       items.push({
         icon: '\u21a9\ufe0f', label: 'Pending Reversal',
         sub: tName + ' · $' + (r.amount||r.charge||r.payment||0).toFixed(2),
@@ -159,9 +168,8 @@ function approveJournalEntry(ref, fallbackId) {
     j.status = 'posted';
     j.approvedBy = approver;
     j.approvedAt = today();
-    d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
-      action:'update', entity:'journal', entityId:j.id,
-      description:'Journal entry approved by '+approver, before:{status:prev}, after:{status:'posted'}});
+    writeAuditEntry({action:'approve_journal', entity_type:'journal', entity_id:j.id,
+      summary:'Journal entry approved by '+approver, detail:{before:{status:prev}, after:{status:'posted'}}});
   });
   saveData(d);
   renderFinanceWorklist();
@@ -184,9 +192,8 @@ function declineJournalEntry(ref, fallbackId) {
     j.declinedAt = today();
     var rl = (d.rentLedger||[]).find(function(r){ return r.id === j.id; });
     if (rl) { rl.status = 'declined'; }
-    d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
-      action:'update', entity:'journal', entityId:j.id,
-      description:'Journal entry declined by '+actor, before:{status:prev}, after:{status:'declined'}});
+    writeAuditEntry({action:'decline_journal', entity_type:'journal', entity_id:j.id,
+      summary:'Journal entry declined by '+actor, detail:{before:{status:prev}, after:{status:'declined'}}});
   });
   saveData(d);
   renderFinanceWorklist();

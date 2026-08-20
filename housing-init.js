@@ -1998,6 +1998,10 @@ async function loadHousingData() {
     if(sowR.ok){var sd=await sowR.json(); sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
     var rfqR = await fetch(SUPABASE_URL+'/rest/v1/housing_rfq?select=*&order=created_at.desc',{headers:HOUSING_HEADERS});
     if(rfqR.ok){var rd=await rfqR.json(); window._rfqCache={}; rd.forEach(function(r){window._rfqCache[r.id]=r;});}
+    // One-shot repair of duplicate SOW project numbers (the pre-fix generator
+    // rolled over at 100 and minted repeated 'SOW-YYYY-00's). Management only;
+    // needs both the SOW and RFQ caches above (RFQ links get re-pointed).
+    if(typeof reconcileSowNumbers === 'function'){ try { reconcileSowNumbers(); } catch(e){ console.warn('[boot] sow renumber threw:', e); } }
     if(typeof sbLoadBcrRegistry === 'function'){ try { await sbLoadBcrRegistry(); } catch(e){} }
     // Tenant-reported maintenance requests + portal application submissions
     // (review queues) — management only.

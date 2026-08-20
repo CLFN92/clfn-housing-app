@@ -34,7 +34,7 @@ function saveRentPayment() {
       if (denoms) { rentEntry.denominations=denoms; rentEntry.receivedBy=receivedBy; }
       d2.rentLedger.push(rentEntry);
       if (!d2.auditLog) d2.auditLog=[];
-      d2.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',entity:'payment',entityId:rentEntry.id,description:tName+' \u2014 rent '+fmt(rentAmt),before:null,after:rentEntry});
+      writeAuditEntry({action:'post_payment',entity_type:'payment',entity_id:rentEntry.id,summary:'Rent payment: '+tName+' \u2014 '+fmt(rentAmt),detail:{after:rentEntry}});
       voucherAllocs.push({label:'Rent', amount:rentAmt, invoices:[]});
       voucherLines.push('Rent: '+fmt(rentAmt));
     }
@@ -48,7 +48,7 @@ function saveRentPayment() {
         if (denoms) { arrEntry.denominations=denoms; arrEntry.receivedBy=receivedBy; }
         d2.arrPayments.push(arrEntry);
         if (!d2.auditLog) d2.auditLog=[];
-        d2.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',entity:'arrPayment',entityId:arrEntry.id,description:tName+' \u2014 arrangement '+fmt(arrAmt),before:null,after:arrEntry});
+        writeAuditEntry({action:'post_arr_payment',entity_type:'arrPayment',entity_id:arrEntry.id,summary:'Arrangement payment: '+tName+' \u2014 '+fmt(arrAmt),detail:{after:arrEntry}});
         voucherAllocs.push({label:'Arrangement ('+arr.ref+')', amount:arrAmt, invoices:[arr.ref]});
         voucherLines.push('Arrangement: '+fmt(arrAmt));
       }
@@ -63,7 +63,7 @@ function saveRentPayment() {
         if (denoms) { loanEntry.denominations=denoms; loanEntry.receivedBy=receivedBy; }
         d2.loanPayments.push(loanEntry);
         if (!d2.auditLog) d2.auditLog=[];
-        d2.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',entity:'loanPayment',entityId:loanEntry.id,description:tName+' \u2014 loan '+fmt(loanAmt),before:null,after:loanEntry});
+        writeAuditEntry({action:'post_loan_payment',entity_type:'loanPayment',entity_id:loanEntry.id,summary:'Loan payment: '+tName+' \u2014 '+fmt(loanAmt),detail:{after:loanEntry}});
         voucherAllocs.push({label:'Loan ('+loan.type+')', amount:loanAmt, invoices:[loan.type]});
         voucherLines.push('Loan: '+fmt(loanAmt));
       }
@@ -199,7 +199,7 @@ function printDenomSheet() {
   var balClass = Math.abs(diff)<0.01?'balanced':diff>0?'over':'short';
   var balMsg = Math.abs(diff)<0.01?'\u2713 Balanced':'Change due: $'+diff.toFixed(2);
   w.document.write('<html><head><title>Cash Sheet</title><style>body{font-family:sans-serif;padding:24px;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}th,td{padding:8px 10px;border:1px solid #ddd;font-size:14px;}th{background:#111;color:#fff;}.balanced{background:#f0fdf4;color:#15803d;padding:10px;border-radius:6px;}.over{background:#fff7ed;color:#c2410c;padding:10px;border-radius:6px;}.sig-line{border-bottom:1px solid #333;height:28px;margin-bottom:6px;margin-top:20px;}@media print{.no-print{display:none;}}</style></head><body>');
-  w.document.write('<h2>'+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing \u2014 Cash Receipt</h2><p>Date: '+new Date().toLocaleDateString('en-CA')+'</p>');
+  w.document.write('<h2>'+(window.NATION_CONFIG && window.NATION_CONFIG.short || "")+' Housing \u2014 Cash Receipt</h2><p>Date: '+new Date().toLocaleDateString('en-CA')+'</p>');
   w.document.write('<table><thead><tr><th>Denomination</th><th>Count</th><th>Subtotal</th></tr></thead><tbody>'+tableRows+'<tr style="font-weight:bold;"><td colspan="2">Total Cash Received</td><td style="text-align:right;">$'+total.toFixed(2)+'</td></tr><tr style="font-weight:bold;"><td colspan="2">Payment Due</td><td style="text-align:right;">$'+due.toFixed(2)+'</td></tr></tbody></table>');
   w.document.write('<div class="'+balClass+'">'+balMsg+'</div>');
   w.document.write('<div class="sig-line"></div><p>Received By: ________________________________</p>');

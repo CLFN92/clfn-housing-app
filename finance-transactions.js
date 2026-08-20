@@ -7,23 +7,29 @@ function initTxnFilters() {
 
 function getAllTransactions() {
   var d = getData();
+  // Honour the header "Show voided entries" toggle like the rent ledger does.
+  // Without this filter, every voided ORIGINAL and its reversal both counted
+  // in the stat cards (Total Charges/Payments each overstated by every voided
+  // amount), and the toggle showPage wires on this page did nothing.
+  var _skipVoided = !window._finShowVoided && typeof finIsVoided === 'function';
+  function _inc(e){ return !_skipVoided || !finIsVoided(e); }
   var txns = [];
-  d.rentLedger.forEach(function(r) {
+  d.rentLedger.filter(_inc).forEach(function(r) {
     txns.push({ date:r.date, tenantId:r.tenantId, ledger: r.gl || 'rent',
       desc:r.desc, charge:r.charge||0, payment:r.payment||0,
       method:r.method||'', status:r.status||'', ref:r.ref||'', id:r.id });
   });
-  d.arrPayments.forEach(function(p) {
+  d.arrPayments.filter(_inc).forEach(function(p) {
     txns.push({ date:p.date, tenantId:p.tenantId, ledger:'arrangement',
       desc:'Arrangement payment', charge:0, payment:p.amount||0,
       method:p.method||'', status:p.status||'', ref:'', id:p.id });
   });
-  d.loanPayments.forEach(function(p) {
+  d.loanPayments.filter(_inc).forEach(function(p) {
     txns.push({ date:p.date, tenantId:p.tenantId, ledger:'loans',
       desc:'Loan payment', charge:0, payment:p.amount||0,
       method:p.method||'', status:p.status||'', ref:'', id:p.id });
   });
-  (d.journalEntries||[]).forEach(function(e) {
+  (d.journalEntries||[]).filter(_inc).forEach(function(e) {
     txns.push({ date:e.date, tenantId:e.tenantId||'', ledger:'journal',
       desc:e.desc||e.memo||'', charge:e.debit||0, payment:e.credit||0,
       method:'', status:e.status||'posted', ref:e.ref||'', id:e.id });

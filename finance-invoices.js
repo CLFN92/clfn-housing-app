@@ -8,7 +8,11 @@ function openInvoiceById(invCacheId) {
 }
 
 function matchInvoicesToPayments(tenantId, d) {
-  var ledger = d.rentLedger.filter(function(r){return r.tenantId===tenantId;})
+  // Voided originals and their reversal rows are excluded on BOTH sides so a
+  // voided invoice never shows a phantom remainder and a voided payment never
+  // "pays down" a live invoice.
+  var _voidOk = (typeof finIsVoided === 'function') ? function(r){ return !finIsVoided(r); } : function(){ return true; };
+  var ledger = d.rentLedger.filter(function(r){return r.tenantId===tenantId && _voidOk(r);})
     .sort(function(a,b){return a.date.localeCompare(b.date);});
   var invoices = ledger.filter(function(r){return r.type==='invoice'||r.type==='opening';});
   var payments = ledger.filter(function(r){return r.type==='payment'&&r.status!=='reversed';});
@@ -110,7 +114,12 @@ var GL_ACCOUNTS = {
   'arrangement':    {code:'1210', name:'Arrangement Receivable',    ledger:'arrangement', type:'arr-charge'},
   'utility-hydro':  {code:'4400', name:'Hydro / Utility Revenue',   ledger:'rent',        type:'utility'},
   'utility-gas':    {code:'4410', name:'Gas / Heating Revenue',     ledger:'rent',        type:'utility'},
-  'other':          {code:'9000', name:'General / Journal Entry',   ledger:'rent',        type:'journal'},
+  // type was 'journal', which _rentLedgerToRow deliberately skips (real
+  // journal entries live in finance_journal) — so GL-9000 charges displayed,
+  // altered the balance, then VANISHED on reload (never persisted). As an
+  // 'adjustment' they map to entry_type 'adjustment_debit' (allowed by the
+  // ledger CHECK constraint) and round-trip like every other charge.
+  'other':          {code:'9000', name:'General / Journal Entry',   ledger:'rent',        type:'adjustment'},
 };
 
 function autoFillInvoice() {
@@ -254,11 +263,11 @@ function saveInvoice() {
   };
 
   d.rentLedger.push(entry);
-  d.auditLog = d.auditLog||[];
-  d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,
-    action:'create',entity:'charge',entityId:entry.id,
-    description:'Charge posted GL'+glInfo.code+': '+(t?tenantName(t):tid)+' \u2014 '+finalDesc+' \u2014 '+fmt(amount),
-    before:null,after:entry});
+  // Real finance_audit_log row \u2014 the old d.auditLog array was never persisted,
+  // so invoice/charge postings left no audit trail at all.
+  writeAuditEntry({action:'post_charge',entity_type:'charge',entity_id:entry.id,
+    summary:'Charge posted GL'+glInfo.code+': '+(t?tenantName(t):tid)+' \u2014 '+finalDesc+' \u2014 '+fmt(amount),
+    detail:{after:entry}});
   saveData(d);
   closeModal('modalNewInvoice');
   renderDashboard();
