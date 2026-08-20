@@ -752,3 +752,36 @@ window.nationDisplay = function nationDisplay(){
 window.nationEmailDomain = function nationEmailDomain(){
   return (window.NATION_CONFIG && NATION_CONFIG.email_domain) || '';
 };
+
+// ── Legacy settings-blob recovery ─────────────────────────────────────────
+// An old bug saved the HM approval threshold by serializing the ENTIRE
+// _appSettings map under one housing_settings row keyed 'app_settings'. Boot
+// hydration only maps rows to top-level keys, so the value never took effect
+// (approval routing silently reverted to the $25k default every reload) and
+// each save re-embedded the previous snapshot inside itself, growing the row
+// geometrically. The save sites now write a dedicated 'hmBudgetLimit' row;
+// this helper — called right after every page's settings hydration — recovers
+// the value from an existing legacy blob (walking the nesting) when no
+// dedicated row exists yet, then drops the blob from the in-memory map so
+// nothing can re-embed it. The stale DB row itself is harmless once ignored
+// and can be deleted from housing_settings at any time.
+window._flattenLegacyAppSettings = function(){
+  try {
+    var s = window._appSettings;
+    if (!s || typeof s !== 'object') return;
+    var blob = s['app_settings'];
+    if (blob === undefined) return;
+    delete s['app_settings'];
+    if (s.hmBudgetLimit !== undefined && s.hmBudgetLimit !== null) return; // dedicated row wins
+    // Each save wrapped the PREVIOUS snapshot one level deeper, so the newest
+    // value is at the outermost level — take the FIRST hit while walking in.
+    var depth = 0, cur = blob, found;
+    while (cur && typeof cur === 'object' && depth < 50) {
+      if (found === undefined && cur.hmBudgetLimit !== undefined && cur.hmBudgetLimit !== null) { found = cur.hmBudgetLimit; break; }
+      cur = cur['app_settings'];
+      depth++;
+    }
+    var n = parseFloat(found);
+    if (!isNaN(n) && n >= 0) s.hmBudgetLimit = n;
+  } catch(e) { /* recovery is best-effort */ }
+};

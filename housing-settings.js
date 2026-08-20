@@ -246,12 +246,18 @@ function aaSaveBudgetLimit(el) {
   var other = document.getElementById('settings_hm_budget_limit'); // Renovation Budget panel
   if (other) other.value = v;
   if (typeof saveSettingWithDraftFallback === 'function') {
-    saveSettingWithDraftFallback('app_settings', s).then(function(ok){
+    // Persist as its OWN settings row. The old code serialized the ENTIRE
+    // _appSettings map under one 'app_settings' row, which boot hydration
+    // never flattened — so the threshold silently reverted to the $25k
+    // default on every reload, and each save re-embedded the previous
+    // snapshot inside itself (geometric row growth). See
+    // _flattenLegacyAppSettings in shared-config.js for the recovery path.
+    saveSettingWithDraftFallback('hmBudgetLimit', v).then(function(ok){
       if (!ok) {
         s.hmBudgetLimit = prev; window._appSettings = s;
         if (typeof showToast === 'function') showToast('Could not save approval threshold — retry.', { type:'error' });
       } else if (typeof showToast === 'function') {
-        showToast('Approval threshold saved: $' + v.toLocaleString());
+        showToast('Approval threshold saved: $' + v.toLocaleString(), { type:'info' });
       }
     });
   }
@@ -416,10 +422,18 @@ function prefillTransferFromTenant() {
   // If form is already filled (editing), don't overwrite
   if(fn || ln) return;
 
-  // Find the currently logged-in user's existing application
-  var email = window.HOUSING_SESSION && window.HOUSING_SESSION.email || '';
+  // Find the currently logged-in user's OWN existing application — matched by
+  // email. The old predicate never used the email it computed and grabbed the
+  // FIRST assigned/approved application of ANYONE, silently injecting a random
+  // person's name/email/phone/band number into the blank form (PII defect +
+  // wrong-person filings). Staff filing a transfer on a tenant's behalf should
+  // use the transfer tenant-search picker instead — this prefill now only
+  // fires for a person starting a transfer for themselves.
+  var email = ((window.HOUSING_SESSION && window.HOUSING_SESSION.email) || '').toLowerCase();
+  if(!email) return;
   var existingApp = apps.find(function(a){
-    return (a.status === 'assigned' || a.status === APP_STATUS.ED_APPROVED) && !a.archived;
+    return a && (a.status === 'assigned' || a.status === APP_STATUS.ED_APPROVED) && !a.archived
+      && String(a.email || '').toLowerCase() === email;
   });
 
   if(!existingApp) return;

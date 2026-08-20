@@ -827,19 +827,16 @@ function openSowModal(unitId, projectNumber) {
   // Mount the consolidated template on first call. Stays idempotent on
   // subsequent opens so element IDs survive between sessions.
   _ensureSowModal();
-  // Reset visited-tab tracking. Re-opens of an EXISTING saved SOW pre-fill
-  // all tabs as reviewed (the user is editing, not first-walking the form),
-  // so the Save button immediately offers Submit mode. Brand-new SOWs
-  // start with no tabs visited; setSowTab('overview') below adds the
-  // first one. The "review every tab" gate only applies to new authoring.
+  // Reset visited-tab tracking. The prefill for existing SOWs (and the
+  // initial setSowTab) happen BELOW, after the target SOW is resolved — two
+  // bugs lived in doing them up here: (1) `willBeEdit` counted ANY SOW history
+  // on the unit (even completed/archived, and before _sowForceNew was read),
+  // so a genuinely NEW request on a unit with history skipped the
+  // review-every-tab submit gate; (2) setSowTab ran before _sowCurrentSowMeta
+  // was refreshed, so _updateSowSaveButtonState read the PREVIOUS SOW's status
+  // — after viewing a submitted MR, a brand-new one opened in "Save Changes"
+  // submit mode and saved straight to 'submitted' with no review or confirm.
   window._sowVisitedTabs = new Set();
-  var willBeEdit = !!(projectNumber || (unitId && typeof getUnitSowList === 'function' && getUnitSowList(unitId).length));
-  if (willBeEdit) {
-    _SOW_TAB_NAMES.forEach(function(t){ window._sowVisitedTabs.add(t); });
-  }
-  // Always reset the tab to Overview on open — otherwise re-opening shows
-  // whatever tab the user was last on, which is rarely what they want.
-  if (typeof setSowTab === 'function') setSowTab('overview');
   _sowUnitId  = unitId || null;
   _sowItemIdx = 0;
 
@@ -879,7 +876,19 @@ function openSowModal(unitId, projectNumber) {
   window._sowWasPreviouslySaved = isEdit && !!saved;
   // Status tile (info strip) reads approval state from here, not a form field —
   // sowStatusBadge needs approval_status/system_approved/archived off the saved record.
-  window._sowCurrentSowMeta = saved ? {approval_status: saved.approval_status, system_approved: saved.system_approved, archived: saved.archived} : {approval_status:''};
+  window._sowCurrentSowMeta = saved ? {approval_status: saved.approval_status, system_approved: saved.system_approved, archived: saved.archived, cancelled: saved.cancelled} : {approval_status:''};
+  // Re-opening an EXISTING saved SOW pre-fills all tabs as reviewed (the user
+  // is editing, not first-walking the form) so the Save button offers
+  // Submit/Save-Changes immediately. Brand-new SOWs start with none — the
+  // "review every tab" gate applies only to first-time authoring. Keyed off
+  // the RESOLVED `saved` record (not raw unit history) — see the note at top.
+  if (saved) {
+    _SOW_TAB_NAMES.forEach(function(t){ window._sowVisitedTabs.add(t); });
+  }
+  // Always reset the tab to Overview on open — otherwise re-opening shows
+  // whatever tab the user was last on. Runs AFTER the meta/visited state above
+  // so _updateSowSaveButtonState computes the right button mode for THIS SOW.
+  if (typeof setSowTab === 'function') setSowTab('overview');
   var label = '';
   if(unitId) {
     var allUnits = getAllUnits();
@@ -1401,6 +1410,23 @@ window._sowRfqStillOpen = _sowRfqStillOpen;
 // downgrade its status (the review step defaults to blank approval fields for
 // roles that can't sign at that tier). For an approved request we hand off the
 // already-saved record untouched.
+// Pre-print/handoff save guard. Printing must never MOVE workflow state: an
+// unconditional saveSOW() from a print button used to (a) strip HM/ED sign-offs
+// when the printer lacked approval authority (the authority gate blanks the
+// fields, the status recomputes downward, and the approved MR re-entered the
+// approval queue), and (b) rebuild the record without its archived flag. So we
+// only persist form edits when the request is still safely editable: unsaved,
+// or saved but not approved/archived/cancelled. Approved/terminal requests
+// print from the already-saved record untouched.
+function _sowSafePreprintSave(){
+  if(typeof saveSOW !== 'function') return;
+  var _ex = (_sowUnitId && window._sowEditingProjectNumber && typeof getSowByProjectNumber === 'function')
+    ? getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber) : null;
+  if(_ex && (_sowIsApproved(_ex) || _ex.archived || _ex.cancelled || _ex.system_approved)) return;
+  saveSOW();
+}
+window._sowSafePreprintSave = _sowSafePreprintSave;
+
 function sowOpenRfq(){
   if(!(_sowUnitId && window._sowEditingProjectNumber)){
     if(typeof showToast === 'function') showToast('Save the request first');
@@ -2559,6 +2585,14 @@ function saveSOW(opts){
     // it. Without this, saving a cancelled request (ED, who can edit it) would
     // silently un-cancel it since `data` is rebuilt from the form.
     if(existing && existing.cancelled){ data.cancelled = existing.cancelled; data.cancelled_at = existing.cancelled_at; data.cancelled_by = existing.cancelled_by; }
+    // Preserve the archived state the same way — only archiveSow/unarchiveSow
+    // flip it. `data` is rebuilt from the form, so without this any re-save
+    // (including a print-triggered one) silently un-archived the request.
+    if(existing && existing.archived){
+      data.archived = existing.archived;
+      if(existing.archivedAt) data.archivedAt = existing.archivedAt;
+      if(existing.archivedBy) data.archivedBy = existing.archivedBy;
+    }
   } else {
     data.created_at = data.date || new Date().toISOString().slice(0,10);
   }
@@ -2626,25 +2660,31 @@ function saveSOW(opts){
   // the dedupe conditions unchanged.
   _sowFireEmails(data, existingForStatus, isNew, sendTenantCopy, _saveMode);
 
-  // Tenant signature captured
-  if(data.tenantSig && (data.tenantSig.name || data.tenantSig.image)) {
+  // Tenant/staff signature captured — transitions only (same rule as the
+  // approval rows below: populateSow restores signatures on open, so an
+  // unconditional log re-recorded them on every subsequent save).
+  var _hadTenantSig = !!(existingForStatus && existingForStatus.tenantSig && (existingForStatus.tenantSig.name || existingForStatus.tenantSig.image));
+  var _hadStaffSig  = !!(existingForStatus && existingForStatus.staffSig  && (existingForStatus.staffSig.name  || existingForStatus.staffSig.image));
+  if(data.tenantSig && (data.tenantSig.name || data.tenantSig.image) && !_hadTenantSig) {
     auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_tenant_signed',
       'Tenant signature recorded — ' + (data.tenantSig.name || 'name not provided') +
       (data.tenantSig.date ? ' on ' + data.tenantSig.date : ''), role);
   }
-  // Staff signature captured
-  if(data.staffSig && (data.staffSig.name || data.staffSig.image)) {
+  if(data.staffSig && (data.staffSig.name || data.staffSig.image) && !_hadStaffSig) {
     auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_staff_signed',
       'Staff signature recorded — ' + (data.staffSig.name || 'name not provided') +
       (data.staffSig.date ? ' on ' + data.staffSig.date : ''), role);
   }
-  // HM approval recorded
-  if(data.hmName) {
+  // HM/ED approval recorded — TRANSITIONS only. populateSow restores the
+  // approval names into the (hidden) fields on every open, so logging whenever
+  // the field is non-empty re-wrote "approval recorded" rows on every edit and
+  // print of an already-approved request, attributed to whoever saved —
+  // polluting the append-only audit trail with phantom approvals.
+  if(data.hmName && !(existingForStatus && existingForStatus.hmName)) {
     auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_hm_approval',
       'HM approval recorded — ' + data.hmName + (data.hmDate ? ' on ' + data.hmDate : ''), role);
   }
-  // ED approval recorded
-  if(data.edName) {
+  if(data.edName && !(existingForStatus && existingForStatus.edName)) {
     auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_ed_approval',
       'ED approval recorded — ' + data.edName + (data.edDate ? ' on ' + data.edDate : ''), role);
   }
@@ -2722,7 +2762,9 @@ function saveSOW(opts){
 
 
 function printSOW(){
-  saveSOW();
+  // Persist form edits only when safe — printing an approved/archived request
+  // must not re-save it (see _sowSafePreprintSave).
+  _sowSafePreprintSave();
   var get = function(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; };
   var chk = function(id){ var el=document.getElementById(id); return el && el.checked; };
   var items   = collectSowItems();

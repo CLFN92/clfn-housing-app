@@ -2297,11 +2297,13 @@ function saveBudgetPools(){
     var prevLimit = s.hmBudgetLimit;
     s.hmBudgetLimit = parseFloat(limitEl.value)||25000;
     window._appSettings = s;
-    saveSettingWithDraftFallback('app_settings', s).then(function(ok){
+    // Dedicated row (not the whole map) — see aaSaveBudgetLimit in
+    // housing-settings.js for why the old 'app_settings' blob never persisted.
+    saveSettingWithDraftFallback('hmBudgetLimit', s.hmBudgetLimit).then(function(ok){
       if(!ok){
         s.hmBudgetLimit = prevLimit;
         window._appSettings = s;
-        showToast('Could not save HM budget limit — retry.');
+        showToast('Could not save HM budget limit — retry.', {type:'error'});
       }
     });
   }

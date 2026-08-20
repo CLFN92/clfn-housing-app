@@ -602,6 +602,7 @@ async function _bootLoadFinanceData(){
         var setD = await setR.json();
         if (!window._appSettings) window._appSettings = {};
         (setD||[]).forEach(function(r){ window._appSettings[r.key] = r.value; });
+        if (typeof _flattenLegacyAppSettings === 'function') _flattenLegacyAppSettings();
         if (typeof initApprovalAuthority === 'function') initApprovalAuthority();
       }
     } catch(e) { console.warn('[finance] settings load skipped:', e); }

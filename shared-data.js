@@ -2604,7 +2604,7 @@ function approvalSweepCount(gate){
     Object.keys(cache).forEach(function(uid){
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow){
-        if (!sow || sow.archived) return;
+        if (!sow || sow.archived || sow.cancelled) return;
         if (onlyOver && !sowRequiresEdApproval(sow)) return;
         if (_sowIsApprovalPending(sow)) n++;
       });
@@ -2661,7 +2661,10 @@ function applyApprovalDisabledSweep(gate){
   Object.keys(cache).forEach(function(uid){
     var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
     list.forEach(function(sow){
-      if (!sow || sow.archived || !_sowIsApprovalPending(sow)) return;
+      // Cancelled requests keep their pre-cancel approval_status, so without
+      // this skip the auto-approve sweep would "approve" cancelled MRs (and a
+      // later ED reopen would resurrect them pre-approved by "System").
+      if (!sow || sow.archived || sow.cancelled || !_sowIsApprovalPending(sow)) return;
       var over  = sowRequiresEdApproval(sow);
       if (!APPROVAL_AUTHORITY.chainDisabled(over ? 'sow_over' : 'sow_under')) return;
       sow.approval_status = over ? 'ed_approved' : 'hm_approved';
@@ -4550,7 +4553,12 @@ function printContractorAgreement() {
 }
 
 function printWorkOrder(){
-  saveSOW();
+  // Persist form edits only when safe — printing an approved/archived request
+  // must not re-save it (a non-approver's save strips HM/ED sign-offs and
+  // downgrades the status). Falls back to the old unconditional save only if
+  // the guard helper isn't loaded on this page.
+  if (typeof _sowSafePreprintSave === 'function') _sowSafePreprintSave();
+  else saveSOW();
   var get = function(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; };
   var items = collectSowItems().filter(function(it){ return it.category||it.description||it.quote||it.cost; });
   var today = new Date().toLocaleDateString('en-CA');
@@ -6039,6 +6047,11 @@ function _wlCollectSows(ctx) {
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow) {
         if (!sow || !sow.items || !sow.items.length) return; // no content
+        // Cancelled and archived requests are terminal — they keep their
+        // pre-cancel approval_status by design (see CLAUDE.md), so without
+        // this check a cancelled 'submitted' MR stayed in the approval queue
+        // with a live Approve button.
+        if (sow.cancelled || sow.archived) return;
         var status = sow.approval_status || '';
         if (status === 'ed_approved' || status === 'completed') return; // already done
         // A draft the current user prepared already shows under "My Drafts" — it
@@ -6089,7 +6102,8 @@ function _wlCollectFieldSows(ctx) {
     Object.keys(fsCache).forEach(function(uid) {
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow) {
-        if (!sow || sow.archived) return;
+        // Cancelled work orders are terminal — the crew must not see them.
+        if (!sow || sow.archived || sow.cancelled) return;
         var status = sow.approval_status || '';
         if (status !== 'hm_approved' && status !== 'ed_approved') return; // approved, not completed
         if (sowHiddenFromCurrentFieldEmployee(sow)) return;               // in-house + assigned to me
@@ -6936,9 +6950,26 @@ function _findDuplicateContractor(name, excludeId){
 }
 
 function saveContractor(){
+  // Returns true on a completed save, false when it aborts (missing name,
+  // declined duplicate warning). saveContractorAndFinalize keys off this —
+  // finalizing after an aborted save used to flip the new-contractor form
+  // into edit mode pointed at the LAST contractor in the directory, so the
+  // user's next Save overwrote that unrelated record.
   var get=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+  // Preserve-when-absent reader: if a form input doesn't exist on this page
+  // (markup drift), keep the previously saved value instead of wiping it to ''.
+  var _prevCt = (function(){
+    var cts = window._contractors || [];
+    var ei = (window._ctEditIdx !== undefined) ? window._ctEditIdx : -1;
+    return (ei >= 0 && ei < cts.length) ? cts[ei] : null;
+  })();
+  var getOrKeep=function(id, field){
+    var el=document.getElementById(id);
+    if(el) return el.value.trim();
+    return (_prevCt && _prevCt[field] != null) ? _prevCt[field] : '';
+  };
   var name=get('ct_name');
-  if(!name){showToast('Contractor name is required.');return;}
+  if(!name){showToast('Contractor name is required.', {type:'error'});return false;}
   var contractors = window._contractors || [];
   var editIdx = (window._ctEditIdx !== undefined) ? window._ctEditIdx : -1;
   var isEdit = editIdx >= 0 && editIdx < contractors.length;
@@ -6956,7 +6987,7 @@ function saveContractor(){
       + (_dupDetail ? ' (' + _dupDetail + ')' : '') + '.\n\n'
       + 'Please confirm this is a different contractor or company before saving.\n\n'
       + 'Save anyway?')) {
-      return;
+      return false;
     }
   }
 
@@ -6966,8 +6997,8 @@ function saveContractor(){
     id:id,name:name,trade:get('ct_trade'),phone:get('ct_phone'),email:get('ct_email'),
     address:get('ct_address'),hst:get('ct_hst'),
     wsibNum:get('ct_wsib_num'),wsibExpiry:get('ct_wsib_expiry'),
-    insProvider:get('ct_ins_provider'),insPolicy:get('ct_ins_policy'),
-    insAmount:get('ct_ins_amount'),insExpiry:get('ct_ins_expiry'),
+    insProvider:getOrKeep('ct_ins_provider','insProvider'),insPolicy:get('ct_ins_policy'),
+    insAmount:getOrKeep('ct_ins_amount','insAmount'),insExpiry:get('ct_ins_expiry'),
     notes:get('ct_notes'), people:ctGetPeople(),
     classification: classRadio ? classRadio.value : '',
     classProof: get('ct_class_proof'),
@@ -7095,11 +7126,16 @@ function saveContractor(){
       }
     }
   }
-  showToast((isEdit ? 'Updated: ' : 'Added: ') + name);
+  showToast((isEdit ? 'Updated: ' : 'Added: ') + name, {type:'info'});
+  return true;
 }
 function saveContractorAndFinalize() {
-  // Save first (reuses existing saveContractor logic)
-  saveContractor();
+  // Save first (reuses existing saveContractor logic). BAIL if the save
+  // aborted (missing name / declined duplicate confirm) — finalizing anyway
+  // used to flip the still-unsaved new-contractor form into edit mode pointed
+  // at the last contractor in the directory, so the next Save overwrote that
+  // unrelated record.
+  if (saveContractor() === false) return;
   // After save, grab the record back and reveal the header Print + Email
   // buttons. The CIC modal uses header buttons as the canonical Print
   // surface — the older footer copies stay hidden but are kept in markup
@@ -7708,6 +7744,13 @@ function _buildAddContractorModalHTML() {
             '<div class="tic-section tic-section-spaced">',
               '<div class="tic-section-h">Liability Insurance</div>',
               '<div class="ct-sec-col">',
+                // Provider + Coverage were dropped in the CIC rebuild while the
+                // save kept reading them — every edit-save wiped the stored
+                // values to ''. Restored so compliance data round-trips again.
+                '<div class="grid-c2-10">',
+                  '<div class="f"><label>Insurance Provider</label><input id="ct_ins_provider" type="text" placeholder="e.g. Intact, Aviva"/></div>',
+                  '<div class="f"><label>Coverage Amount ($)</label><input id="ct_ins_amount" type="text" inputmode="decimal" placeholder="e.g. 2,000,000"/></div>',
+                '</div>',
                 '<div class="grid-c2-10">',
                   '<div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>',
                   '<div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>',

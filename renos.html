@@ -850,7 +850,7 @@ async function loadRenosData() {
     if(_ctv && _ctv.style.display !== 'none' && true) { /* contractors now on contractors.html */ }
     if(sowR && sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
     if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
-    if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
+    if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});if(typeof _flattenLegacyAppSettings==='function')_flattenLegacyAppSettings();}
     if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
     // Apply saved theme (logo + brand colors) — without this, the shared
     // header keeps the build-time default logo instead of the one uploaded

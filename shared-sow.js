@@ -115,7 +115,13 @@ function nextProjectNumber(unitId){
       }
     });
   });
-  var seq = ('0' + (maxN + 1)).slice(-2); // zero-pad to 2 digits: 01, 02 … 99
+  // Zero-pad to a MINIMUM of 2 digits but never truncate: 01, 02 … 99, 100, 101.
+  // The old `('0'+n).slice(-2)` rolled over at 100 → 'SOW-YYYY-00', and because
+  // parseInt('00') is 0 it never raised maxN — so EVERY request after the 99th
+  // in a year got the same duplicate number (seen in production as multiple
+  // SOW-2026-00 records). String(n) preserves 3+ digit sequences.
+  var seq = String(maxN + 1);
+  if (seq.length < 2) seq = '0' + seq;
   return prefix + seq;
 }
 

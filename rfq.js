@@ -153,6 +153,7 @@ async function loadRfqPageData() {
     var settings = await stR.json();
     window._appSettings = {};
     settings.forEach(function(r) { window._appSettings[r.key] = r.value; });
+    if (typeof _flattenLegacyAppSettings === 'function') _flattenLegacyAppSettings();
   }
   if (rfqR && rfqR.ok) {
     window._rfqCache = {};
@@ -609,6 +610,14 @@ function showRfqForm(rfqId, unitId, sowPn) {
     // New RFQ
     _rfqSowUnitId = unitId || null;
     _rfqSowPn     = sowPn  || null;
+    // Blank EVERY form field first by populating from an empty record. The
+    // old branch reset only ~10 fields, so a new RFQ opened after viewing
+    // another one silently inherited its scope summary, price breakdown,
+    // award fields, signatory/site-lead details — and saved them onto the
+    // new draft (which also suppressed the SOW scope prefill, since it only
+    // fills an empty summary). The defaults below then overwrite as before.
+    _populateFormFields({ status: 'draft', data: {} });
+    _rfqContractEmailed = false;
     var newId = (typeof generateRfqNumber === 'function') ? generateRfqNumber() : ('RFQ-' + new Date().getFullYear() + '-0001');
     document.getElementById('rfq_number').value = newId;
     document.getElementById('rfq_status_display').value = 'draft';
@@ -1330,10 +1339,23 @@ async function issueRfq() {
   if (!confirmed) return;
 
   showToast('Issuing RFQ to ' + n + ' contractor' + (n===1?'':'s') + '...');
-  payload.status    = 'issued';
-  payload.issued_at = new Date().toISOString();
 
   try {
+    // NEVER-SAVED RFQ: claim the number through saveRfqDraft's collision-safe
+    // insert first. RFQ numbers are generated from the in-memory cache, so two
+    // users can pick the same RFQ-YYYY-NNNN — the old direct merge-duplicates
+    // upsert here silently REPLACED the other user's RFQ and then emailed
+    // contractors under its number. saveRfqDraft retries on 409 and bumps the
+    // number (updating #rfq_number), so we rebuild the payload after it runs.
+    if (!_rfqCurrentId) {
+      await saveRfqDraft();
+      if (!_rfqCurrentId) { showToast('Could not save the RFQ — not issued', {type:'error'}); return; }
+      payload = _buildRfqPayload();   // pick up the (possibly bumped) number
+    }
+    payload.status    = 'issued';
+    payload.issued_at = new Date().toISOString();
+    // From here the id is OURS (inserted above or previously saved) — the
+    // upsert is a legitimate update of our own row.
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_rfq', {
       method: 'POST',
       headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
@@ -1457,7 +1479,13 @@ function showAwardModal(rfqId, prefill) {
     return (window._contractors || []).find(function(c){ return c && c.id === id; });
   }).filter(Boolean);
 
-  var bids = Object.assign({}, (rfq.data && rfq.data.bids) || {}, _rfqBids || {});
+  // Merge the live in-memory bid edits over the saved record ONLY when this
+  // modal is for the currently open RFQ. _rfqBids is module state hydrated by
+  // showRfqForm and not cleared on Back-to-List — awarding another RFQ from a
+  // list row used to show the previously opened RFQ's bid amounts in this
+  // dropdown's "(bid $…)" suffixes.
+  var _bidsForThis = (rfqId === _rfqCurrentId) ? (_rfqBids || {}) : {};
+  var bids = Object.assign({}, (rfq.data && rfq.data.bids) || {}, _bidsForThis);
   var opts = cts.map(function(ct){
     var b = bids[ct.id]; var amt = b && parseFloat(b.amount);
     var suffix = (amt && amt > 0) ? '  (bid $' + amt.toLocaleString('en-CA', {minimumFractionDigits:2}) + ')' : '';

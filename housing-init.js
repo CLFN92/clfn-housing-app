@@ -2008,6 +2008,7 @@ async function loadHousingData() {
     var stR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
     if(stR.ok){var stD=await stR.json(); window._appSettings={};
       stD.forEach(function(r){window._appSettings[r.key]=r.value;});
+      if(typeof _flattenLegacyAppSettings === 'function') _flattenLegacyAppSettings();
       if(window._appSettings['scoring_model_v2']) window.liveV2ScoreModel=window._appSettings['scoring_model_v2'];
       // Also hydrate liveScoreModel (V1 array format) used by buildV2FormSelects dropdowns
       var _sm = window._appSettings['scoring_model_v2'] || window._appSettings['scoring_model'];
