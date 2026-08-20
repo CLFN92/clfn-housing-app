@@ -180,7 +180,26 @@ async function resolveHousingRole() {
       encodeURIComponent(HOUSING_SESSION.email) + '&is_active=eq.true',
       { headers: HOUSING_HEADERS }
     );
-    var rows = r.ok ? await r.json() : [];
+    // Distinguish "the server answered: no active staff row" from "the lookup
+    // itself failed" — the two must NOT be conflated: no-row means this
+    // authenticated account isn't staff (fail CLOSED, sign out), while a
+    // transient failure must NOT log field staff out on a flaky connection
+    // (fail SOFT into the least-privileged role, with a visible notice).
+    var lookupOk = r.ok;
+    var rows = lookupOk ? await r.json() : [];
+    if (lookupOk && (!rows || !rows.length)) {
+      // Authenticated, but not an active staff member. The old code silently
+      // handed them a working L1 employee UI (RLS was the only real gate).
+      console.warn('[HOUSING] authenticated user has no active staff row — signing out');
+      try {
+        ['clfn_housing_token','clfn_housing_refresh','clfn_housing_token_exp',
+         'clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
+          .forEach(function(k){ try { sessionStorage.removeItem(k); } catch (e) {} });
+      } catch (e) {}
+      try { if (typeof doLogout === 'function') doLogout(); } catch (e) {}
+      try { window.location.href = 'index.html'; } catch (e) {}
+      return;
+    }
     if (rows && rows.length) {
       var staffRow    = rows[0];
 
@@ -222,13 +241,19 @@ async function resolveHousingRole() {
       // bounced to the home page. Only affects users with an explicit list.
       _enforcePageFeature();
     } else {
+      // Lookup HTTP-failed (r.ok false) — transient. Fail soft to the
+      // least-privileged role, but say so: a manager silently downgraded to
+      // the L1 UI on a flaky boot had no idea why their nav/approvals vanished.
+      console.warn('[HOUSING] staff lookup HTTP ' + r.status + ' — falling back to L1 for this session');
       HOUSING_SESSION.role = 'housing_employee_l1';
       window.currentRole   = 'housing_employee_l1';
+      if (typeof showToast === 'function') showToast('Could not verify your role (connection issue) — limited access this session. Reload to retry.', { type: 'error' });
     }
   } catch(e) {
     console.warn('[HOUSING] role lookup failed:', e);
     HOUSING_SESSION.role = 'housing_employee_l1';
     window.currentRole   = 'housing_employee_l1';
+    if (typeof showToast === 'function') showToast('Could not verify your role (connection issue) — limited access this session. Reload to retry.', { type: 'error' });
   } finally {
     window._booting = false;
   }

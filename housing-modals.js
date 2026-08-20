@@ -54,7 +54,7 @@ function contractorSearchFilter(q) {
   if(!filtered.length) {
     results.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">'
       +'<div class="empty-icon-lg">🧰</div>'
-      +'<div class="empty-title">'+(q.trim().length > 0 ? 'No contractors matching "'+q+'"' : 'No contractors added yet')+'</div>'
+      +'<div class="empty-title">'+(q.trim().length > 0 ? 'No contractors matching "'+escapeHtml(q)+'"' : 'No contractors added yet')+'</div>'
       +'<div class="empty-sub">'+( q.trim().length > 0 ? 'Try a different search.' : 'Use the button above to add your first contractor.')+'</div>'
       +'</div>';
     return;
@@ -67,10 +67,10 @@ function contractorSearchFilter(q) {
       +' onmouseover="this.style.borderColor=&quot;var(--yellow)&quot;"'  
       +' onmouseout="this.style.borderColor=&quot;var(--border)&quot;"'  
       +' onclick="closeContractorSearch();openAddContractorModal('+idx+')">'
-      +'<div style="width:40px;height:40px;border-radius:10px;background:var(--dark);color:var(--yellow);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+initials+'</div>'
+      +'<div style="width:40px;height:40px;border-radius:10px;background:var(--dark);color:var(--yellow);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+escapeHtml(initials)+'</div>'
       +'<div style="flex:1;min-width:0;">'
-        +'<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">'+( c.name||'Unknown')+'</div>'
-        +'<div class="js-lbl-sm">'+(c.trade||'General')+(c.phone?' · '+formatPhone(c.phone):'')+'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">'+escapeHtml(c.name||'Unknown')+'</div>'
+        +'<div class="js-lbl-sm">'+escapeHtml(c.trade||'General')+(c.phone?' · '+escapeHtml(formatPhone(c.phone)):'')+'</div>'
       +'</div>'
       +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>'
       +'</div>';
@@ -849,9 +849,9 @@ function ueTenantSearch(q) {
       + ' style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;"'
       + ' onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'none\'">' 
       + '<div>'
-      + '<div class="js-txt-bold">' + name + '</div>'
-      + '<div class="js-lbl-sm">' + a.id
-        + (a.bedrooms ? ' · ' + a.bedrooms + ' bed needed' : '') + '</div>'
+      + '<div class="js-txt-bold">' + escapeHtml(name) + '</div>'
+      + '<div class="js-lbl-sm">' + escapeHtml(a.id)
+        + (a.bedrooms ? ' · ' + escapeHtml(String(a.bedrooms)) + ' bed needed' : '') + '</div>'
       + '</div>'
       + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:' + statusBg + ';color:' + statusColor + ';white-space:nowrap;">' + statusLabel + '</span>'
       + '</div>';
@@ -927,8 +927,8 @@ function ueTenantSelect(appId, name, status) {
   sel.style.display = 'block';
   sel.innerHTML = '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">'
     + '<div>'
-    + '<div style="font-size:13px;font-weight:700;">' + name + '</div>'
-    + '<div class="js-lbl-sm" class="mt-4">' + appId + '</div>'
+    + '<div style="font-size:13px;font-weight:700;">' + escapeHtml(name) + '</div>'
+    + '<div class="js-lbl-sm" class="mt-4">' + escapeHtml(appId) + '</div>'
     + '</div>'
     + '<div class="flex-g8">'
     + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:' + statusBg + ';color:' + statusColor + ';">' + statusLabel + '</span>'

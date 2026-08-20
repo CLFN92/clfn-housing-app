@@ -706,8 +706,10 @@ function renderMatchView(){
 
   var rows = _matchRows.map(function(app, i){
     var best = _allocatedUnit(app);
-    var name = ((app.fn||'')+' '+(app.ln||'')).trim();
-    var curAddr = _currentTenancyAddr(app);   // current home address, if resolvable
+    // Escaped at source — applicant names/addresses can originate from the
+    // public portal, and this row HTML is built by string concatenation.
+    var name = escapeHtml(((app.fn||'')+' '+(app.ln||'')).trim());
+    var curAddr = escapeHtml(_currentTenancyAddr(app) || '');   // current home address, if resolvable
     var isTransfer = (app.appType === 'transfer_request') || !!curAddr;  // current tenant moving
     var tCol = tierColor[app.tier] || '#6b7280';
     var tier = (app.tier||'Low Priority').replace(' Priority','');
@@ -785,8 +787,8 @@ function renderMatchView(){
   // than an inline onclick, so both views share one wiring path.
   function _matchCardHtml(app, i){
     var best = _allocatedUnit(app);
-    var name = ((app.fn||'')+' '+(app.ln||'')).trim();
-    var curAddr = _currentTenancyAddr(app);
+    var name = escapeHtml(((app.fn||'')+' '+(app.ln||'')).trim());
+    var curAddr = escapeHtml(_currentTenancyAddr(app) || '');
     var isTransfer = (app.appType === 'transfer_request') || !!curAddr;
     var tCol = tierColor[app.tier] || '#6b7280';
     var tier = (app.tier||'Low Priority').replace(' Priority','');
@@ -886,7 +888,7 @@ function _matchDeleteApp(appId){
   if(typeof showConfirm === 'function'){
     showConfirm({
       title:       'Delete application?',
-      message:     'Remove <strong>'+name+'</strong> from the match list? The application is archived (hidden from active lists) and its record is preserved in the audit trail.',
+      message:     'Remove <strong>'+escapeHtml(name)+'</strong> from the match list? The application is archived (hidden from active lists) and its record is preserved in the audit trail.',
       confirmText: 'Delete',
       danger:      true
     }).then(function(ok){ if(ok) doIt(); });
@@ -1233,23 +1235,33 @@ function tenantSearchFilter(q) {
 
   if(!filtered.length) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">'
-      + (q ? 'No tenants found matching "'+q+'"' : 'No assigned tenants on file.')
+      + (q ? 'No tenants found matching "'+escapeHtml(q)+'"' : 'No assigned tenants on file.')
       + '</div>';
     return;
   }
 
-  container.innerHTML = filtered.map(function(r) {
+  // Rows are keyed by INDEX into a module-level results array instead of the
+  // old JSON.stringify(...).replace(/"/g,"'") inline-onclick hack — that broke
+  // with a SyntaxError on any name/address containing an apostrophe (O'Brien)
+  // and injected the raw strings into the handler. Display strings are escaped.
+  window._tenSearchResults = filtered;
+  container.innerHTML = filtered.map(function(r, _ri) {
     var bg = r.status==='reserved' ? '#faf5ff' : 'var(--info-blue-bg)';
-    return '<div onclick="selectTenantRecord('+JSON.stringify({id:r.id,name:r.name,addr:r.addr,appId:r.appId}).replace(/"/g,"'")+')" '
+    return '<div onclick="_selTenantRec('+_ri+')" '
       + 'style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:7px;cursor:pointer;background:'+bg+';margin-bottom:6px;transition:opacity .1s;" '
       + 'onmouseover="this.style.opacity=\'0.8\'" onmouseout="this.style.opacity=\'1\'">'
       + '<div style="width:36px;height:36px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
-      + (r.name ? r.name.charAt(0).toUpperCase() : '?') + '</div>'
-      + '<div><div class="js-txt-bold">'+r.name+'</div>'
-      + '<div class="js-lbl-sm">'+r.addr+'</div></div>'
+      + escapeHtml(r.name ? r.name.charAt(0).toUpperCase() : '?') + '</div>'
+      + '<div><div class="js-txt-bold">'+escapeHtml(r.name)+'</div>'
+      + '<div class="js-lbl-sm">'+escapeHtml(r.addr)+'</div></div>'
       + '</div>';
   }).join('');
 }
+// Click hand-off for the tenant-search rows above.
+window._selTenantRec = function(i){
+  var rec = (window._tenSearchResults || [])[i];
+  if (rec && typeof selectTenantRecord === 'function') selectTenantRecord(rec);
+};
 
 function showInventoryForRole() {
   var role = window.currentRole || 'housing_employee_l1';
@@ -1628,7 +1640,7 @@ function showHousingKpiDrilldown(type) {
     headers:   exportHeaders,
     rows:      exportRows,
     colWidths: exportColWidths,
-    filename:  'CLFN_' + (title||type).replace(/[^a-zA-Z0-9]+/g,'_') + '_' + today
+    filename:  nationShort() + '_' + (title||type).replace(/[^a-zA-Z0-9]+/g,'_') + '_' + today
   };
 
   var existing = document.getElementById('modalHousingKpiDrill');
@@ -1761,7 +1773,7 @@ function showLikelyHousedReport(){
     headers:   ['Applicant','Current Address','Status','Score'],
     rows:      list.map(function(x){ return [(x.app.fn||'')+' '+(x.app.ln||''), x.addr, STATUS_LBL(x.app), x.app.score||0]; }),
     colWidths: [30,34,20,10],
-    filename:  'CLFN_Likely_Already_Housed_' + today
+    filename:  nationShort() + '_Likely_Already_Housed_' + today
   };
 
   var existing = document.getElementById('modalLikelyHoused');
@@ -2004,7 +2016,7 @@ function showReconcileReport(){
     headers:   ['Unit','State','Status field'],
     rows:      gap.map(function(u){ return [uAddr(u), (u.status||'(none)'), u.status||'']; }),
     colWidths: [40,30,30],
-    filename:  'CLFN_Unit_Reconciliation_' + new Date().toISOString().slice(0,10)
+    filename:  nationShort() + '_Unit_Reconciliation_' + new Date().toISOString().slice(0,10)
   };
 
   var existing = document.getElementById('modalReconcile');

@@ -1545,7 +1545,7 @@ async function confirmAward() {
   if (_elig.length && typeof showConfirm === 'function') {
     var _go = await showConfirm({
       title:       'Contractor eligibility',
-      message:     ((ct && ct.name) || 'This contractor') + ' is ' + _elig.join('; ') + '. Award anyway?',
+      message:     escapeHtml((ct && ct.name) || 'This contractor') + ' is ' + escapeHtml(_elig.join('; ')) + '. Award anyway?',
       confirmText: 'Award anyway', cancelText: 'Cancel'
     });
     if (!_go) return;   // leave the award modal open so they can pick another
@@ -1561,7 +1561,7 @@ async function confirmAward() {
   var proceed  = (typeof showConfirm === 'function')
     ? await showConfirm({
         title:       'Awarded',
-        message:     ((ct && ct.name) || 'Contractor') + ' awarded ' + amtLabel + '. Set up the contract now?',
+        message:     escapeHtml((ct && ct.name) || 'Contractor') + ' awarded ' + amtLabel + '. Set up the contract now?',
         confirmText: 'Set up contract →', cancelText: 'Later'
       })
     : false;
@@ -1589,7 +1589,7 @@ async function _rfqManualAward() {
   if (!_rfqCurrentId) { showToast('Save the RFQ first'); return; }
   var ct   = (window._contractors || []).find(function(c){ return c && c.id === ctId; });
   var elig = (typeof _rfqContractorEligibility === 'function') ? _rfqContractorEligibility(ct) : [];
-  var msg  = ((ct && ct.name) || 'This contractor') + ' will be recorded as the awarded contractor for '
+  var msg  = escapeHtml((ct && ct.name) || 'This contractor') + ' will be recorded as the awarded contractor for '
            + _rfqFmtMoney(amt) + '. <strong>No emails will be sent</strong>, and the linked SOW will be marked approved.'
            + (elig.length ? '<br><br>Note: ' + escapeHtml((ct && ct.name) || 'the contractor') + ' is ' + escapeHtml(elig.join('; ')) + '.' : '');
   if (typeof showConfirm === 'function') {
@@ -2735,7 +2735,7 @@ async function generateContractorContract() {
     var _sigNote = _noSigs.length ? ' Signatures are not captured (' + _noSigs.join(', ') + ') — you can sign on paper and re-generate.' : '';
     var _goAward = await showConfirm({
       title:       'Generate & Award Contract?',
-      message:     'This will generate the contract, award this RFQ to ' + (_ct0.name || 'the selected contractor') + ', and approve the linked maintenance request.' + _sigNote + ' Continue?',
+      message:     'This will generate the contract, award this RFQ to ' + escapeHtml(_ct0.name || 'the selected contractor') + ', and approve the linked maintenance request.' + _sigNote + ' Continue?',
       confirmText: 'Generate & Award', cancelText: 'Cancel'
     });
     if (!_goAward) return;

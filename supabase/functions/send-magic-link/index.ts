@@ -99,7 +99,7 @@ serve(async (req) => {
       '<p style="font-size:14px;line-height:1.65;color:#374151;margin:0 0 20px;">Click below to sign in to the ' + nationName +
       ' Housing system. This link is single-use and expires shortly - open it on the device you want to sign in on.</p>' +
       '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:' + btnColor + ';">' +
-      '<a href="' + actionLink + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:#111827;text-decoration:none;border-radius:8px;">Sign in</a>' +
+      '<a href="' + esc(actionLink) + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:#111827;text-decoration:none;border-radius:8px;">Sign in</a>' +
       '</td></tr></table>' +
       (expiryStr
         ? '<p style="font-size:13px;line-height:1.6;color:#374151;margin:22px 0 0;"><strong>Your access is valid until ' + esc(expiryStr) +

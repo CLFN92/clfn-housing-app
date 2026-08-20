@@ -1180,7 +1180,7 @@ function confirmAssignment() {
     if(typeof showConfirm === 'function' && typeof openTenantCard === 'function'){
       showConfirm({
         title:   'Assigned — generate the agreement?',
-        message: name + ' is assigned to ' + addr + '. Generate the occupancy agreement now?',
+        message: escapeHtml(name) + ' is assigned to ' + escapeHtml(addr) + '. Generate the occupancy agreement now?',
         confirmText: 'Generate Agreement →', cancelText: 'Later'
       }).then(function(ok){
         if(ok){ window._ticAutoLease = 'residential_lease'; openTenantCard(u.id); }

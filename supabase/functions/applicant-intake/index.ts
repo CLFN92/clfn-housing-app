@@ -107,8 +107,12 @@ function isSafeRedirect(u: string): boolean {
     const h = url.hostname
     const localOk = (h === 'localhost' || h === '127.0.0.1')
     if (url.protocol !== 'https:' && !localOk) return false
-    return h === 'fnhub.app' || h.endsWith('.fnhub.app')
-        || h.endsWith('.pages.dev') || h.endsWith('.workers.dev') || localOk
+    // Our own hosts ONLY. The old wildcard *.pages.dev / *.workers.dev
+    // acceptance meant ANY attacker-registered Cloudflare Pages/Workers
+    // subdomain was an accepted post-auth redirect target (open-redirect
+    // token leak; Supabase's own uri_allow_list was the only real gate).
+    // Mirrors support-login's safeRedirect.
+    return h === 'fnhub.app' || h.endsWith('.fnhub.app') || localOk
   } catch { return false }
 }
 

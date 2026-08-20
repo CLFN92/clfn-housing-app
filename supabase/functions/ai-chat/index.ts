@@ -31,6 +31,7 @@ const MAX_TOOL_TURNS = 6    // hard cap on the tool-use loop
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 function json(body: Record<string, unknown>, status = 200): Response {
@@ -96,7 +97,7 @@ const TABLES: Record<string, TableDef> = {
   },
   housing_projects: {
     roles: ALL,
-    cols: 'id, project_number (CP-YYYY-NN, e.g. CP-2026-01), name, type (lot_development|house_build|mixed|commercial_building|band_building|infrastructure), status (planning|active|on_hold|completed|cancelled), funding_source, budget, start_date, target_date, archived, created_at. These are CAPITAL PROJECTS (funded initiatives like "build 5 houses" or "develop 20 lots") - NOT the SOW-YYYY-NN "Project #" on maintenance requests. Milestones, expenses, grants, payment requests, PO/department numbers, and the cost-allocation snapshot live in a `data` jsonb: poNumber, deptNumber, grants[] (source, reference, amount - a project can have several grants; budget = their sum), milestones[] (budgetAmount = per-milestone P&L budget), expenses[] (amount; vendor + contractorId when the payee is a registered contractor, else vendorAddress/vendorPhone for manual vendors; docs{invoice,eft,bank} = funder-compliance attachments; claimedIn/claimedNumber = which payment request billed it), paymentRequests[] (number REQ-NN, funder, expenseIds, total), allocation. Use select=* to read them and sum expenses[].amount for spend-to-date.',
+    cols: 'id, project_number (CP-YYYY-NN, e.g. CP-2026-01), name, type (lot_development|house_build|mixed|commercial_building|band_building|infrastructure), status (planning|active|on_hold|completed|cancelled), funding_source, budget, start_date, target_date, archived, created_at. These are CAPITAL PROJECTS (funded initiatives like "build 5 houses" or "develop 20 lots") - NOT the SOW-YYYY-NN "Project #" on maintenance requests. Milestones, expenses, grants, payment requests, PO/department numbers, and the cost-allocation snapshot live in a `data` jsonb: poNumber, deptNumber, grants[] (source, reference, amount - a project can have several grants; budget = their sum), milestones[] (budgetAmount = per-milestone P&L budget), expenses[] (amount; vendor + contractorId when the payee is a registered contractor, else vendorAddress/vendorPhone for manual vendors; docs{invoice,eft,bank} = funder-compliance attachments), paymentRequests[] (number REQ-NN, funder, expenseIds, total), allocation. Which payment request billed an expense is DERIVED: an expense id appearing in a paymentRequests[].expenseIds list (do not look for claimedIn/claimedNumber fields - no longer written). Use select=* to read them and sum expenses[].amount for spend-to-date.',
   },
   housing_project_lots: {
     roles: ALL,
@@ -112,7 +113,9 @@ const TABLES: Record<string, TableDef> = {
   },
 }
 
-const SAFE_OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in', 'is', 'not']
+// NOTE: 'not' removed -- PostgREST's `not` is a modifier PREFIX (not.eq.x),
+// not a standalone op, so `col=not.<value>` was malformed and silently errored.
+const SAFE_OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in', 'is']
 
 function schemaHintFor(role: string): string {
   const lines: string[] = []
@@ -153,8 +156,14 @@ async function runQuery(role: string, email: string, input: Record<string, unkno
 
   const params: string[] = []
 
+  // SECURITY: no parentheses/colons in select. PostgREST resource EMBEDDING
+  // (select=*,finance_rent_ledger(*)) runs with the service-role key and only
+  // the BASE table's role is checked above, so allowing '(' let any staff role
+  // read MGMT/finance-only tables through an embedded relation. Embedding is
+  // never needed here -- the schema hints tell the model to use select=* and
+  // read jsonb fields client-side.
   let select = String(input.select || '*').trim()
-  if (!/^[a-z0-9_,*().: ]+$/i.test(select)) select = '*'
+  if (!/^[a-z0-9_,* ]+$/i.test(select)) select = '*'
   params.push('select=' + encodeURIComponent(select))
 
   for (const f of access.forced) params.push(f)

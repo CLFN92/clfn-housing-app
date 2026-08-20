@@ -1176,7 +1176,7 @@ function promptTenantNote(fullName, opts) {
   if (!fullName || typeof showPrompt !== 'function') return Promise.resolve(false);
   return showPrompt({
     title:       opts.title || 'Add a note (optional)',
-    message:     opts.message || ('Add a quick note for ' + fullName + '. Leave blank to skip.'),
+    message:     opts.message || ('Add a quick note for ' + escapeHtml(fullName) + '. Leave blank to skip.'),
     placeholder: opts.placeholder || 'Type a note…',
     multiline:   true,
     confirmText: opts.confirmText || 'Save note',
@@ -1975,6 +1975,9 @@ function sigBlock(label, pName, title, dt, imgSrc) {
 }
 
 function _buildContractorAgreementHTML(ct) {
+  // Print-window HTML is same-origin — escape every stored contractor field
+  // (an injected name/address executed in the popup otherwise).
+  var _esc2 = function(v){ return escapeHtml(v == null || v === '' ? '—' : String(v)); };
   var today = new Date().toLocaleDateString('en-CA');
   var logoSrc = (document.querySelector('.app-logo img')||{}).src || '';
   var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
@@ -2038,12 +2041,12 @@ function _buildContractorAgreementHTML(ct) {
     /* Company Information */
     +'<div class="section"><div class="section-title">Contractor Information</div>'
     +'<div class="section-body"><div class="grid-3">'
-      +'<div class="field"><label>Company / Name</label><span>'+(ct.name||'—')+'</span></div>'
-      +'<div class="field"><label>Trade / Specialty</label><span>'+(ct.trade||'—')+'</span></div>'
-      +'<div class="field"><label>HST / Business #</label><span>'+(ct.hst||'—')+'</span></div>'
+      +'<div class="field"><label>Company / Name</label><span>'+_esc2(ct.name)+'</span></div>'
+      +'<div class="field"><label>Trade / Specialty</label><span>'+_esc2(ct.trade)+'</span></div>'
+      +'<div class="field"><label>HST / Business #</label><span>'+_esc2(ct.hst)+'</span></div>'
       +'<div class="field"><label>Phone</label><span>'+(ct.phone?formatPhone(ct.phone):'—')+'</span></div>'
-      +'<div class="field"><label>Email</label><span>'+(ct.email||'—')+'</span></div>'
-      +'<div class="field"><label>Address</label><span>'+(ct.address||'—')+'</span></div>'
+      +'<div class="field"><label>Email</label><span>'+_esc2(ct.email)+'</span></div>'
+      +'<div class="field"><label>Address</label><span>'+_esc2(ct.address)+'</span></div>'
     +'</div></div></div>'
 
     /* Classification */
@@ -2052,18 +2055,18 @@ function _buildContractorAgreementHTML(ct) {
       +'<div class="field"><label>Classification</label>'
         +'<span class="class-badge">'+classLabel+'</span>'
       +'</div>'
-      +(ct.classProof ? '<div class="field" style="margin-top:8px;"><label>Proof of Indigenous Ownership</label><span>'+ct.classProof+'</span></div>' : '')
+      +(ct.classProof ? '<div class="field" style="margin-top:8px;"><label>Proof of Indigenous Ownership</label><span>'+_esc2(ct.classProof)+'</span></div>' : '')
     +'</div></div>'
 
     /* Compliance */
     +'<div class="section"><div class="section-title">Compliance &amp; Insurance</div>'
     +'<div class="section-body"><div class="grid-3">'
-      +'<div class="field"><label>WSIB Account #</label><span>'+(ct.wsibNum||'—')+'</span></div>'
-      +'<div class="field"><label>WSIB Expiry</label><span>'+(ct.wsibExpiry||'—')+'</span></div>'
+      +'<div class="field"><label>WSIB Account #</label><span>'+_esc2(ct.wsibNum)+'</span></div>'
+      +'<div class="field"><label>WSIB Expiry</label><span>'+_esc2(ct.wsibExpiry)+'</span></div>'
       +'<div class="field"></div>'
-      +'<div class="field"><label>Insurance Provider</label><span>'+(ct.insProvider||'—')+'</span></div>'
-      +'<div class="field"><label>Policy #</label><span>'+(ct.insPolicy||'—')+'</span></div>'
-      +'<div class="field"><label>Coverage / Expiry</label><span>'+(ct.insAmount||'—')+' · '+(ct.insExpiry||'—')+'</span></div>'
+      +'<div class="field"><label>Insurance Provider</label><span>'+_esc2(ct.insProvider)+'</span></div>'
+      +'<div class="field"><label>Policy #</label><span>'+_esc2(ct.insPolicy)+'</span></div>'
+      +'<div class="field"><label>Coverage / Expiry</label><span>'+_esc2(ct.insAmount)+' · '+_esc2(ct.insExpiry)+'</span></div>'
     +'</div></div></div>'
 
     /* Terms of Reference */
@@ -3811,10 +3814,12 @@ function ctRenderPeople(people) {
     return;
   }
   list.innerHTML = window._ctPeople.map(function(p, i) {
+    // value attributes escaped — a stored name/email containing a double quote
+    // (or an injected payload) broke out of the attribute otherwise.
     return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">'
-      +'<input type="text"  class="ct-person-name"  data-pi="'+i+'" value="'+(p.name||'')+'"  placeholder="Full name"  style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
-      +'<input type="tel"   class="ct-person-phone" data-pi="'+i+'" value="'+(p.phone?formatPhone(p.phone):'')+'" placeholder="(705)-000-0000" oninput="fmtPhone(this)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
-      +'<input type="email" class="ct-person-email" data-pi="'+i+'" value="'+(p.email||'')+'" placeholder="Email"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="text"  class="ct-person-name"  data-pi="'+i+'" value="'+escapeHtml(p.name||'')+'"  placeholder="Full name"  style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="tel"   class="ct-person-phone" data-pi="'+i+'" value="'+escapeHtml(p.phone?formatPhone(p.phone):'')+'" placeholder="(705)-000-0000" oninput="fmtPhone(this)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="email" class="ct-person-email" data-pi="'+i+'" value="'+escapeHtml(p.email||'')+'" placeholder="Email"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
       +'<button type="button" onclick="ctRemovePerson('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;" title="Remove">✕</button>'
       +'</div>';
   }).join('');
@@ -4792,11 +4797,11 @@ function printWorkOrder(){
     +'<div class="section-title">Project Information</div>'
     +'<div class="section-body">'
       +'<div class="grid-2" style="margin-bottom:10px;">'
-        +'<div class="field"><label>Unit Address</label><span>'+( address||'—')+'</span></div>'
-        +'<div class="field"><label>Tenant</label><span>'+(tenantName||'—')+'</span></div>'
+        +'<div class="field"><label>Unit Address</label><span>'+esc(address||'—')+'</span></div>'
+        +'<div class="field"><label>Tenant</label><span>'+esc(tenantName||'—')+'</span></div>'
         +'<div class="field"><label>Tenant Phone</label><span>'+esc(get('sow_tenant_phone')||'—')+'</span></div>'
-        +'<div class="field"><label>Contractor</label><span>'+(contractor||'—')+'</span></div>'
-        +'<div class="field"><label>Issued By</label><span>'+(preparedBy||'—')+'</span></div>'
+        +'<div class="field"><label>Contractor</label><span>'+esc(contractor||'—')+'</span></div>'
+        +'<div class="field"><label>Issued By</label><span>'+esc(preparedBy||'—')+'</span></div>'
         +'<div class="field"><label>Start Date</label><span>'+(startDate||'—')+'</span></div>'
         +'<div class="field"><label>Completion Date</label><span>'+(endDate||'—')+'</span></div>'
       +'</div>'
@@ -5806,9 +5811,10 @@ function renderRenosView(){
         ?'<div style="font-size:12px;font-weight:600;margin-bottom:3px;">'+(prog.status||'No updates yet')+(pct?' — '+pct+'%':'')+'</div>'
           +'<div style="height:4px;width:100px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div>'
         :'<span class="js-lbl-sm">No request filed</span>';
-      var ctName=sow&&sow.contractor?sow.contractor:'—';
-      return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+u.id+'">'
-        +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:var(--danger);':'')+'">'+u.num+' '+u.street+'</td>'
+      // Address/contractor escaped like the cards branch (_rnEsc) already does.
+      var ctName=sow&&sow.contractor?_rnEsc(sow.contractor):'—';
+      return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+_rnEsc(u.id)+'">'
+        +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:var(--danger);':'')+'">'+_rnEsc((u.num||'')+' '+(u.street||''))+'</td>'
         +'<td style="padding:10px 10px;text-align:center;font-weight:700;">'+u.bedrooms+'</td>'
         +'<td class="pad-10">'+statusPill+'</td>'
         +'<td class="pad-10">'+progressCell+'</td>'
@@ -7970,23 +7976,26 @@ function sowContractorSearch(q) {
       +'</div>');
   }
 
+  // Names/trades/query escaped — a contractor name containing a double quote
+  // broke the data-ct-name attribute (wrong name written onto the request), and
+  // an HTML payload in name/trade/q executed in the dropdown.
   rows = rows.concat(matches.map(function(c){
-    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" onmousedown="sowSelectContractor(this)" '
+    return '<div data-ct-name="'+escapeHtml(c.name)+'" data-ct-id="'+escapeHtml(c.id||'')+'" onmousedown="sowSelectContractor(this)" '
       +'style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<div style="font-weight:600;">'+c.name+'</div>'
-      +(c.trade?'<div class="js-lbl-sm">'+c.trade+'</div>':'')
+      +'<div style="font-weight:600;">'+escapeHtml(c.name)+'</div>'
+      +(c.trade?'<div class="js-lbl-sm">'+escapeHtml(c.trade)+'</div>':'')
       +'</div>';
   }));
 
   if(!matches.length && term) {
     rows.push('<div style="padding:9px 14px;font-size:12px;color:var(--muted);">'
-      +'No contractor matching "'+q+'" found.</div>');
+      +'No contractor matching "'+escapeHtml(q)+'" found.</div>');
   }
   rows.push('<div onmousedown="sowAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
     +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
     +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +(term&&!matches.length?'Add "'+q+'" as new contractor':'Add new contractor')
+    +(term&&!matches.length?'Add "'+escapeHtml(q)+'" as new contractor':'Add new contractor')
     +'</div>');
 
   dd.innerHTML = rows.join('');
@@ -8064,7 +8073,12 @@ function userLookupDebounce(){
 //  current renderWorklist builds its own markup and calls none of them. See
 //  DEAD_CODE_AUDIT.md.)
 function wlOpenApp(el) {
-  var id = el.getAttribute('data-wl-id') || (el.closest('[data-wl-id]') && el.closest('[data-wl-id]').getAttribute('data-wl-id'));
+  // Accepts an application id STRING (the only live caller — selectTenantRecord
+  // — passes rec.appId; the old element-only signature made every such click
+  // throw a TypeError) or a legacy element carrying data-wl-id.
+  var id = (typeof el === 'string')
+    ? el
+    : (el && el.getAttribute && (el.getAttribute('data-wl-id') || (el.closest && el.closest('[data-wl-id]') && el.closest('[data-wl-id]').getAttribute('data-wl-id'))));
   if(!id) return;
   var apps = typeof applications !== 'undefined' ? applications : [];
   var app = apps.find(function(x){ return x.id === id; });
@@ -8662,12 +8676,14 @@ function rpContractorSearch(q) {
     ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term) || (c.trade||'').toLowerCase().includes(term); })
     : contractors;
 
+  // Escaped for the same reasons as sowContractorSearch (attribute breakage +
+  // stored XSS via contractor name/trade, reflected q).
   var rows = matches.map(function(c) {
-    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
+    return '<div data-ct-name="'+escapeHtml(c.name)+'" data-ct-id="'+escapeHtml(c.id||'')+'" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
       +'onmousedown="rpSelectContractor(this)" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<div style="font-weight:600;">'+c.name+'</div>'
-      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
+      +'<div style="font-weight:600;">'+escapeHtml(c.name)+'</div>'
+      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+escapeHtml(c.trade)+'</div>':'')
       +'</div>';
   });
 
@@ -8675,7 +8691,7 @@ function rpContractorSearch(q) {
   rows.push('<div onmousedown="rpAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
     +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
     +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +(term && !matches.length ? 'Add "'+q+'" as new contractor' : 'Add new contractor')
+    +(term && !matches.length ? 'Add "'+escapeHtml(q)+'" as new contractor' : 'Add new contractor')
     +'</div>');
 
   dd.innerHTML = rows.join('');

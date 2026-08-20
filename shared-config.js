@@ -753,6 +753,14 @@ window.nationEmailDomain = function nationEmailDomain(){
   return (window.NATION_CONFIG && NATION_CONFIG.email_domain) || '';
 };
 
+// Single accessor for the nation's registry id (the NATIONS_DIRECTORY key,
+// e.g. 'clfn'). Returns '' when unresolvable — consumers that WRITE rows keyed
+// by nation must treat empty as "don't write", never substitute another
+// nation's id (OCAP).
+window.nationId = function nationId(){
+  return (window.NATION_CONFIG && NATION_CONFIG.id) || '';
+};
+
 // ── Legacy settings-blob recovery ─────────────────────────────────────────
 // An old bug saved the HM approval threshold by serializing the ENTIRE
 // _appSettings map under one housing_settings row keyed 'app_settings'. Boot

@@ -1025,11 +1025,14 @@ function _auditFmtDetail(s) {
     var subj = m[2].trim().replace(/^.*?Housing\s*[—–-]\s*/i, '').trim(); // drop brand prefix
     s = '✉ ' + to + (subj ? ' · ' + subj : '');
   }
-  return s.replace(/\bApplication\b/g, 'App')
+  s = s.replace(/\bApplication\b/g, 'App')
           .replace(/\bMaintenance Request\b/gi, 'MR')
           .replace(/\bReceived\b/g, "Rec'd")
           .replace(/\bReference\b/gi, 'Ref')
           .replace(/\bNumber\b/gi, 'No.');
+  // Detail strings embed user-controlled names/addresses (incl. portal-origin)
+  // and land in innerHTML — escape on the way out.
+  return (typeof escapeHtml === 'function') ? escapeHtml(s) : s;
 }
 
 // Labels for the separate finance_audit_log (occurred_at / actor_* / summary).

@@ -170,7 +170,7 @@
       +   _fieldRow('CTA text', 'lbl_cta', c.cta_text || 'SCAN TO REPORT AN ISSUE', 'SCAN TO REPORT AN ISSUE')
       +   _fieldRow('Housing email', 'lbl_email', c.housing_email, 'housing@nation.ca', 'email')
       +   _fieldRow('Housing phone', 'lbl_phone', c.housing_phone, '705-555-1234')
-      +   _fieldRow('Default community', 'lbl_comm', c.default_community, 'Constance Lake')
+      +   _fieldRow('Default community', 'lbl_comm', c.default_community, (typeof nationDisplay === 'function' ? nationDisplay() : ''))
       +   _fieldRow('QR base URL', 'lbl_qrbase', c.qr_base_url, qrBase())
       + '</div>'
       + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;">'
@@ -330,11 +330,20 @@
   window._lblAddContact = function () { if (S.contacts.length < 3) { S.contacts.push({ label: '', phone: '' }); render(); } };
   window._lblRemoveContact = function (i) { if (S.contacts.length > 2) { S.contacts.splice(i, 1); render(); } };
 
+  // Nation id for label rows: saved config row -> nation registry id. NEVER a
+  // hardcoded nation literal (multi-tenant hard rule) — writing another
+  // nation's id silently cross-tenants label config/print history. Empty =
+  // refuse to write.
+  function _lblNation(){
+    return (S.cfg && S.cfg.nation_id) || (typeof nationId === 'function' ? nationId() : '') || '';
+  }
+
   window._lblSaveConfig = async function () {
     if (!isAdmin()) { toast('Only the ED can change label settings'); return; }
+    if (!_lblNation()) { toast('Nation is not configured — cannot save label settings', { type: 'error' }); return; }
     var g = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
     var row = {
-      nation_id: (S.cfg && S.cfg.nation_id) || 'clfn',
+      nation_id: _lblNation(),
       department_label: g('lbl_dept') || null,
       cta_text: g('lbl_cta') || 'SCAN TO REPORT AN ISSUE',
       housing_email: g('lbl_email') || null,
@@ -367,10 +376,11 @@
     var clean = S.contacts.map(function (c) { return { label: (c.label || '').trim(), phone: (c.phone || '').trim() }; })
       .filter(function (c) { return c.label || c.phone; });
     if (clean.length < 2 || clean.length > 3) { toast('Enter 2 or 3 emergency contacts', { type: 'error' }); return; }
+    if (!_lblNation()) { toast('Nation is not configured — cannot save contacts', { type: 'error' }); return; }
     try {
       var r = await fetch(SUPABASE_URL + '/rest/v1/rpc/set_emergency_contacts', {
         method: 'POST', headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ p_contacts: clean, p_nation: (S.cfg && S.cfg.nation_id) || 'clfn' })
+        body: JSON.stringify({ p_contacts: clean, p_nation: _lblNation() })
       });
       if (!r.ok) { var t = await r.text(); toast('Could not save contacts' + (/2 or 3/.test(t) ? ' — need 2 or 3' : (/emergency_contacts/.test(t) ? ' — run the labels migration first' : '')), { type: 'error' }); return; }
       S.contacts = clean;
@@ -407,7 +417,7 @@
     try {
       await fetch(SUPABASE_URL + '/rest/v1/rpc/record_label_prints', {
         method: 'POST', headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ p_unit_ids: unitIds, p_output: output, p_substrate: substrate || null, p_notes: notes || null, p_nation: (S.cfg && S.cfg.nation_id) || 'clfn' })
+        body: JSON.stringify({ p_unit_ids: unitIds, p_output: output, p_substrate: substrate || null, p_notes: notes || null, p_nation: _lblNation() })
       });
       if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'label_prints_recorded', 'Printed ' + unitIds.length + ' label(s) [' + output + ']', window.currentRole || 'ed');
     } catch (e) { /* history is best-effort; never block the print */ }

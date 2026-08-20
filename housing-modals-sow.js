@@ -768,8 +768,8 @@ function _openSowPicker(unitId, activeList) {
           + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:' + ss.bg + ';color:' + ss.c + ';">' + ss.label + '</span>'
           + '<span style="font-size:10px;color:var(--muted);">' + date + '</span>'
         + '</div>'
-        + (contractor ? '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">👷 ' + contractor + '</div>' : '')
-        + (scopePreview ? '<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + scopePreview + '</div>' : '')
+        + (contractor ? '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">👷 ' + escapeHtml(contractor) + '</div>' : '')
+        + (scopePreview ? '<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(scopePreview) + '</div>' : '')
         + '<div style="font-size:12px;font-weight:700;color:var(--text);margin-top:4px;">' + amount + '</div>'
       + '</div>'
       + '<button data-pick-pn="' + pn + '" style="flex-shrink:0;background:var(--yellow);border:none;color:var(--dark);padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Open →</button>'

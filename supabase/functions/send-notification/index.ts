@@ -342,6 +342,12 @@ serve(async (req: Request) => {
       error: "Required fields: to, subject, and one of message|html|bodyHtml",
     }, 400);
   }
+  // Recipient must be a plausible single email address. Previously unvalidated:
+  // any staff JWT could pass an arbitrary string straight into the provider
+  // payload (header-injection / provider-error surface from the nation mailbox).
+  if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(to).trim())) {
+    return jsonResponse({ error: "Invalid recipient address" }, 400);
+  }
 
   // Compose body - three modes, in priority order:
   //   1. `html`     - caller supplies a complete document, used as-is
