@@ -36,6 +36,31 @@ window.housingUnits = window.housingUnits || [];
 var DEFAULT_V2_TIERS = { critical: 80, high: 60, medium: 40 };
 window.liveV2ScoreModel = window.liveV2ScoreModel || {};
 window.liveV2Tiers      = window.liveV2Tiers      || Object.assign({}, DEFAULT_V2_TIERS);
+
+// ── Single tier resolver + palettes ────────────────────────────────────────
+// tierFor(score) is THE tier derivation — always reads the ED-adjustable
+// liveV2Tiers thresholds. Four drifted copies used to exist (calcScore
+// hardcoded 80/60/40 and ignored the ED's settings entirely; triggerV2Score,
+// tierColor, and scoreApplicationLocally each re-derived their own), so the
+// same score could label differently between the V1 and V2 display paths.
+// Two palettes are deliberate: tierColorDark for pills on the dark scorecard
+// header, tierColor (below, light) for pills on light surfaces.
+window.tierFor = function tierFor(score) {
+  var t = window.liveV2Tiers || { critical: 80, high: 60, medium: 40 };
+  var s = Number(score) || 0;
+  return s >= t.critical ? 'Critical Priority'
+       : s >= t.high     ? 'High Priority'
+       : s >= t.medium   ? 'Medium Priority'
+       : 'Low Priority';
+};
+window.tierColorDark = function tierColorDark(tier) {
+  return ({
+    'Critical Priority': { bg:'#0d2d1a', col:'#4ade80' },
+    'High Priority':     { bg:'#0d2040', col:'#93c5fd' },
+    'Medium Priority':   { bg:'#3d3000', col:'#fcd34d' },
+    'Low Priority':      { bg:'#3d1515', col:'#f87171' }
+  })[tier] || { bg:'var(--dark3)', col:'#aaa' };
+};
 window.liveScoreModel   = window.liveScoreModel   || null;
 
 // ── Match Priority Model (ED-adjustable) ──────────────────────────────
@@ -1018,14 +1043,22 @@ function applyTenancyFieldRoles() {
 // ── Build V2 form selects from live scoring model ──────────────────────────
 function buildV2FormSelects() {
   var model = liveScoreModel;
-  // Re-read from appSettings in case they loaded after init
+  // Re-read from appSettings in case they loaded after init.
   if(window._appSettings) {
     var src = window._appSettings['scoring_model_v2'] || window._appSettings['scoring_model'];
     if(src && src.length) {
+      // Legacy V1 ARRAY format (rows with cat/label/pts).
       model = src.map(function(r) {
         if(r.pts === undefined && r.p !== undefined) return Object.assign({}, r, {pts: r.p});
         return r;
       });
+    } else if (src && typeof src === 'object' && typeof _v1RowsFromV2 === 'function') {
+      // Saved V2 OBJECT (what saveV2ScoringModel actually persists). The old
+      // `src.length` test silently skipped it, so these dropdown point labels
+      // never reflected the ED's edits. Merge over defaults, then synthesize
+      // the V1 rows this renderer needs.
+      var _eff = (typeof _effectiveV2Model === 'function') ? _effectiveV2Model() : src;
+      model = _v1RowsFromV2(_eff);
     }
   }
 
@@ -1263,45 +1296,67 @@ function calcPersonsOverStandard() {
 }
 
 
+// Resolve the effective V2 scoring model: the ED-saved liveV2ScoreModel merged
+// section-by-section over DEFAULT_V2_SCORE_MODEL (so a model saved before a
+// section/option existed still gets defaults for the gaps).
+function _effectiveV2Model() {
+  var def  = window.DEFAULT_V2_SCORE_MODEL || {};
+  var live = window.liveV2ScoreModel || {};
+  var model = {};
+  Object.keys(def).forEach(function(section){
+    model[section] = Object.assign({}, def[section], (live[section] && typeof live[section] === 'object') ? live[section] : {});
+  });
+  return model;
+}
+window._effectiveV2Model = _effectiveV2Model;
+
 function scoreApplicationLocally(app) {
-  var urgentMap = { homeless:25, domestic_violence:20, fire_disaster:20, homeless_eviction:15, eviction_risk:10, separation:10, none:0 };
-  var urgentPts = urgentMap[app.urgentNeed || 'none'] !== undefined ? urgentMap[app.urgentNeed || 'none'] : 0;
-  var healthMap = { severe:15, moderate:10, minor:5, none:0 };
-  var healthPts = healthMap[app.healthRisk || 'none'] !== undefined ? healthMap[app.healthRisk || 'none'] : 0;
+  // Every point value comes from the ED-adjustable model (Settings → Scoring),
+  // NOT hardcoded literals. The old version hardcoded all maps — the ED edited
+  // weights, got a success toast and audit row, and scoring never changed
+  // (several literals didn't even match the editor's displayed defaults).
+  // Structural behavior stays code-owned: the haveHouse gate on overcrowding,
+  // the +1/yr uncapped waitlist accrual, and the isNew→no_history routing.
+  var M = _effectiveV2Model();
+  function pts(section, key, fallbackKey){
+    var sec = M[section] || {};
+    var v = sec[key];
+    if (v === undefined && fallbackKey !== undefined) v = sec[fallbackKey];
+    return Number(v) || 0;
+  }
+  var urgentPts = pts('urgent_need', app.urgentNeed || 'none', 'none');
+  var healthPts = pts('health_risk', app.healthRisk || 'none', 'none');
   // Overcrowding only applies if the applicant has an existing house — if they
   // have no current home, "over occupancy" isn't a meaningful housing-need signal.
   var overcrowdingPts = app.haveHouse
     ? Math.min(10, Math.max(0, parseInt(app.personsOverStandard || '0') || 0))
     : 0;
-  var deps = Math.min(5, parseInt(app.dependentsUnder18 || '0') || 0);
-  var householdPts = Math.min(10, deps + (app.elderInHousehold?3:0) + (app.loneParent?3:0) + (app.householdDisability?2:0));
-  var accessMap = { high:10, moderate:5, none:0 };
-  var accessPts = accessMap[app.accessibilityNeed || 'none'] !== undefined ? accessMap[app.accessibilityNeed || 'none'] : 0;
+  var H = M.household || {};
+  var deps = Math.max(0, parseInt(app.dependentsUnder18 || '0') || 0);
+  var depPts = Math.min(Number(H.max_dependents) || 0, deps * (Number(H.per_dependent_u18) || 0));
+  var householdPts = Math.min(Number(H.max_total) || 0,
+    depPts
+    + (app.elderInHousehold   ? (Number(H.elder)       || 0) : 0)
+    + (app.loneParent         ? (Number(H.lone_parent) || 0) : 0)
+    + (app.householdDisability? (Number(H.disability)  || 0) : 0));
+  var accessPts = pts('accessibility', app.accessibilityNeed || 'none', 'none');
   // No cap — an applicant keeps accruing +1 pt for every full year on the
   // waitlist, however long that ends up being.
   var waitlistPts = 0;
   if (app.appDate) { var yrs = (Date.now() - new Date(app.appDate).getTime()) / (365.25*24*3600*1000); waitlistPts = Math.max(0, Math.floor(yrs)); }
   var sectionA = urgentPts + healthPts + overcrowdingPts + householdPts + accessPts + waitlistPts;
   var isNew = (app.noPriorTenancy === true || app.noPriorTenancy === 'true');
-  var rentMap = { excellent:10, mostly:7, occasional:5, frequent:0, no_history:6 };
-  var condMap = { excellent:10, good:7, fair:4, damage:0, no_history:7 };
-  var conductMap = { clean:5, minor:3, unresolved:0, no_history:4 };
-  var incomeMap = { stable:5, irregular:2, none:0 };
-  var rentPts    = rentMap[isNew    ? 'no_history' : (app.rentPaymentHistory || 'no_history')];
-  var condPts    = condMap[isNew    ? 'no_history' : (app.unitCondition     || 'no_history')];
-  var conductPts = conductMap[isNew ? 'no_history' : (app.tenancyConduct    || 'no_history')];
-  var incomePts  = incomeMap[app.incomeStability || 'stable'];
-  if (rentPts    === undefined) rentPts    = 6;
-  if (condPts    === undefined) condPts    = 7;
-  if (conductPts === undefined) conductPts = 4;
-  if (incomePts  === undefined) incomePts  = 5;
+  var rentPts    = pts('rent_payment',    isNew ? 'no_history' : (app.rentPaymentHistory || 'no_history'), 'no_history');
+  var condPts    = pts('unit_condition',  isNew ? 'no_history' : (app.unitCondition      || 'no_history'), 'no_history');
+  var conductPts = pts('tenancy_conduct', isNew ? 'no_history' : (app.tenancyConduct     || 'no_history'), 'no_history');
+  var incomePts  = pts('income_stability', app.incomeStability || 'stable', 'stable');
   var sectionB = rentPts + condPts + conductPts + incomePts;
-  var arrearsMap = { none:0, cleared:0, repayment:-5, no_repayment:-10 };
-  var arrearsDed = arrearsMap[app.arrearsStatus || 'none'] !== undefined ? arrearsMap[app.arrearsStatus || 'none'] : 0;
+  var arrearsDed = pts('arrears', app.arrearsStatus || 'none', 'none');
   var edAdj = parseInt(app.edAdjustment || '0') || 0;
   var finalScore = Math.max(0, sectionA + sectionB + arrearsDed + edAdj);
-  var _t = window.liveV2Tiers || { critical:80, high:60, medium:40 };
-  var tier = finalScore >= _t.critical ? 'Critical Priority' : finalScore >= _t.high ? 'High Priority' : finalScore >= _t.medium ? 'Medium Priority' : 'Low Priority';
+  var tier = (typeof tierFor === 'function') ? tierFor(finalScore)
+    : (function(){ var _t = window.liveV2Tiers || { critical:80, high:60, medium:40 };
+        return finalScore >= _t.critical ? 'Critical Priority' : finalScore >= _t.high ? 'High Priority' : finalScore >= _t.medium ? 'Medium Priority' : 'Low Priority'; })();
   return { score:finalScore, tier:tier, isNewApplicant:isNew, breakdown:{ sectionA:{ total:sectionA, urgent:urgentPts, health:healthPts, overcrowding:overcrowdingPts, household:householdPts, accessibility:accessPts, waitlist:waitlistPts }, sectionB:{ total:sectionB, rent:rentPts, condition:condPts, conduct:conductPts, income:incomePts }, arrears:arrearsDed, edAdjustment:edAdj } };
 }
 
@@ -1372,14 +1427,10 @@ function triggerV2Score() {
   try {
     var result = scoreApplicationLocally(appData);
 
-    // Apply live tier thresholds (ED-adjustable) to override Edge Function tier
+    // Tier already derived by scoreApplicationLocally via the shared tierFor()
+    // (ED-adjustable liveV2Tiers) — no separate re-derivation here.
     var _score = result.score;
-    var _t = window.liveV2Tiers || { critical: 80, high: 60, medium: 40 };
-    var _tier = _score >= _t.critical ? 'Critical Priority'
-              : _score >= _t.high     ? 'High Priority'
-              : _score >= _t.medium   ? 'Medium Priority'
-              : 'Low Priority';
-    result.tier = _tier;
+    var _tier  = result.tier;
 
     window._lastScoreResult    = result;
     window._lastScoreBreakdown = result.breakdown;
@@ -1395,15 +1446,9 @@ function triggerV2Score() {
     if (scoreShadow) scoreShadow.textContent = _score;
     if (tierEl) {
       tierEl.textContent = _tier;
-      var tierColors = {
-        'Critical Priority': { bg:'#0d2d1a', color:'#4ade80' },
-        'High Priority':      { bg:'#0d2040', color:'#93c5fd' },
-        'Medium Priority':    { bg:'#3d3000', color:'#fcd34d' },
-        'Low Priority':       { bg:'#3d1515', color:'#f87171' }
-      };
-      var tc = tierColors[_tier] || { bg:'var(--dark3)', color:'#aaa' };
+      var tc = tierColorDark(_tier);
       tierEl.style.background = tc.bg;
-      tierEl.style.color      = tc.color;
+      tierEl.style.color      = tc.col;
     }
     if (tierShadow) tierShadow.textContent = _tier;
     if (barEl) barEl.style.width = Math.min(100, Math.round(_score)) + '%';
@@ -1654,7 +1699,10 @@ function calcScore(){
   // ED Adjustment
   const edAdj=parseInt(document.getElementById('edAdjustment')?document.getElementById('edAdjustment').value||'0':'0')||0;
   const adjustedTotal=total+edAdj;
-  const adjustedTier=adjustedTotal>=80?'Critical Priority':adjustedTotal>=60?'High Priority':adjustedTotal>=40?'Medium Priority':'Low Priority';
+  // Tier from the ED-adjustable thresholds — this path hardcoded 80/60/40 and
+  // could label the same score differently from the V2 path once the ED moved
+  // a threshold.
+  const adjustedTier=tierFor(adjustedTotal);
 
   const _ts=document.getElementById('totalScore');if(_ts)_ts.textContent=adjustedTotal;
   // Also sync primary display
@@ -1662,10 +1710,7 @@ function calcScore(){
   const adjTierEl=document.getElementById('priorityTier');
   if(adjTierEl){
     adjTierEl.textContent=adjustedTier;
-    var _tc = adjustedTotal>=80 ? {bg:'#0d2d1a',col:'#4ade80'}
-            : adjustedTotal>=60 ? {bg:'#0d2040',col:'#93c5fd'}
-            : adjustedTotal>=40 ? {bg:'#3d3000',col:'#fcd34d'}
-            : {bg:'#3d1515',col:'#f87171'};
+    var _tc = tierColorDark(adjustedTier);
     adjTierEl.style.background = _tc.bg;
     adjTierEl.style.color      = _tc.col;
   }
@@ -1820,9 +1865,19 @@ function calcDuration(startInput) {
 }
 
 
-// ── Housing Unit Inventory (from SharePoint — 262 units) ──
-const HOUSING_UNITS_DATA=[];
-let housingUnits=HOUSING_UNITS_DATA.slice();
+// ── Housing Unit Inventory ──
+// The canonical array is window.housingUnits (initialized at the top of this
+// file). A top-level `let housingUnits` used to live here — global `let`
+// SHADOWS the window property for every bare-identifier reference in every
+// later script, so the app's core data split into two divergent copies: the
+// data loaders assigned the lexical binding while window.* readers (AI
+// context, Rescore All, the approval-gate sweep, portal merge, TIC cache
+// sync) saw a permanently empty array. Same story for `let applications` /
+// `let dashView` further down. Never re-add top-level let/const for shared
+// globals — use `var` (which IS the window property) or window.* explicitly.
+// (The legacy `const HOUSING_UNITS_DATA=[]` was deleted with it — as a const
+// it never created window.HOUSING_UNITS_DATA, so the `window.HOUSING_UNITS_DATA
+// || []` fallbacks elsewhere already ran on undefined and keep working.)
 
 // ── Audit Log ──
 var auditLog=[];
@@ -2006,8 +2061,9 @@ function unarchiveUnit(unitId) {
 }
 
 
-let applications=[];
-let dashView=false;
+// (top-level `let applications` / `let dashView` deleted — see the shadowing
+// note at the Housing Unit Inventory section above. window.applications is
+// initialized at the top of this file; dashView had no remaining readers.)
 
 // Load or init applications
 // Applications loaded from Supabase on login (loadAppDataFromSupabase)
@@ -2163,11 +2219,18 @@ if (!window.liveScoreModel && window.DEFAULT_SCORING_MODEL.length) {
 // If Supabase hasn't loaded the model yet (or was never saved), seed
 // liveScoreModel so New Application form dropdowns always have labelled options.
 if (!window.liveScoreModel || !window.liveScoreModel.length) {
-  var _v2 = window.DEFAULT_V2_SCORE_MODEL || {};
+  window.liveScoreModel = _v1RowsFromV2(window.DEFAULT_V2_SCORE_MODEL || {});
+}
+
+// Synthesize the V1-format row array (used by the New Application form
+// dropdown labels) from a V2 model OBJECT. Shared by the boot fallback above
+// and buildV2FormSelects, so the dropdowns reflect the ED's live edits.
+function _v1RowsFromV2(_v2) {
+  _v2 = _v2 || {};
   var _un = _v2.urgent_need || {};
   var _hr = _v2.health_risk || {};
   var _is = _v2.income_stability || {};
-  window.liveScoreModel = [
+  return [
     {id:'un1', cat:'urgent_need',      label:'None',                        pts: _un.none              || 0},
     {id:'un2', cat:'urgent_need',      label:'Overcrowding',                pts: _un.eviction_risk     || 15},
     {id:'un3', cat:'urgent_need',      label:'Eviction / Homelessness Risk',pts: _un.homeless_eviction || 20},
@@ -2185,6 +2248,7 @@ if (!window.liveScoreModel || !window.liveScoreModel.length) {
     {id:'oc1', cat:'occupancy',        label:'Per person over NOS',         pts: (_v2.household||{}).per_dependent_u18  || 2},
   ];
 }
+window._v1RowsFromV2 = _v1RowsFromV2;
 
 // ── Stubs for autoPopulateScore() ────────────────────────────────────────────
 // `livePoints(key)` and `liveAgePoints(age)` are referenced inside
