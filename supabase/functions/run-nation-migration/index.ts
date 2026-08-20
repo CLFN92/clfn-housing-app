@@ -95,8 +95,8 @@ serve(async (req) => {
 
   // Enumerate targets: active nations with a project, minus the control plane.
   const PLATFORM_REF = refFromUrl(SUPABASE_URL)
-  let q = admin.from('nations').select('subdomain, display_name, supabase_url, status')
-  const { data: nations, error: nErr } = await q
+  const { data: nations, error: nErr } = await admin
+    .from('nations').select('subdomain, display_name, supabase_url, status')
   if (nErr) return json({ error: 'lookup_failed', detail: nErr.message }, 500)
   let list = (nations || []).filter((n: any) => refFromUrl(n.supabase_url || ''))
   if (wantTargets.length) list = list.filter((n: any) => wantTargets.indexOf(String(n.subdomain).toLowerCase()) !== -1)

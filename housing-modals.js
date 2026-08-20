@@ -335,8 +335,8 @@ function openUnitEditModal(unitId){
     var _eb = document.getElementById('ue_sig_ed_badge');
     if(_eb && u.unitEdSig.decision) {
       _eb.textContent  = u.unitEdSig.decision === 'approved' ? 'Approved ✓' : u.unitEdSig.decision;
-      _eb.style.background = u.unitEdSig.decision === 'approved' ? 'var(--warn-amber-bg)' : 'var(--warn-amber-bg)';
-      _eb.style.color      = 'var(--success)';
+      _eb.style.background = u.unitEdSig.decision === 'approved' ? 'var(--success-bg)' : 'var(--warn-amber-bg)';
+      _eb.style.color      = u.unitEdSig.decision === 'approved' ? 'var(--success)' : 'var(--warn-amber-text)';
     }
   }
 
@@ -602,9 +602,27 @@ function ueUpdateBudgetRouting() {
   if(!uid) return;
 
   var limit = getHmBudgetLimit();
-  var sowData = null;
-  sowData = getSowData(uid);
-  var totalCost = sowData ? (parseFloat((sowData.totalCost||'').toString().replace(/[^0-9.]/g,''))||0) : 0;
+  // Route on the LARGEST active, not-yet-approved Maintenance Request for the
+  // unit — not just the most recently created one (getSowData). With multiple
+  // open MRs, keying off "most recent" let a small follow-up request hide a
+  // big earlier one still awaiting sign-off, collapsing the ED block.
+  var maxPending = 0, maxActive = 0;
+  var _sows = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
+  _sows.forEach(function(s){
+    if (!s || s.cancelled || s.archived) return;
+    var v = parseFloat(((s.totalCost != null ? s.totalCost : (s.amount != null ? s.amount : s.cost)) || '').toString().replace(/[^0-9.]/g, '')) || 0;
+    if (v > maxActive) maxActive = v;
+    if (s.approval_status !== 'ed_approved' && s.approval_status !== 'completed' && v > maxPending) maxPending = v;
+  });
+  // Pending requests drive the routing; if everything is already signed off,
+  // keep showing the blocks for the largest active request so existing
+  // signatures stay visible rather than collapsing.
+  var totalCost = maxPending || maxActive;
+  // Fallback for the legacy flat cache shape (getUnitSowList unavailable).
+  if (!totalCost && !_sows.length) {
+    var sowData = (typeof getSowData === 'function') ? getSowData(uid) : null;
+    totalCost = sowData ? (parseFloat((sowData.totalCost||'').toString().replace(/[^0-9.]/g,''))||0) : 0;
+  }
 
   var indicator = document.getElementById('ue_budget_indicator');
   var hmBlock   = document.getElementById('ue_sig_hm_block');
@@ -751,8 +769,10 @@ function saveUnitEdit(){
         showToast('⚠ ' + _as.reason);
         return;
       }
-      // Write back HM approval flag on unit
-      u.tenantApprovedBy = CLFN_PERMS.roleLabel(role2=== ROLE.ED ? ROLE.ED : ROLE.HOUSING_MANAGER);
+      // Record who actually gated the assignment — the saver's real role, not
+      // a forced ED/HM label (an L2 saving here used to be stamped "Housing
+      // Manager", misattributing the sign-off).
+      u.tenantApprovedBy = CLFN_PERMS.roleLabel(role2);
       u.tenantApprovedAt = new Date().toISOString().split('T')[0];
     }
   }
@@ -1382,282 +1402,8 @@ function printScorecard(){
 
 
 
-function previewFromDash(app){
-  if(!app) return;
-  var name    = ((app.fn||'')+' '+(app.ln||'')).trim() || '—';
-  var today   = new Date().toLocaleDateString('en-CA');
-  var logoSrc = (document.querySelector('.app-logo img')||{}).src || '';
-  var hasCoApp = !!(app.coApp && app.coApp.fn);
-  var hasArr   = !!app.hasArrears;
-
-  // ── helpers ──
-  function row(k, v) {
-    var val = (v !== null && v !== undefined && String(v).trim() !== '') ? v : '—';
-    return '<tr>'
-      +'<td style="padding:4px 10px;color:var(--muted);font-size:10px;font-weight:600;width:34%;'
-      +'border-bottom:1px solid var(--border);vertical-align:top;">'+k+'</td>'
-      +'<td style="padding:4px 10px;font-size:10px;border-bottom:1px solid var(--border);">'+val+'</td>'
-      +'</tr>';
-  }
-  function section(title, body) {
-    return '<div style="margin-bottom:12px;page-break-inside:avoid;">'
-      +'<div style="font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;'
-      +'color:var(--muted);border-bottom:2.5px solid var(--yellow);padding-bottom:3px;margin-bottom:0;">'
-      +title+'</div>'
-      +'<table class="std-tbl">'+body+'</table>'
-      +'</div>';
-  }
-  function yn(v) { return v ? 'Yes' : 'No'; }
-  function dollar(v) { var f=parseFloat(v)||0; return f>0 ? formatCurrency(f) : '—'; }
-
-  // ── sig block — renders the SAVED signature off the application record.
-  // `sig` is the saved {name,date,image} object (app.sig.applicant, etc.).
-  // image is a drawn data: URL, a 'typed:<name>' string, or 'wet:<ref>';
-  // falls back to a blank "Sign here" box when unsigned. fallbackName/Date
-  // fill the name/date when the sig object doesn't carry them.
-  function sigBlock(label, sig, fallbackName, fallbackDate) {
-    sig = sig || {};
-    var _esc  = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
-    var pName = sig.name || fallbackName || '';
-    var dt    = sig.date || fallbackDate || '';
-    var img   = sig.image || '';
-    var sigArea;
-    if (img.indexOf('data:') === 0) {
-      sigArea = '<img src="'+img+'" style="max-height:58px;max-width:96%;object-fit:contain;" alt="signature"/>';
-    } else if (img.indexOf('typed:') === 0) {
-      sigArea = '<span style="font-family:\'Segoe Script\',\'Brush Script MT\',cursive;font-size:20px;color:var(--text);">'+_esc(img.slice(6))+'</span>';
-    } else if (img.indexOf('wet:') === 0) {
-      var ref = img.slice(4);
-      sigArea = '<span style="font-size:9.5px;color:var(--muted);">&#10003; Signed on paper / e-sign'+((ref && ref !== 'pending') ? ' &mdash; '+_esc(ref) : '')+'</span>';
-    } else {
-      sigArea = '<span style="font-size:9px;color:var(--border);">Sign here</span>';
-    }
-    return '<div class="print-sec">'
-      +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
-      +'color:var(--muted);margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'
-      +'<div><div class="sig-lbl">Full Name</div>'
-      +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+_esc(pName)+'</div></div>'
-      +'<div><div class="sig-lbl">Date</div>'
-      +'<div style="font-size:10px;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+_esc(dt)+'</div></div>'
-      +'</div>'
-      +'<div style="width:100%;height:65px;border:1px solid var(--border);border-radius:3px;background:var(--bg);'
-      +'display:flex;align-items:center;justify-content:center;overflow:hidden;">'
-      +sigArea+'</div>'
-      +'</div>';
-  }
-  function internalSig(label) {
-    return '<div class="print-sec">'
-      +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
-      +'color:#7a5c00;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e8d87a;">'+label+'</div>'
-      +'<div class="sig-lbl">Name &amp; Title</div>'
-      +'<div style="border-bottom:1px solid var(--dark-border);height:16px;margin-bottom:8px;"></div>'
-      +'<div class="sig-lbl">Signature</div>'
-      +'<div style="border-bottom:1px solid var(--dark-border);height:52px;margin-bottom:8px;"></div>'
-      +'<div style="display:grid;grid-template-columns:1fr 90px;gap:10px;">'
-      +'<div><div class="sig-lbl">Date</div>'
-      +'<div class="sig-line"></div></div>'
-      +'<div><div class="sig-lbl">Decision</div>'
-      +'<div class="sig-line"></div></div>'
-      +'</div></div>';
-  }
-
-  // ── income body ──
-  var incBody = '';
-  if(app.incomes && app.incomes.length) {
-    app.incomes.forEach(function(inc, i) {
-      var amt = inc.primaryAmt ? dollar(inc.primaryAmt) : '—';
-      incBody += row(inc.person || ('Income '+(i+1)),
-        (inc.incomeType||'—') + (inc.primaryAmt ? ' — '+dollar(inc.primaryAmt) : '')
-        + (inc.employer ? ' · '+inc.employer : ''));
-    });
-  }
-  if(!incBody) incBody = row('Income / Employment', '—');
-
-  // ── household body ──
-  var habBody = '';
-  if(app.habitants && app.habitants.length) {
-    app.habitants.forEach(function(h, i) {
-      var nm = [(h.fn||''),(h.ln||'')].filter(Boolean).join(' ') || ('Member '+(i+1));
-      habBody += row(nm, (h.relationship||'') + (h.dob ? ' · DOB: '+h.dob : ''));
-    });
-  }
-  if(!habBody) habBody = row('Household Members', '—');
-
-  // ── references body ──
-  var refBody = '';
-  if(app.references && app.references.length) {
-    app.references.forEach(function(r, i) {
-      var nm = [(r.fn||''),(r.ln||'')].filter(Boolean).join(' ') || ('Reference '+(i+1));
-      if(nm || r.phone) refBody += row(nm, (r.relationship||'') + (r.phone ? ' · '+formatPhone(r.phone) : '') + (r.email ? ' · '+r.email : ''));
-    });
-  }
-  if(!refBody) refBody = row('References', '—');
-
-  // ── pets body ──
-  var petBody = '';
-  if(app.pets && app.pets.length) {
-    app.pets.forEach(function(p) {
-      if(p.type || p.name) petBody += row(p.name || p.type, [p.type, p.size, p.desc].filter(Boolean).join(' · '));
-    });
-  }
-
-  var sigCols = hasCoApp ? '1fr 1fr 1fr' : '1fr 1fr';
-
-  var doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
-    +'<title>'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Application — '+name+'</title>'
-    +'<style>'
-    +'*{box-sizing:border-box;margin:0;padding:0;}'
-    +'@page{size:letter;margin:14mm 13mm 20mm 13mm;}'
-    +'body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:var(--text);background:#fff;line-height:1.4;}'
-    +'.footer{position:fixed;bottom:7mm;left:0;right:0;padding:0 13mm;display:flex;justify-content:space-between;font-size:8.5px;color:#aaa;border-top:1px solid #eee;padding-top:4px;}'
-    +'</style>'
-    +'</head><body>'
-
-    // Header
-    +'<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--yellow);padding-bottom:10px;margin-bottom:14px;">'
-    +'<div class="flex-g10">'
-    +(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+'"/>':'')
-    +'<div><div class="js-txt-lg">'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Application</div>'
-    +'<div style="font-size:9.5px;color:var(--muted);">'+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+'</div></div></div>'
-    +'<div style="text-align:right;font-size:9.5px;color:var(--muted);line-height:1.9;">'
-    +'<strong style="font-size:12px;color:var(--text);">'+name+'</strong><br/>'
-    +(app.id||'—')+'<br/>Date: '+today+'</div></div>'
-
-    // 1. Applicant Information
-    +section('Applicant Information',
-       row('First Name',           app.fn   ||'—')
-      +row('Last Name',            app.ln   ||'—')
-      +row('Date of Birth',        app.dob  ||'—')
-      +row('Band Number',          app.band ||'—')
-      +row('On Reserve Status',    app.reserve||'—')
-      +row('Marital Status',       app.marital||'—')
-      +row('Cell Phone',           app.phone?formatPhone(app.phone):'—')
-      +row('Email Address',        app.email||'—')
-      +row('Application Date',     app.appDate||'—')
-      +row('Accessibility Needs',  app.accessibility||'None')
-      +row('Housing Classification', app.classification||'—')
-    )
-
-    // 2. Current Address
-    +section('Current Address',
-       row('Street Address',  app.street  ||'—')
-      +row('City',            app.city    ||'—')
-      +row('Province',        app.province||'—')
-      +row('Postal Code',     app.postal  ||'—')
-      +row('Occupancy Date',  app.occDate ||'—')
-    )
-
-    // 3. Housing & Arrears
-    +section('Current Housing &amp; Arrears',
-       row('Currently Has a House', yn(app.haveHouse))
-      +row('Home Condition',   app.haveHouse ? (app.homeCondition||'—') : 'N/A')
-      +row('Arrears Owed to '+(window.NATION_CONFIG&&NATION_CONFIG.short||''), yn(hasArr))
-      +row('Arrears Amount',   hasArr ? dollar(app.arrBalAmt) : 'N/A')
-    )
-
-    // 4. Employment & Income
-    +section('Employment &amp; Income', incBody)
-
-    // 5. Co-Applicant
-    +section('Co-Applicant',
-       row('Co-Applicant', yn(hasCoApp))
-      +(hasCoApp ? row('First Name',    app.coApp.fn  ||'—') : '')
-      +(hasCoApp ? row('Last Name',     app.coApp.ln  ||'—') : '')
-      +(hasCoApp ? row('Date of Birth', app.coApp.dob ||'—') : '')
-      +(hasCoApp ? row('Band Number',   app.coApp.band||'—') : '')
-      +(hasCoApp ? row('Reserve Status',app.coApp.reserve||'—') : '')
-      +(hasCoApp ? row('Cell Phone',    app.coApp.cell?formatPhone(app.coApp.cell):'—') : '')
-      +(hasCoApp ? row('Email',         app.coApp.email||'—') : '')
-    )
-
-    // 6. Household Members
-    +section('Household Members', habBody)
-
-    // 7. References
-    +section('References', refBody)
-
-    // 8. Pets
-    +(petBody ? section('Pets', petBody) : '')
-
-    // Terms & Conditions
-    +'<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);page-break-inside:avoid;">'
-    +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid var(--yellow);">Terms &amp; Conditions — Applicant Declaration</div>'
-    +'<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">By signing below, I hereby apply for housing assistance from the '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' ('+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+') Housing Program and declare the following:</p>'
-    +'<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
-    +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
-    +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
-    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>).</li>'
-    // Item #4 — CLFN-program sharing consent. Only printed when the applicant
-    // checked the consent box at submit time (saved as app.consentShareCLFN).
-    // If unchecked, omitted so the print mirrors what was actually agreed to.
-    +(app && app.consentShareCLFN
-      ? '<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including but not limited to Health, Education, Wellness, Ontario Works, and Finance &mdash; strictly for the purpose of supporting and coordinating services connected to my housing application. Sharing will occur only with authorized staff, on a need-to-know basis, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>). I may withdraw this consent in writing to the Housing Manager at any time.</li>'
-      : '')
-    +'<li>I understand that my application will be scored according to the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
-    +'<li>I agree to notify the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
-    +'<li>I understand that acceptance into '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' prior to occupancy.</li>'
-    +'<li>I agree to comply with all '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
-    +'<li>I authorize '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
-    +'</ol></div>'
-
-    // Consent acknowledgment — visible confirmation block, only when the
-    // saved record carries consentShareCLFN=true. Reads the captured stamp
-    // (consentShareCLFNAt / consentShareCLFNBy) so it shows a real audit trail.
-    +(app && app.consentShareCLFN
-      ? '<div style="margin-top:12px;padding:10px 12px;border:1.5px solid #15803d;border-radius:4px;background:#f0fdf4;page-break-inside:avoid;">'
-        + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#15803d;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #bbf7d0;">'
-        + '&#x2611; Consent to Share &mdash; '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Programs &middot; <span style="font-weight:700;">CONFIRMED</span></div>'
-        + '<p style="font-size:9.5px;color:var(--text);line-height:1.55;margin:0 0 5px;">'
-        + 'The applicant has consented to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including Health, Education, Wellness, Ontario Works, and Finance &mdash; in support of this housing application.'
-        + '</p>'
-        + '<p style="font-size:8.5px;color:var(--muted);margin:0;">'
-        + 'Recorded: '+(app.consentShareCLFNAt ? escapeHtml(String(app.consentShareCLFNAt).slice(0,10)) : 'on submission')
-        + (app.consentShareCLFNBy ? ' &middot; Captured by '+escapeHtml(app.consentShareCLFNBy) : '')
-        + '</p>'
-        + '</div>'
-      : '')
-
-    // Signatures
-    +'<div style="margin-top:14px;page-break-inside:avoid;">'
-    +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:2.5px solid var(--yellow);padding-bottom:3px;margin-bottom:10px;">Signatures</div>'
-    +'<div style="display:grid;grid-template-columns:'+sigCols+';gap:12px;">'
-    +sigBlock('Applicant', app.sig && app.sig.applicant, name, app.appDate||today)
-    +(hasCoApp ? sigBlock('Co-Applicant', app.sig && app.sig.coApplicant, (app.coApp.fn||'')+' '+(app.coApp.ln||''), app.appDate||today) : '')
-    +sigBlock('Received by — Housing Staff', app.sig && app.sig.staff, '', today)
-    +'</div></div>'
-
-    // Internal Use
-    +'<div style="margin-top:16px;border:2px solid var(--yellow);border-radius:5px;padding:12px;page-break-inside:avoid;">'
-    +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--warn-amber);margin-bottom:10px;padding-bottom:5px;border-bottom:1.5px solid var(--yellow);">For Internal Use Only</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;font-size:9.5px;">'
-    +'<div><div style="color:var(--muted);margin-bottom:2px;">Date Received</div><div style="border-bottom:1px solid var(--muted);height:16px;"></div></div>'
-    +'<div><div style="color:var(--muted);margin-bottom:2px;">File Number</div><div style="border-bottom:1px solid var(--muted);height:16px;"></div></div>'
-    +'<div><div style="color:var(--muted);margin-bottom:2px;">Waitlist Position</div><div style="border-bottom:1px solid var(--muted);height:16px;"></div></div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;font-size:9.5px;">'
-    +'<div><div class="sig-lbl">Application Complete?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
-    +'<div><div class="sig-lbl">Documents Verified?</div><div>☐ Yes &nbsp;&nbsp; ☐ No &nbsp;&nbsp; ☐ Pending</div></div>'
-    +'<div><div class="sig-lbl">Site Visit Required?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
-    +'</div>'
-    +'<div style="margin-bottom:12px;font-size:9.5px;"><div class="sig-lbl">Internal Notes</div>'
-    +'<div style="border:1px solid var(--border);border-radius:3px;height:44px;background:var(--surface);"></div></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'
-    +internalSig('Housing Manager Approval')
-    +internalSig('Executive Director Approval')
-    +'</div></div>'
-
-    +'<div class="footer">'
-    +'  <span>'+escapeHtml(buildNationFooterStrip())+'</span>'
-    +'  <span id="footerRight" style="display:flex;gap:20px;align-items:center;">'
-    +'    <span>Generated '+today+'</span>'
-    +'    <span id="pageNum" style="font-weight:600;color:var(--muted);"></span>'
-    +'  </span>'
-    +'</div>'
-    +'</body></html>';
-
-  showPrintPanel(doc, 'Housing Application');
-}
+// (previewFromDash removed — ~275-line print template with zero call sites;
+// the live equivalent is printApplicationPreview in housing-app.js.)
 
 function openMatchScorecard(appId, unitId) {
   var app  = (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id===appId; });
@@ -2271,16 +2017,8 @@ window._lotArchive = _lotArchive;
 window._renderLotsList = _renderLotsList;
 
 // ── renderBudgetPools ──
-var BUDGET_POOLS = [
-  { id:'emergency', label:'Emergency Repairs',  icon:'🚨', color:'var(--danger)', bg:'var(--danger-bg)' },
-  { id:'isc',       label:'ISC Funds',          icon:'🏛️', color:'#1d4ed8', bg:'var(--info-blue-bg)' },
-  { id:'rrap',      label:'RRAP Funds',         icon:'🏠', color:'#7c3aed', bg:'#faf5ff' },
-  { id:'band',      label:'Band Funds',         icon:'🌲', color:'var(--success)', bg:'var(--success-bg)' },
-  { id:'cmhc',      label:'CMHC',               icon:'🏗️', color:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)' },
-  { id:'ofnlp',     label:'OFNLP',              icon:'🤝', color:'#0e7490', bg:'#ecfeff' },
-  { id:'fncfs',     label:'FNCFS Funds',        icon:'👶', color:'#be185d', bg:'#fdf2f8', requiresDependants:true },
-  { id:'band_rep',  label:'Band Rep Funds',     icon:'🏡', color:'#4f46e5', bg:'#eef2ff' },
-];
+// BUDGET_POOLS lives in shared-config.js (single registry — renos.html's copy
+// had drifted to 6 pools while this file's had 8). Do not re-add a local copy.
 
 
 
@@ -2345,26 +2083,8 @@ function closeRenoSearch() {
   document.body.classList.remove('modal-open');
 }
 
-function openRenoNewRequest() {
-  // Open unit search first — employee picks a unit then opens its SOW
-  var m = document.getElementById('unitSearchModal');
-  if(!m){ openUnitSearch(); return; }
-  // Override unit search results click to open SOW instead of edit modal
-  window._renoNewRequestMode = true;
-  unitSearchFilter('');
-  m.style.setProperty('display','flex','important');
-  document.body.classList.add('modal-open');
-  // Update title hint
-  var title = m.querySelector('#unit_search_results');
-  setTimeout(function(){
-    var i=document.getElementById('unit_search_input');
-    if(i){ i.value=''; i.placeholder='Search for the unit needing renovation…'; i.focus(); }
-    // Patch clicks to open SOW
-    if(title) title.querySelectorAll('[onclick]').forEach(function(el){
-      // Will be re-rendered on filter — handled in unitSearchFilter via flag
-    });
-  }, 150);
-}
+// (openRenoNewRequest + window._renoNewRequestMode removed — zero call sites;
+// the flag was never read anywhere.)
 
 function renoSearchFilter(q) {
   var allUnits = getAllUnits();
@@ -2448,8 +2168,7 @@ function openRenoProgress(unitId) {
   var allUnits = getAllUnits();
   var u = allUnits.find(function(x){ return x.id === unitId; });
   if(!u) return;
-  var _rpUnitId = unitId;
-  window._rpUnitId = unitId;
+  window._rpUnitId = unitId;   // (shadowing local removed — only the window global is read)
 
   // Populate header
   var hdr = document.getElementById('rp_unit_header');
@@ -3275,6 +2994,32 @@ function confirmApprovalAction() {
   if(notes) applications[idx].lastActionNotes = notes;
   applications[idx].lastActionBy   = window.currentRole || 'staff';
   applications[idx].lastActionAt   = new Date().toISOString();
+
+  // Declining an ALREADY-ASSIGNED applicant must unwind the unit, or it stays
+  // occupied/reserved with no live tenancy. (Ported from the retired dashboard
+  // decline path when that dead code was removed — this is the only live
+  // decline flow now.)
+  if(action === 'declined' && applications[idx].assignedUnit){
+    var _duHad = applications[idx].assignedUnit;
+    var _duAll = (typeof housingUnits !== 'undefined') ? housingUnits : [];
+    var _duIdx = _duAll.findIndex(function(u){ return u.id === _duHad; });
+    if(_duIdx >= 0){
+      var _du = _duAll[_duIdx];
+      var _duAddr = ((_du.num||'')+' '+(_du.street||'')).trim() || _duHad;
+      _du.assignedTo = ''; _du.assignedName = ''; _du.assignedDate = '';
+      _du.tenantApprovedBy = ''; _du.tenantApprovedAt = '';
+      _du.transferPending = false; _du.status = 'vacant';
+      _duAll[_duIdx] = _du;
+      saveUnitWithDraftFallback(_du).then(function(ok){
+        if(!ok) showToast('Unit unassignment saved locally — will sync when network is available.', { type:'info' });
+      });
+      auditEntry(_du.id, 'unit_unassigned', _duAddr + ' returned to vacant — applicant declined', window.currentRole || 'staff');
+    }
+    applications[idx].assignedUnit = '';
+    applications[idx].assignedAddress = '';
+    applications[idx].assignmentOverrideNotes = '';
+    applications[idx].transferPending = false;
+  }
 
   // ── Capture approval signatures at each stage ──────────────────────────
   function _fv(id){ var e=document.getElementById(id); return e?e.value.trim():''; }

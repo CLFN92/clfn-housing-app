@@ -354,6 +354,46 @@ try {
   if (_cachedLogo) window._setFavicon(_cachedLogo);
 } catch(e) {}
 
+// ── jsPDF lazy-loader (single implementation) ─────────────────────────────
+// Loads jsPDF (and optionally the autotable plugin) from the CSP-allowlisted
+// CDN on first use. Every per-file copy of this loader delegated here in the
+// audit cleanup (notifications.js, labels.js, projects-init.js,
+// inspections-init.js, shared-data.js exports, finance-pdf-jspdf.js) — do not
+// re-add a local one. Returns a Promise resolving to the jsPDF constructor.
+// Unlike some of the old copies, this correctly loads autotable even when
+// jsPDF itself is already present (a page that first generated a plain PDF
+// used to throw `doc.autoTable is not a function` on its next table export).
+window.loadJsPdf = function loadJsPdf(opts) {
+  opts = opts || {};
+  var JS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  var AT_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+  function haveJs(){ return !!(window.jspdf && window.jspdf.jsPDF); }
+  function haveAt(){ return !!(haveJs() && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable); }
+  function addScript(src) {
+    return new Promise(function(resolve, reject){
+      // Dedupe: reuse an in-flight/loaded tag rather than injecting twice.
+      var existing = document.querySelector('script[src="' + src + '"]');
+      if (existing) {
+        if (existing.dataset.jspdfLoaded) return resolve();
+        existing.addEventListener('load',  function(){ resolve(); });
+        existing.addEventListener('error', function(){ reject(new Error('script load failed: ' + src)); });
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload  = function(){ s.dataset.jspdfLoaded = '1'; resolve(); };
+      s.onerror = function(){ reject(new Error('script load failed: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  var p = haveJs() ? Promise.resolve() : addScript(JS_SRC);
+  if (opts.autotable) p = p.then(function(){ return haveAt() ? null : addScript(AT_SRC); });
+  return p.then(function(){
+    if (!haveJs()) throw new Error('jsPDF unavailable');
+    return window.jspdf.jsPDF;
+  });
+};
+
 // ── PWA / offline (Phase O1) ──────────────────────────────────────────────
 // Register the service worker (sw.js) so the app shell + PDF libraries are
 // cached and staff can open the app and generate/sign forms with no internet,
@@ -1787,8 +1827,22 @@ window.DocLibrary = (function(){
       // Image thumbnails — lazy-load signed URLs
       root.querySelectorAll('[data-dl-thumb]').forEach(function(img){
         var path = img.getAttribute('data-dl-thumb');
+        // Memoize signed URLs per path (valid 1h; cache for 45min). Without
+        // this, every render — each chip click, category change, upload, and
+        // error banner — re-signed EVERY visible thumbnail: 30 photos meant 30
+        // Storage sign requests per filter click on the slow cell connections
+        // this app is designed around.
+        state._thumbUrlCache = state._thumbUrlCache || {};
+        var hit = state._thumbUrlCache[path];
+        if (hit && hit.exp > Date.now()) {
+          img.src = hit.url; img.style.display = 'block';
+          return;
+        }
         _signUrl(opts, path).then(function(u){
-          if (u) { img.src = u; img.style.display = 'block'; }
+          if (u) {
+            state._thumbUrlCache[path] = { url: u, exp: Date.now() + 45*60*1000 };
+            img.src = u; img.style.display = 'block';
+          }
         }).catch(function(){});
       });
       // Inline category edit
@@ -1935,14 +1989,17 @@ window.DocLibrary = (function(){
           }
           next(i+1);
         }).catch(function(err){
-          state.uploading = false;
           var msg = (err && err.message) ? err.message : 'unknown error';
           _setError('Upload failed: ' + f.name + ' (' + msg + ')');
           // Also fire a toast — the in-widget banner auto-dismisses and users
           // miss it. The toast keeps the failure visible long enough to read.
           if (typeof window.showToast === 'function') {
-            window.showToast('Upload failed: ' + f.name, { type:'error', duration:6000 });
+            window.showToast('Upload failed: ' + f.name, { type:'error' });
           }
+          // CONTINUE with the remaining files — the old code aborted the whole
+          // batch here, so dropping 5 files with a transient failure on #2
+          // silently never attempted #3–#5 (and skipped the final refresh).
+          next(i+1);
         });
       }
       next(0);
@@ -2229,7 +2286,7 @@ window.DocLibrary = (function(){
     } catch(e){ console.warn('[offline-file] flush failed:', e); }
     _offFileFlushing = false;
     if (uploaded && typeof window.showToast === 'function') {
-      window.showToast('Synced ' + uploaded + ' saved file' + (uploaded > 1 ? 's' : '') + ' to the server.');
+      window.showToast('Synced ' + uploaded + ' saved file' + (uploaded > 1 ? 's' : '') + ' to the server.', { type: 'info' });
     }
   }
   if (typeof window !== 'undefined') {

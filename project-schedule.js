@@ -415,8 +415,11 @@
     _psRender();
   };
   window._psToggleExport = function(btn){
-    var m = document.getElementById('ps_export_menu');
-    if(m) m.classList.toggle('open');
+    // The shared CSS shows the menu via `.export-dropdown.open .header-export-menu`
+    // — the class must go on the WRAPPER. Toggling it on the menu itself (the
+    // old code) matched no rule, so the Export menu could never open.
+    var wrap = btn && btn.closest ? btn.closest('.export-dropdown') : null;
+    if (wrap) wrap.classList.toggle('open');
   };
   window._psOpenSow = function(unitId, pn){
     if(typeof openSowModal === 'function'){ closeProjectSchedule(); openSowModal(unitId, pn); return; }

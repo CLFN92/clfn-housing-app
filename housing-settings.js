@@ -1506,7 +1506,7 @@ function _readThemeFromForm() {
 }
 
 function saveThemeSettings() {
-  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change the theme.'); return; }
+  if((window.currentRole||'') !== ROLE.ED && (window.currentRole||'') !== ROLE.SUPER_USER) { showToast('Only the Executive Director can change the theme.', {type:'error'}); return; }
   var theme = _readThemeFromForm();
   if(typeof _applyTheme === 'function') _applyTheme(theme);
   if(!window._appSettings) window._appSettings = {};
@@ -1522,7 +1522,7 @@ function saveThemeSettings() {
 }
 
 function resetThemeSettings() {
-  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change the theme.'); return; }
+  if((window.currentRole||'') !== ROLE.ED && (window.currentRole||'') !== ROLE.SUPER_USER) { showToast('Only the Executive Director can change the theme.', {type:'error'}); return; }
   showConfirm({
     title:       'Reset brand theme?',
     message:     'This clears any saved colors and logo and restores the default brand. This cannot be undone.',
@@ -1664,7 +1664,7 @@ function _rfReadFromForm() {
 }
 
 function saveRequiredFieldsSettings() {
-  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change required fields.'); return; }
+  if((window.currentRole||'') !== ROLE.ED && (window.currentRole||'') !== ROLE.SUPER_USER) { showToast('Only the Executive Director can change required fields.', {type:'error'}); return; }
   // Merge visible-tab edits with stored config so we save the full picture
   var visible = _rfReadFromForm();
   if(!window._appSettings) window._appSettings = {};
@@ -1682,7 +1682,7 @@ function saveRequiredFieldsSettings() {
 }
 
 function resetRequiredFieldsSettings() {
-  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change required fields.'); return; }
+  if((window.currentRole||'') !== ROLE.ED && (window.currentRole||'') !== ROLE.SUPER_USER) { showToast('Only the Executive Director can change required fields.', {type:'error'}); return; }
   showConfirm({
     title:       'Reset required fields?',
     message:     'This clears any saved overrides and restores the default required fields.',

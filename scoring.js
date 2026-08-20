@@ -116,7 +116,7 @@ function saveV2ScoringModel() {
   // (localStorage mirror removed — nothing ever read it; housing_settings is
   // the real persistence via saveSettingWithDraftFallback below.)
   saveSettingWithDraftFallback('scoring_model_v2', liveV2ScoreModel).then(function(ok){
-    if(!ok) showToast('Scoring model saved locally but did not reach the server — it may revert on next sign-in.');
+    if(!ok) showToast('Scoring model saved locally but did not reach the server — it may revert on next sign-in.', { type: 'error' });
   });
 }
 
@@ -125,7 +125,7 @@ function saveV2Tiers() {
   // the real persistence via saveSettingWithDraftFallback below.)
   saveSettingWithDraftFallback('scoring_tiers_v2', liveV2Tiers).then(function(ok){
     if(!ok) {
-      showToast('Tier thresholds saved locally but did not reach the server — please retry.');
+      showToast('Tier thresholds saved locally but did not reach the server — please retry.', { type: 'error' });
       return;
     }
     showToast('Tier thresholds saved — rescore all to apply');
@@ -321,10 +321,10 @@ function updateV2Tier(el) {
   liveV2Tiers[key] = val;
   // Validate ordering — warn but don't block
   if (liveV2Tiers.critical <= liveV2Tiers.high) {
-    showToast('Warning: Critical threshold should be higher than High');
+    showToast('Warning: Critical threshold should be higher than High', { type: 'error' });
   }
   if (liveV2Tiers.high <= liveV2Tiers.medium) {
-    showToast('Warning: High threshold should be higher than Medium');
+    showToast('Warning: High threshold should be higher than Medium', { type: 'error' });
   }
   // Live-update the range labels so the ED can see the effect immediately
   var t = liveV2Tiers;
@@ -432,14 +432,14 @@ function _matchPriorityGuard(featureName, callback) {
     }
     return true;
   }
-  if (typeof showToast === 'function') showToast((featureName || 'This action') + ' is not available for your role.');
+  if (typeof showToast === 'function') showToast((featureName || 'This action') + ' is not available for your role.', { type: 'error' });
   return false;
 }
 
 function saveMatchPriorityModelED() {
   _matchPriorityGuard('Match Priority weighting updated', function() {
     saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
-      if(!ok){ showToast('Match priority weights saved locally but did not reach the server — it may revert on next sign-in.'); return; }
+      if(!ok){ showToast('Match priority weights saved locally but did not reach the server — it may revert on next sign-in.', { type: 'error' }); return; }
       showToast('Match priority weights saved');
     });
     auditEntry('SETTINGS', 'match_priority_model', 'Match priority weights updated: Has-Match=' + liveMatchPriorityModel.hasMatchBonus + ' Temporary=' + liveMatchPriorityModel.temporaryBonus + ' On-Reserve=' + liveMatchPriorityModel.onReserveBonus + ' No-House=' + liveMatchPriorityModel.noHouseBonus, window.currentRole);
@@ -451,7 +451,7 @@ function resetMatchPriorityModelED() {
     liveMatchPriorityModel = Object.assign({}, DEFAULT_MATCH_PRIORITY_MODEL);
     renderMatchPriorityEditor();
     saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
-      if(!ok){ showToast('Match priority weights reset locally but did not reach the server — it may revert on next sign-in.'); return; }
+      if(!ok){ showToast('Match priority weights reset locally but did not reach the server — it may revert on next sign-in.', { type: 'error' }); return; }
       showToast('Match priority weights reset to defaults');
     });
     auditEntry('SETTINGS', 'match_priority_model_reset', 'Match priority weights reset to defaults', window.currentRole);
@@ -935,14 +935,14 @@ function _nationLinkify(s) {
 function saveNationSettings() {
   var role = window.currentRole || '';
   if (!APPROVAL_AUTHORITY.can('editApprovalAuthority', role)) {
-    showToast('Only the Executive Director can edit nation settings.');
+    showToast('Only the Executive Director can edit nation settings.', { type: 'error' });
     return;
   }
   function v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
   var disp  = v('nation_input_display');
   var short = v('nation_input_short');
-  if (!disp)  { showToast('Display name is required'); var de=document.getElementById('nation_input_display'); if(de) de.focus(); return; }
-  if (!short) { showToast('Short name is required');   var se=document.getElementById('nation_input_short');   if(se) se.focus(); return; }
+  if (!disp)  { showToast('Display name is required', { type: 'error' }); var de=document.getElementById('nation_input_display'); if(de) de.focus(); return; }
+  if (!short) { showToast('Short name is required', { type: 'error' });   var se=document.getElementById('nation_input_short');   if(se) se.focus(); return; }
   if (short.length > 16) { showToast('Short name must be 16 characters or fewer'); return; }
 
   var emailVal = v('nation_input_email');
@@ -1188,7 +1188,7 @@ function renderNosTable() {
 
 function saveNosTable() {
   if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
-    showToast('Only the Executive Director can update the NOS table.');
+    showToast('Only the Executive Director can update the NOS table.', { type: 'error' });
     return;
   }
   var nos = {};
@@ -1206,7 +1206,7 @@ function saveNosTable() {
       showToast('\u2713 NOS table saved');
       auditEntry('SETTINGS', 'nos_table_save', 'NOS table updated by ED', CLFN_PERMS.roleLabel(ROLE.ED));
     } else {
-      showToast('Save failed — check connection');
+      showToast('Save failed — check connection', { type: 'error' });
     }
   });
 }
@@ -1888,17 +1888,9 @@ var auditLog=[];
 // ══════════════════════════════════════════════════════════════
 
 // Collect all unit-linked documents into one bundle object
-function _bundleUnitDocs(unitId) {
-  var bundle = {};
-  var keys = ['clfn_sow_','clfn_reno_progress_','clfn_reno_budget_','clfn_tenant_files_','clfn_unit_photos_'];
-  keys.forEach(function(k) {
-    try {
-      var raw = null; // data now in Supabase
-      if(raw && raw !== 'null') bundle[k + unitId] = raw;
-    } catch(e) {}
-  });
-  return bundle;
-}
+// (_bundleUnitDocs removed — its data source was long gone, so it always
+//  returned {} while the audit text claimed documents were "bundled/preserved".
+//  Documents already survive archival in Storage + housing_audit_log.)
 
 // Archive an APPLICATION — bundles any linked unit documents before archiving
 function archiveApplication(appId) {
@@ -1908,7 +1900,6 @@ function archiveApplication(appId) {
   var app  = applications[idx];
   var linkedUnitId = app.assignedUnit || app.assignedUnitId || null;
   if(linkedUnitId) {
-    app.archivedUnitDocs = _bundleUnitDocs(linkedUnitId);
   }
   app.archived   = true;
   app.archivedAt = new Date().toISOString().split('T')[0];
@@ -1916,7 +1907,7 @@ function archiveApplication(appId) {
   if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
   else sbSaveApplication(app).catch(function(e){ console.warn('Archive save failed:',e); });
   auditEntry(appId, 'archived',
-    'Application archived' + (linkedUnitId ? ' — unit docs bundled for ' + linkedUnitId : ''),
+    'Application archived',
     role);
   _refreshAppViews();
   showToast('Application and supporting documents archived');
@@ -1980,7 +1971,7 @@ function archiveUnit(unitId) {
       archivedAt: new Date().toISOString(),
       archivedBy: role,
       reason: 'Demolished / Removed from active inventory',
-      docs: _bundleUnitDocs(unitId)
+      docs: {}
     };
     u.archived   = true;
     u.archivedAt = new Date().toISOString().split('T')[0];
@@ -2004,7 +1995,7 @@ function archiveUnit(unitId) {
       }
     });
     auditEntry('UNIT:' + unitId, 'unit_archived',
-      addr + ' archived — ' + Object.keys(u.unitArchive.docs).length + ' document(s) preserved', role);
+      addr + ' archived (documents remain in Storage / the unit Documents tab)', role);
     closeUnitEditModal();
     renderInventoryView();
     if(typeof updateDashStats === 'function') updateDashStats();

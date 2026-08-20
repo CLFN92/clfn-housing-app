@@ -876,7 +876,7 @@ async function notifyApplicationConfirmation(app) {
     emails.push(clean);
   }
   _addEmail(app.email);
-  _addEmail(app.co_email);
+  _addEmail(app.coApp && app.coApp.email);   // field lives on coApp — app.co_email never existed, so co-applicants never got the copy
 
   // Additional staff recipients: primary + CC role checkboxes from the
   // Settings -> Notifications tab. Both default to empty for this event
@@ -936,24 +936,9 @@ async function notifyApplicationConfirmation(app) {
   }, eventKey);
 }
 
-// Lazy-load a CDN script and resolve once it's available. Used to pull
-// in jsPDF and html2canvas on demand — neither is loaded on every page,
-// so the application-confirmation flow grabs them when first needed.
-function _loadScriptOnce(src, isAvailable) {
-  return new Promise(function(resolve, reject){
-    if (isAvailable && isAvailable()) return resolve();
-    var s = document.createElement('script');
-    s.src     = src;
-    s.onload  = function(){ resolve(); };
-    s.onerror = function(){ reject(new Error('script load failed: ' + src)); };
-    document.head.appendChild(s);
-  });
-}
 async function _loadJsPdf() {
-  await _loadScriptOnce(
-    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-    function(){ return !!(window.jspdf && window.jspdf.jsPDF); }
-  );
+  // Delegates to the shared lazy-loader in shared.js (single implementation).
+  await window.loadJsPdf();
 }
 // Generate the applicant confirmation PDF as a text-rendered (vector)
 // document using jsPDF's native text + line primitives. Walks the live

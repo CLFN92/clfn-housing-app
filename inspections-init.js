@@ -165,10 +165,9 @@ function _inspBadge(status) {
   return '<span class="' + cls + '">' + (labels[status] || status || 'Pending') + '</span>';
 }
 
-function _esc(s) {
-  if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, function(c){ return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; });
-}
+// _esc lives in shared-ui.js (delegates to escapeHtml — same five-char escape
+// this file's local copy did). The top-level copy that was here collided with
+// it on window. Do not re-add a page-level _esc.
 
 // ── Modal: open ──────────────────────────────────────────────────────────────
 function _inspUuid() {
@@ -566,10 +565,17 @@ async function saveInspection(approveAction) {
   } else if (approveAction === 'revoke') {
     record.approved_by = null;
     record.approved_at = null;
-  } else if (!record.approved_by
-      && (status === 'pass' || status === 'fail' || status === 'needs_repair')
+  } else if ((status === 'pass' || status === 'fail' || status === 'needs_repair')
       && typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.chainDisabled
-      && APPROVAL_AUTHORITY.chainDisabled('inspection')) {
+      && APPROVAL_AUTHORITY.chainDisabled('inspection')
+      // Guard on the EXISTING saved record — `record` is a fresh form scrape
+      // that never carries approved_by, so the old `!record.approved_by` check
+      // was always true and every edit-save replaced a real HM/ED sign-off
+      // (made before the setting was switched off) with "System".
+      && !(function(){
+        var _ex = (window._inspections || []).find(function(x){ return x && x.id === window._inspEditId; });
+        return _ex && _ex.approved_by;
+      })()) {
     // The inspection sign-off step is switched OFF in Settings — auto-approve a
     // completed report on save ("any off = fully approved"), recorded as System.
     record.approved_by = 'System — approval disabled';
@@ -589,24 +595,15 @@ async function saveInspection(approveAction) {
     if (idx >= 0) window._inspections[idx] = saved;
     else window._inspections.unshift(saved);
 
-    // Update unit inspection dates
-    if (typeof housingUnits !== 'undefined') {
-      var unit = housingUnits.find(function(u){ return u.id === unitId; });
-      if (unit) {
-        unit.lastInspectionDate = date;
-        // Advance the next-due date from this inspection (annual cadence).
-        var _nd = _inspComputeNextDue(date, type);
-        if (_nd !== undefined) unit.nextInspectionDue = _nd;
-        if (typeof sbSaveUnit === 'function') sbSaveUnit(unit);
-      }
-    }
+    // Update unit inspection dates (shared with the guided questionnaire's save).
+    _inspUpdateUnitDates(unitId, date, type);
 
     if(typeof showToast==='function') showToast(approveAction === 'approve' ? 'Inspection approved.' : approveAction === 'revoke' ? 'Approval revoked.' : 'Inspection saved.');
 
     // Check if any items need attention — prompt to create a Maintenance Request.
     // BOTH 'repair' (needs-repair) AND 'fail' items generate a request; previously
     // only 'repair' did, so an inspection with FAILED items produced no MR.
-    var repairItems = checklist.filter(function(it){ return it.rating === 'repair' || it.rating === 'fail'; });
+    var repairItems = _inspRepairItems(checklist);
     closeInspectionModal();
     renderInspectionsList();
 
@@ -640,6 +637,26 @@ async function saveInspection(approveAction) {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Inspection'; }
   }
 }
+
+// ── Shared post-save steps (used by saveInspection AND the guided
+//    questionnaire in inspection-questionnaire.js — keep both paths calling
+//    these so they can't drift again) ─────────────────────────────────────────
+function _inspUpdateUnitDates(unitId, date, type) {
+  if (typeof housingUnits === 'undefined') return;
+  var unit = housingUnits.find(function(u){ return u.id === unitId; });
+  if (!unit) return;
+  unit.lastInspectionDate = date;
+  // Advance the next-due date from this inspection (annual cadence).
+  var _nd = _inspComputeNextDue(date, type);
+  if (_nd !== undefined) unit.nextInspectionDue = _nd;
+  if (typeof sbSaveUnit === 'function') sbSaveUnit(unit);
+}
+window._inspUpdateUnitDates = _inspUpdateUnitDates;
+
+function _inspRepairItems(checklist) {
+  return (checklist || []).filter(function(it){ return it.rating === 'repair' || it.rating === 'fail'; });
+}
+window._inspRepairItems = _inspRepairItems;
 
 // ── SOW prompt ───────────────────────────────────────────────────────────────
 function _inspPromptSOW(insp, repairItems) {
@@ -716,16 +733,11 @@ function generateInspectionPDF() {
   if (!insp) return;
 
   var loadjsPDF = function(cb) {
-    if (window.jspdf && window.jspdf.jsPDF) { cb(); return; }
-    var s1 = document.createElement('script');
-    s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    s1.onload = function() {
-      var s2 = document.createElement('script');
-      s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
-      s2.onload = cb;
-      document.head.appendChild(s2);
-    };
-    document.head.appendChild(s1);
+    // Delegates to the shared lazy-loader in shared.js (single implementation;
+    // also fixes the old copy skipping autotable when jsPDF was already loaded).
+    window.loadJsPdf({ autotable: true }).then(function(){ cb(); }, function(){
+      if(typeof showToast==='function') showToast('Could not load the PDF library.', {type:'error'});
+    });
   };
 
   loadjsPDF(function() {
@@ -837,6 +849,15 @@ function generateInspectionPDF() {
 
     if (typeof loadHousingData === 'function') {
       try { await loadHousingData(); } catch(e) { console.warn('[inspections] data load:', e); }
+    }
+    // Module gate RE-CHECK after settings hydration: the pre-load check above
+    // ran before housing_settings existed, so a persisted "module off" was
+    // never seen there (the gate failed open on direct URLs).
+    if (typeof initModuleEnablement === 'function') try { initModuleEnablement(); } catch(e) {}
+    if (typeof moduleOn === 'function' && !moduleOn('inspections')) {
+      if (typeof showModuleDisabledNotice === 'function') showModuleDisabledNotice('Inspections');
+      else window.location.href = 'housing.html';
+      return;
     }
     // Pick up any ED-customised approval-authority overrides (e.g. approveInspection).
     if (typeof initApprovalAuthority === 'function') { try { initApprovalAuthority(); } catch(e) {} }

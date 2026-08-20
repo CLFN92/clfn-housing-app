@@ -92,10 +92,7 @@ function applyPermissions() {
         btn.style.display = can(perm) ? '' : 'none';
       }
     });
-    // Auto engine
-    if (onclick.indexOf('showAutoEngineModal') >= 0) {
-      btn.style.display = can('run_auto_engine') ? '' : 'none';
-    }
+    // (auto-engine gating removed — the feature was deleted in the audit cleanup)
   });
 }
 

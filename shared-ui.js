@@ -338,12 +338,16 @@ function tableApplyFilterSort(rows, accessors, state) {
       });
     });
   }
-  // Sort
+  // Sort — decorate–sort–undecorate so each row's accessor runs ONCE, not
+  // once per comparison. Some accessors are expensive (Reno Score walks the
+  // whole inventory + SOW cache; Match Priority scores against every vacant
+  // unit), and the comparator used to invoke them O(n log n) times.
   if (state.sort && state.sort.key && typeof accessors[state.sort.key] === 'function') {
     var getS = accessors[state.sort.key];
     var dir = state.sort.dir;
-    filtered.sort(function(a, b){
-      var av = getS(a), bv = getS(b);
+    var decorated = filtered.map(function(r){ return { r: r, v: getS(r) }; });
+    decorated.sort(function(a, b){
+      var av = a.v, bv = b.v;
       var aN = (av == null || av === '');
       var bN = (bv == null || bv === '');
       if (aN && bN) return 0;
@@ -355,6 +359,7 @@ function tableApplyFilterSort(rows, accessors, state) {
       if (as > bs) return  1 * dir;
       return 0;
     });
+    filtered = decorated.map(function(d){ return d.r; });
   }
   return filtered;
 }
@@ -914,7 +919,7 @@ function edGuard(featureName, callback) {
     }
     return true;
   }
-  showToast((featureName || 'This action') + ' requires Executive Director access.');
+  showToast((featureName || 'This action') + ' requires Executive Director access.', { type: 'error' });
   return false;
 }
 
@@ -1082,14 +1087,13 @@ function edGuard(featureName, callback) {
       if (item) { e.preventDefault(); selectItem(item.getAttribute('data-id'), item.getAttribute('data-label')); }
     });
 
-    document.addEventListener('click', function outsideClick(e){
-      if (!wrap.contains(e.target) && !drop.contains(e.target)) {
-        if (isOpen) close();
-      } else if (isOpen) {
-        // Keep listening
-        document.addEventListener('click', outsideClick, { once: true });
-      }
-    }, { once: true });
+    // Persistent outside-click closer. The old {once:true} listener only
+    // re-armed on an INSIDE click while open — after the first selection or
+    // any outside click it was consumed and never re-added, so from the second
+    // open onward the dropdown stayed glued open until Escape.
+    document.addEventListener('click', function(e){
+      if (isOpen && !wrap.contains(e.target) && !drop.contains(e.target)) close();
+    });
 
     caret.addEventListener('mousedown', function(e){
       e.preventDefault();

@@ -410,11 +410,20 @@
       created_by:      (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || ''
     };
     try {
-      await _inspSave(record, true);
+      var saved = await _inspSave(record, true);
+      // Same post-save steps as the standard inspection form (inspections-init.js):
+      // stamp the unit's last-inspection / next-due dates, and offer to spin up a
+      // Maintenance Request for failed / needs-repair items. Previously this path
+      // skipped both, so questionnaire-saved inspections silently drifted.
+      if (typeof _inspUpdateUnitDates === 'function') _inspUpdateUnitDates(record.unit_id, record.inspection_date, record.type);
       if(typeof _inspLoad === 'function') await _inspLoad();
       if(typeof renderInspectionsList === 'function') renderInspectionsList();
       if(typeof showToast === 'function') showToast('✓ Inspection saved');
       close();
+      if (typeof _inspRepairItems === 'function' && typeof _inspPromptSOW === 'function') {
+        var repairItems = _inspRepairItems(record.checklist);
+        if (repairItems.length && record.overall_status !== 'pass') _inspPromptSOW(saved || record, repairItems);
+      }
     } catch(e){
       S.saving = false; render();
       if(typeof showToast === 'function') showToast('Save failed: ' + (e && e.message ? e.message : 'unknown error'), {type:'error'});

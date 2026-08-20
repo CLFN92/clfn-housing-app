@@ -17,13 +17,8 @@
   'use strict';
 
   function _load(cb, onerr) {
-    function haveAll() { return window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable; }
-    if (haveAll()) return cb();
-    function add(src, next) { var s = document.createElement('script'); s.src = src; s.onload = next; s.onerror = function () { (onerr || function () {})(); }; document.head.appendChild(s); }
-    var jsSrc = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    var atSrc = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
-    if (window.jspdf && window.jspdf.jsPDF) { add(atSrc, cb); }
-    else { add(jsSrc, function () { add(atSrc, cb); }); }
+    // Delegates to the shared lazy-loader in shared.js (single implementation).
+    window.loadJsPdf({ autotable: true }).then(function () { cb(); }, function () { (onerr || function () {})(); });
   }
 
   function accent() { return (typeof window._themeAccentHex === 'function') ? window._themeAccentHex() : '#9A4A1F'; }

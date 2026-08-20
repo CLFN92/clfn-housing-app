@@ -609,7 +609,7 @@ function _enterDegradedMode(){
   _degradedUntil = Date.now() + _DEGRADED_COOLDOWN_MS;
   console.warn('[save-queue] slow network detected — degraded mode for ' + (_DEGRADED_COOLDOWN_MS/1000) + 's');
   if(typeof showToast === 'function'){
-    showToast('Slow connection — saving locally. Will sync when signal improves.', 'warn');
+    showToast('Slow connection — saving locally. Will sync when signal improves.', { type: 'info' });   // string 2nd arg was silently DROPPED by showToast
   }
   // Schedule a probe at the end of the cooldown window.
   setTimeout(_runDegradedProbe, _DEGRADED_COOLDOWN_MS + 100);
@@ -619,7 +619,13 @@ function _runDegradedProbe(){
   if(_degradedProbeRunning) return;
   if(!navigator.onLine) return; // still fully offline — online event will handle it
   _degradedProbeRunning = true;
-  var entries = saveQueueGetAll();
+  // Probe with one of the CURRENT user's queued entries (shared-iPad safety —
+  // never push another signed-in user's entity under this user's token), and
+  // remember it so success can DEQUEUE it: the old code left the probed entry
+  // in the queue and then ran syncSaveQueue, which re-sent it (duplicate rows
+  // for append-only types like tenant notes).
+  var _own    = (typeof _currentOwnerEmail === 'function' ? _currentOwnerEmail() : '') || '';
+  var entries = saveQueueGetAll().filter(function(e){ return !e.ownerEmail || !_own || e.ownerEmail === _own; });
   var probe   = entries.length ? entries[0] : null;
   var attempt = probe
     ? _SAVE_RETRY[probe.entityType](probe.entity)
@@ -631,7 +637,8 @@ function _runDegradedProbe(){
     _degradedProbeRunning = false;
     _degradedUntil = 0; // exit degraded mode
     console.log('[save-queue] probe succeeded — exiting degraded mode');
-    if(typeof showToast === 'function') showToast('Connection restored — syncing saved data.');
+    if(probe) saveQueueRemove(probe.entityType, probe.id);   // probed entry already persisted — don't re-send it
+    if(typeof showToast === 'function') showToast('Connection restored — syncing saved data.', { type: 'info' });
     syncSaveQueue().catch(function(){});
     if(typeof window.flushOfflineFiles === 'function') window.flushOfflineFiles();   // O2: sync queued PDFs/files
   }).catch(function(){
@@ -2503,17 +2510,11 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
 
   } else if(format==='pdf') {
     var loadjsPDF = function(cb){
-      if(window.jspdf&&window.jspdf.jsPDF){ cb(); return; }
-      var s1=document.createElement('script');
-      s1.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s1.onload=function(){
-        var s2=document.createElement('script');
-        s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
-        s2.onload=cb; s2.onerror=function(){showToast('Could not load PDF library.');};
-        document.head.appendChild(s2);
-      };
-      s1.onerror=function(){showToast('Could not load PDF library.');};
-      document.head.appendChild(s1);
+      // Delegates to the shared lazy-loader in shared.js (single implementation;
+      // also fixes the old copy skipping autotable when jsPDF was already loaded).
+      window.loadJsPdf({ autotable: true }).then(function(){ cb(); }, function(){
+        showToast('Could not load PDF library.', {type:'error'});
+      });
     };
     loadjsPDF(function(){
       var doc = new window.jspdf.jsPDF({orientation: pdfLandscape?'landscape':'portrait', unit:'mm', format:'a4'});
@@ -3159,17 +3160,23 @@ function _appSubMerge(id, targetAppId){
   var note = (document.getElementById('app_sub_note') || {}).value || '';
   var p = s.payload || {};
   var staffEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  // Merge onto a CLONE, save, and only adopt onto the live app after the save
+  // resolves. The old code mutated the live object first with no rollback —
+  // after a failed save every screen showed portal data that wasn't in the DB
+  // until a reload silently reverted it.
+  var merged = JSON.parse(JSON.stringify(target));
   // Scalar applicant fields — overwrite only when the applicant supplied a value.
   ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp'].forEach(function(k){
-    if(p[k] !== undefined && p[k] !== '' && p[k] !== null) target[k] = p[k];
+    if(p[k] !== undefined && p[k] !== '' && p[k] !== null) merged[k] = p[k];
   });
-  if(p.hasCoApp && p.coApp) target.coApp = p.coApp;
+  if(p.hasCoApp && p.coApp) merged.coApp = p.coApp;
   // Repeater lists — replace only if the applicant provided a non-empty set.
-  ['habitants','incomes','references','pets'].forEach(function(k){ if(Array.isArray(p[k]) && p[k].length) target[k] = p[k]; });
-  if(s.submission_type === 'transfer'){ target.appType = 'transfer_request'; target.transferPending = true; }
-  target.last_portal_merge = { submission_id: s.id, type: s.submission_type, at: new Date().toISOString(), by: staffEmail };
+  ['habitants','incomes','references','pets'].forEach(function(k){ if(Array.isArray(p[k]) && p[k].length) merged[k] = p[k]; });
+  if(s.submission_type === 'transfer'){ merged.appType = 'transfer_request'; merged.transferPending = true; }
+  merged.last_portal_merge = { submission_id: s.id, type: s.submission_type, at: new Date().toISOString(), by: staffEmail };
   if(typeof showToast === 'function') showToast('Merging into ' + targetAppId + '…');
-  sbSaveApplication(target).then(function(){
+  sbSaveApplication(merged).then(function(){
+    Object.assign(target, merged);   // save confirmed — adopt onto the live app
     return _appSubResolve(id, 'approved', note, targetAppId).then(function(){
       _appSubLinkProfile(s.applicant_uid, targetAppId);
       _appSubCarryDocs(targetAppId, p._docs);
@@ -4265,7 +4272,7 @@ async function lookupUser(){
   var _canExternal = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole);
   if(_isExternal && !_canExternal){
     resultEl.style.display='block';
-    resultEl.innerHTML='<div style="padding:10px 14px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;font-size:12px;color:var(--danger);">External (non-' + _lookupDomain + ') emails can only be added by the Executive Director, as an external consultant.</div>';
+    resultEl.innerHTML='<div style="padding:10px 14px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;font-size:12px;color:var(--danger);">External (non-' + _lkDom + ') emails can only be added by the Executive Director, as an external consultant.</div>';
     return;
   }
   resultEl.innerHTML='<div style="padding:10px;font-size:12px;color:var(--muted);">Searching…</div>';
@@ -4358,7 +4365,6 @@ function openAddContractorModal(editIdx){
   }, 80);
   // Pre-fill if editing
   if(window._ctEditIdx >= 0) {
-    var contractors = [];
     var contractors = window._contractors || [];
     var ct = contractors[window._ctEditIdx];
     if(ct) {
@@ -4433,7 +4439,6 @@ function openAddContractorModal(editIdx){
   }
 }
 function openCtApprovalPanel(idx) {
-  var contractors = [];
   var contractors = window._contractors || [];
   var ct = contractors[idx];
   if(!ct) return;
@@ -4918,23 +4923,39 @@ function renderBudgetPools(){
 // ── Contractor row stats ──────────────────────────────────────────────
 // Returns the number of SOWs filed against a contractor and the cumulative
 // dollar value (sum of totalCost across all SOWs). Used by both the KPI
-// strip and the per-row #Jobs / Cumulative $ columns. Cheap enough to
-// recompute on every render — _sowCache is fully in-memory.
+// strip and the per-row #Jobs / Cumulative $ columns.
+//
+// Built as ONE pass over _sowCache shared by every caller in the same
+// synchronous render burst — the old per-contractor getAllSowsForContractor
+// walk made the contractor list O(contractors × SOWs). The memo is dropped on
+// the next macrotask (setTimeout 0), so it can never outlive the render that
+// built it or go stale after a save.
+var _ctStatsMemo = null;
+function _ctBuildStatsMap() {
+  var map = {};
+  var cache = window._sowCache || {};
+  Object.keys(cache).forEach(function(unitId){
+    var raw = cache[unitId];
+    if (!raw) return;
+    var sows = Array.isArray(raw.sows) ? raw.sows : [raw];
+    sows.forEach(function(s){
+      if (!s || !s.contractorId) return;
+      var e = map[s.contractorId] || (map[s.contractorId] = { jobCount: 0, totalValue: 0 });
+      e.jobCount++;
+      e.totalValue += (typeof s.amount === 'number' && !isNaN(s.amount)) ? s.amount
+        : parseFloat(String(s.totalCost || '').replace(/[^0-9.\-]/g, '')) || 0;
+    });
+  });
+  return map;
+}
 function _ctRowStats(ct) {
   var ctId = ct && ct.id;
-  if (!ctId || typeof getAllSowsForContractor !== 'function') {
-    return { jobCount: 0, totalValue: 0 };
+  if (!ctId) return { jobCount: 0, totalValue: 0 };
+  if (!_ctStatsMemo) {
+    _ctStatsMemo = _ctBuildStatsMap();
+    setTimeout(function(){ _ctStatsMemo = null; }, 0);
   }
-  var sows = getAllSowsForContractor(ctId);
-  var total = 0;
-  for (var i = 0; i < sows.length; i++) {
-    var s = sows[i] && sows[i].sow;
-    if (!s) continue;
-    var n = (typeof s.amount === 'number' && !isNaN(s.amount)) ? s.amount
-          : parseFloat(String(s.totalCost || '').replace(/[^0-9.\-]/g, '')) || 0;
-    total += n;
-  }
-  return { jobCount: sows.length, totalValue: total };
+  return _ctStatsMemo[ctId] || { jobCount: 0, totalValue: 0 };
 }
 
 // ── Contractor KPIs ──────────────────────────────────────────────────
@@ -5659,10 +5680,20 @@ function renderRenosView(){
     return (u.under_renovation || u.status==='condemned') && !u.archived;
   });
 
+  // Per-render memo — calcRenoScore does a full-inventory find + SOW read per
+  // call, and this render used to call it from the sort comparator
+  // (O(n log n) scans), the Priority column accessor, the score badge, and
+  // each card tile. Scoped to this render's closure so it can never go stale.
+  var _rsMemo = {};
+  function _renoScoreOf(uid){
+    if (!Object.prototype.hasOwnProperty.call(_rsMemo, uid)) _rsMemo[uid] = calcRenoScore(uid);
+    return _rsMemo[uid];
+  }
+
   // Default sort — priority desc. Stays in effect until the user picks
   // a column-menu sort (tableApplyFilterSort preserves this when no
   // sort key is set).
-  allReno.sort(function(a,b){ return calcRenoScore(b.id).score - calcRenoScore(a.id).score; });
+  allReno.sort(function(a,b){ return _renoScoreOf(b.id).score - _renoScoreOf(a.id).score; });
 
   // Search filter — scans every visible column.
   var _renoSearch = ((document.getElementById('renos_search')||{}).value || '').toLowerCase().trim();
@@ -5679,7 +5710,7 @@ function renderRenosView(){
   }
 
   function scoreBadge(uid){
-    var r=calcRenoScore(uid); var s=r.score;
+    var r=_renoScoreOf(uid); var s=r.score;
     var tier=s>=40?{label:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{label:'Low',c:'var(--success)',bg:'var(--success-bg)'};
     return '<span style="font-size:15px;font-weight:800;color:var(--text);">'+s+'</span>'
       +' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span>';
@@ -5692,7 +5723,7 @@ function renderRenosView(){
     status:     { label: 'Status',     accessor: function(u){ return u.status === 'condemned' ? 'Condemned' : 'Under Repair'; } },
     progress:   { label: 'Progress',   accessor: function(u){ var p=getRenoProgress(u.id); return p && p.overallPct || 0; } },
     contractor: { label: 'Contractor', accessor: function(u){ var s=getSowData(u.id); return (s && s.contractor) || '(none)'; } },
-    priority:   { label: 'Priority',   accessor: function(u){ return calcRenoScore(u.id).score || 0; } }
+    priority:   { label: 'Priority',   accessor: function(u){ return _renoScoreOf(u.id).score || 0; } }
   };
   var _renosAccessors = {};
   Object.keys(_renosColumns).forEach(function(k){ _renosAccessors[k] = _renosColumns[k].accessor; });
@@ -5771,7 +5802,7 @@ function renderRenosView(){
         var prog = getRenoProgress(u.id);
         var pct = prog.overallPct || 0;
         var uid = String(u.id).replace(/'/g,"\\'");
-        var _rs = calcRenoScore(u.id).score;
+        var _rs = _renoScoreOf(u.id).score;
         var _tier = _rs>=40?{l:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:_rs>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:_rs>=12?{l:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{l:'Low',c:'var(--success)',bg:'var(--success-bg)'};
         return _cardTile({
           title: _rnEsc(((u.num||'')+' '+(u.street||'')).trim()),
@@ -5850,16 +5881,13 @@ window._renosSetView = function(v){
 };
 
 function renderSowAuditLog(unitId) {
+  // Re-wired to housing_audit_log (rows keyed entity_id = 'SOW:<unitId>' by
+  // auditEntry). The previous version's data load had been removed, leaving a
+  // permanently empty panel that told staff "No audit entries yet" while rows
+  // existed in the table.
   var tbody = document.getElementById('sow_audit_tbody');
-  if(!tbody) return;
-  var log = [];
-  // audit log loaded from Supabase
+  if(!tbody || !unitId) return;
 
-  // Filter to entries for this unit's SOW
-  var prefix = 'SOW:' + (unitId || '');
-  var sowLog = log.filter(function(e) { return e.appId === prefix; });
-
-  // Action labels with icons
   var actionLabels = {
     'sow_created':       '🆕 Created',
     'sow_updated':       '✏️ Updated',
@@ -5867,25 +5895,42 @@ function renderSowAuditLog(unitId) {
     'sow_staff_signed':  '✍️ Staff Signed',
     'sow_hm_approval':   '✅ HM Approval',
     'sow_ed_approval':   '✅ ED Approval',
-    'sow_accountability':'⚠️ Accountability'
+    'sow_accountability':'⚠️ Accountability',
+    'sow_completed':     '🏁 Completed',
+    'sow_reopened':      '↺ Reopened',
+    'sow_cancelled':     '✖ Cancelled',
+    'sow_archived':      '🗄 Archived',
+    'sow_renumbered':    '# Renumbered'
   };
 
-  if(!sowLog.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">No audit entries yet — save the Maintenance Request to begin tracking.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = sowLog.map(function(e) {
-    var d   = new Date(e.ts);
-    var ds  = d.toLocaleDateString('en-CA') + ' ' + d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
-    var lbl = actionLabels[e.action] || e.action;
-    return '<tr class="row-divider">'
-      + '<td style="padding:8px 14px;font-size:11px;color:var(--muted);white-space:nowrap;">' + ds + '</td>'
-      + '<td style="padding:8px 14px;font-size:12px;font-weight:600;white-space:nowrap;">' + lbl + '</td>'
-      + '<td style="padding:8px 14px;font-size:12px;color:var(--text);">' + (e.detail||'—') + '</td>'
-      + '<td style="padding:8px 14px;font-size:11px;color:var(--muted);white-space:nowrap;">' + (e.user||'—') + '</td>'
-      + '</tr>';
-  }).join('');
+  tbody.innerHTML = '<tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">Loading history…</td></tr>';
+  fetch(SUPABASE_URL + '/rest/v1/housing_audit_log?entity_id=eq.' + encodeURIComponent('SOW:' + unitId)
+      + '&select=action,detail,actor,created_at&order=created_at.desc&limit=40',
+      { headers: HOUSING_HEADERS })
+    .then(function(r){ return r.ok ? r.json() : []; })
+    .then(function(rows){
+      var el = document.getElementById('sow_audit_tbody');
+      if(!el) return;
+      if(!rows || !rows.length) {
+        el.innerHTML = '<tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">No audit entries yet — save the Maintenance Request to begin tracking.</td></tr>';
+        return;
+      }
+      el.innerHTML = rows.map(function(e) {
+        var d   = new Date(e.created_at);
+        var ds  = isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-CA') + ' ' + d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
+        var lbl = actionLabels[e.action] || e.action;
+        // detail is a JSON blob {detail, name} written by auditEntry.
+        var det = e.detail, who = e.actor || '—';
+        try { var pj = JSON.parse(e.detail); if (pj && typeof pj === 'object') { det = pj.detail || ''; if (pj.name) who = pj.name; } } catch(err) {}
+        return '<tr class="row-divider">'
+          + '<td style="padding:8px 14px;font-size:11px;color:var(--muted);white-space:nowrap;">' + ds + '</td>'
+          + '<td style="padding:8px 14px;font-size:12px;font-weight:600;white-space:nowrap;">' + escapeHtml(lbl) + '</td>'
+          + '<td style="padding:8px 14px;font-size:12px;color:var(--text);">' + escapeHtml(det || '—') + '</td>'
+          + '<td style="padding:8px 14px;font-size:11px;color:var(--muted);white-space:nowrap;">' + escapeHtml(who) + '</td>'
+          + '</tr>';
+      }).join('');
+    })
+    .catch(function(e){ console.warn('[sow audit] load failed:', e); });
 }
 function renderUnitScoreTable(){
   var tbody=document.getElementById('unit_score_tbody');
@@ -5981,7 +6026,6 @@ function _wlCollectDrafts(ctx) {
   var draftSows = [];
   if (isSuperUser || email || myName) {
     var sowCache = window._sowCache || {};
-    var sowUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(sowCache).forEach(function(uid) {
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow) {
@@ -5992,7 +6036,7 @@ function _wlCollectDrafts(ctx) {
         if (!isSuperUser) {
           if (!prep || (myName && prep !== myName)) return;
         }
-        var u = sowUnits.find(function(x){ return x && x.id === uid; });
+        var u = (ctx.unitById || {})[uid];
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
         draftSows.push({ uid: uid, pn: sow.project_number || '', addr: addr, by: isSuperUser ? prep : '' });
       });
@@ -6003,12 +6047,11 @@ function _wlCollectDrafts(ctx) {
   var draftRfqs = [];
   if ((isSuperUser || email) && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
-    var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
       var rfq = rfqCache[rfqId];
       if (!rfq || rfq.status !== 'draft') return;
       if (!isSuperUser && (rfq.created_by || '').toLowerCase() !== email) return;
-      var u = rfqUnits.find(function(x){ return x && x.id === rfq.sow_unit_id; });
+      var u = (ctx.unitById || {})[rfq.sow_unit_id];
       var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : (rfq.sow_unit_id||'');
       draftRfqs.push({ id: rfqId, addr: addr, by: isSuperUser ? (rfq.created_by || '') : '' });
     });
@@ -6048,7 +6091,6 @@ function _wlCollectSows(ctx) {
   var sowItems = [];
   if (ctx.isManagement) {
     var sowCache2 = window._sowCache || {};
-    var sowUnitsAll = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(sowCache2).forEach(function(uid) {
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow) {
@@ -6078,7 +6120,7 @@ function _wlCollectSows(ctx) {
           status === '' || status === 'draft' || status === 'signed' || status === 'submitted'
         );
         if (!needsHm && !needsEd) return;
-        var u = sowUnitsAll.find(function(x){ return x && x.id === uid; });
+        var u = (ctx.unitById || {})[uid];
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
         sowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status,
           amount:     (typeof sow.amount === 'number' ? sow.amount : (parseFloat(String(sow.totalCost||'').replace(/[^0-9.\-]/g,'')) || 0)),
@@ -6104,7 +6146,6 @@ function _wlCollectFieldSows(ctx) {
   var fieldSowItems = [];
   if (ctx.role === 'field_employee') {
     var fsCache = window._sowCache || {};
-    var fsUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(fsCache).forEach(function(uid) {
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow) {
@@ -6113,7 +6154,7 @@ function _wlCollectFieldSows(ctx) {
         var status = sow.approval_status || '';
         if (status !== 'hm_approved' && status !== 'ed_approved') return; // approved, not completed
         if (sowHiddenFromCurrentFieldEmployee(sow)) return;               // in-house + assigned to me
-        var u = fsUnits.find(function(x){ return x && x.id === uid; });
+        var u = (ctx.unitById || {})[uid];
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
         fieldSowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status });
       });
@@ -6128,11 +6169,10 @@ function _wlCollectRfqs(ctx) {
   var rfqItems = [];
   if (ctx.isManagement && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
-    var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
       var rfq = rfqCache[rfqId]; if (!rfq) return;
       if (rfq.status !== 'issued') return;
-      var u = rfqUnits.find(function(x){ return x && x.id === rfq.sow_unit_id; });
+      var u = (ctx.unitById || {})[rfq.sow_unit_id];
       var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : (rfq.sow_unit_id||'');
       var closes = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '';
       rfqItems.push({ id: rfqId, addr: addr, closes: closes, recipients: (rfq.recipient_contractor_ids||[]).length,
@@ -6351,8 +6391,11 @@ function renderWorklist() {
   var myName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.name : '') || '';
   var apps   = (typeof applications !== 'undefined' && applications) ? applications : [];
 
-  // Shared context — computed ONCE and passed to every collector.
-  var ctx = { role: role, email: email, myName: myName, apps: apps, isManagement: isManagement, canFinal: canFinal, isSuperUser: isSuperUser };
+  // Shared context — computed ONCE and passed to every collector. unitById
+  // replaces the per-item housingUnits.find() scans the collectors used to do.
+  var unitById = {};
+  (typeof housingUnits !== 'undefined' && housingUnits ? housingUnits : []).forEach(function(u){ if (u && u.id != null) unitById[u.id] = u; });
+  var ctx = { role: role, email: email, myName: myName, apps: apps, isManagement: isManagement, canFinal: canFinal, isSuperUser: isSuperUser, unitById: unitById };
 
   var _drafts       = _wlCollectDrafts(ctx);
   var draftApps     = _drafts.draftApps;
@@ -8287,7 +8330,7 @@ function exportRenos(format) {
     var rs=calcRenoScore(u.id);
     var sow=null;sow = getSowData(u.id);
     var prog=null;prog = (window._renoProgress && window._renoProgress[u.id]) || {};
-    return[u.num+' '+u.street,u.bedrooms,(u.type&&u.type!=='0'&&u.type!=='nan')?u.type:'',(u.foundation&&u.foundation!=='0'&&u.foundation!=='nan')?u.foundation:'',u.status,rs.score||0,(prog.contractor||sow&&sow.contractor||''),(sow?'Yes':'No'),(prog.progress||0)+'%'];
+    return[u.num+' '+u.street,u.bedrooms,(u.type&&u.type!=='0'&&u.type!=='nan')?u.type:'',(u.foundation&&u.foundation!=='0'&&u.foundation!=='nan')?u.foundation:'',u.status,rs.score||0,(prog.contractor||sow&&sow.contractor||''),(sow?'Yes':'No'),(prog.overallPct||0)+'%'];
   });
   var _ns4=nationShort();
   _doExport(format,headers,data,_ns4+'_Renovations_'+new Date().toISOString().slice(0,10),[30,8,16,14,14,14,22,10,12],true);
@@ -8669,7 +8712,6 @@ function showMatch(){
 function rpContractorSearch(q) {
   var dd = document.getElementById('rp_ct_dropdown');
   if(!dd) return;
-  var contractors = [];
   var contractors = window._contractors || [];
   var term = (q||'').toLowerCase().trim();
   var matches = term

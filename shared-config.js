@@ -728,6 +728,24 @@ var RENO_FUND_RULES = {
 // Critical system SOW categories — must be funded first
 var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Doors','Plumbing'];
 
+// Renovation budget pools — the single registry (like RENO_FUND_RULES above).
+// Consumed by the Settings → Reno Budget editor (housing-modals.js), the SOW
+// fund-source labels (shared-data.js, housing-modals-sow.js, renos.html), and
+// the Capital Projects funding dropdown (projects-init.js). The page-local
+// copies in housing-modals.js and renos.html drifted (renos was missing fncfs
+// + band_rep) — do not re-add per-page copies.
+var BUDGET_POOLS = [
+  { id:'emergency', label:'Emergency Repairs',  icon:'🚨', color:'var(--danger)', bg:'var(--danger-bg)' },
+  { id:'isc',       label:'ISC Funds',          icon:'🏛️', color:'#1d4ed8', bg:'var(--info-blue-bg)' },
+  { id:'rrap',      label:'RRAP Funds',         icon:'🏠', color:'#7c3aed', bg:'#faf5ff' },
+  { id:'band',      label:'Band Funds',         icon:'🌲', color:'var(--success)', bg:'var(--success-bg)' },
+  { id:'cmhc',      label:'CMHC',               icon:'🏗️', color:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)' },
+  { id:'ofnlp',     label:'OFNLP',              icon:'🤝', color:'#0e7490', bg:'#ecfeff' },
+  { id:'fncfs',     label:'FNCFS Funds',        icon:'👶', color:'#be185d', bg:'#fdf2f8', requiresDependants:true },
+  { id:'band_rep',  label:'Band Rep Funds',     icon:'🏡', color:'#4f46e5', bg:'#eef2ff' },
+];
+window.BUDGET_POOLS = BUDGET_POOLS;
+
 // Single accessor for the nation's short identifier. Replaces a fallback that
 // hardcoded 'CLFN' in ~13 places (a HARD-RULE violation). NATION_CONFIG.short is
 // set at boot (see NATIONS_DIRECTORY resolver above, where the CLFN default

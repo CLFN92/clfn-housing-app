@@ -322,7 +322,7 @@ function _appendAIMessage(role, text, id) {
     'max-width:85%;padding:9px 13px;border-radius:12px;font-size:13px;',
     'line-height:1.5;white-space:pre-wrap;word-break:break-word;',
     isUser
-      ? 'background:var(--yellow);color:#fff;border-bottom-right-radius:3px;'
+      ? 'background:var(--yellow);color:var(--dark);border-bottom-right-radius:3px;'
       : 'background:#2f3033;border:1px solid #444;color:#e8e8e5;border-bottom-left-radius:3px;',
   ].join('');
   bubble.textContent = displayText;
@@ -475,12 +475,10 @@ function _aiRenderChart(wrap, spec) {
 // ── Export an assistant reply as a branded PDF ───────────────────────────────
 function _aiLoadScript(src, cb){ var s=document.createElement('script'); s.src=src; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
 function _aiLoadPdfLibs(cb){
-  if (window._aiPdfReady) { cb(); return; }
-  _aiLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function(){
-    _aiLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js', function(){
-      window._aiPdfReady = true; cb();
-    });
-  });
+  // Delegates to the shared lazy-loader in shared.js (single implementation).
+  // Preserves the old behaviour of always calling cb (the caller re-checks
+  // window.jspdf before use), matching _aiLoadScript's onerror=cb semantics.
+  window.loadJsPdf({ autotable: true }).then(function(){ cb(); }, function(){ cb(); });
 }
 // Render a chart spec to a PNG data URL via an offscreen Chart.js canvas.
 function _aiChartToImage(spec, cb){

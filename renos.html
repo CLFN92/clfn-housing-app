@@ -794,14 +794,10 @@ function openRenoBudget(unitId) {
     return;
   }
 
-  // Module gate: bounce back to housing.html if the renovations module is
-  // disabled for this nation. The page must not render any reno UI without it.
-  if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('renovations')) {
-    window.location.href = 'housing.html';
-    return;
-  }
-
-  // Restore session from saved values — no API call needed
+  // Restore session from saved values, then verify against the staff table —
+  // this page previously trusted sessionStorage alone, so a role change
+  // (promotion/demotion) never applied here until re-login, unlike every
+  // other sub-page.
   HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
   HOUSING_SESSION.accessToken = token;
   HOUSING_SESSION.role  = savedRole;
@@ -811,9 +807,22 @@ function openRenoBudget(unitId) {
   // _realRole tracks the authenticated role; _viewAsRole is the ED's preview-as selection.
   // When a real ED previews as HM/Employee, _realRole stays 'ed' so the role dropdown stays visible.
   if(!window._realRole) window._realRole = savedRole;
-  
+  if (HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
+    try { await resolveHousingRole(); } catch(e) { console.warn('[RENOS] role resolve:', e); }
+    window.currentRole = HOUSING_SESSION.role || savedRole;
+    window._realRole   = HOUSING_SESSION.role || savedRole;
+  }
+
   try {
     await loadRenosData();
+    // Module gate — AFTER settings hydration (loadRenosData loads
+    // housing_settings) so a persisted "renovations off" is actually enforced;
+    // the old pre-load CLFN_MODULES.isEnabled check ran before the saved state
+    // existed and failed open on direct URLs.
+    if (typeof moduleOn === 'function' && !moduleOn('renovations')) {
+      window.location.href = 'housing.html';
+      return;
+    }
     initRenosPage();
   } catch(e) {
     console.error('[RENOS] init failed:', e.message, e.stack);
@@ -1243,35 +1252,15 @@ function canEditProgressFor(unitId){
 
 
 
-async function udpProcessFiles(files) {
-  if(!files||!files.length) return;
-  var uid = _currentDetailUnitId;
-  var zone = document.getElementById('udp_drop_zone');
-  if(zone){ zone.style.borderColor='var(--yellow)'; }
-  try {
-    for(var i=0; i<files.length; i++){
-      await sbUploadAndSave('tenant', uid, files[i], 'tenants/'+uid);
-    }
-    showToast('\u2713 '+files.length+' file'+(files.length>1?'s':'')+' uploaded');
-    udpRenderFilePreviews(uid);
-  } catch(e){
-    showToast('Upload failed: '+e.message);
-  }
-  if(zone){ zone.style.borderColor='var(--border)'; }
-}
+// (udpProcessFiles removed — its #udp_drop_zone host left with the old unit
+// detail panel; the Documents tab DocLibrary owns uploads now.)
 
 
 
 
 // ── renderBudgetPools ──
-var BUDGET_POOLS = [
-  { id:'emergency', label:'Emergency Repairs',  icon:'🚨', color:'#b91c1c', bg:'#fef2f2' },
-  { id:'isc',       label:'ISC Funds',          icon:'🏛️', color:'#1d4ed8', bg:'#eff6ff' },
-  { id:'rrap',      label:'RRAP Funds',         icon:'🏠', color:'#7c3aed', bg:'#faf5ff' },
-  { id:'band',      label:'Band Funds',         icon:'🌲', color:'#15803d', bg:'#f0fdf4' },
-  { id:'cmhc',      label:'CMHC',               icon:'🏗️', color:'#92400e', bg:'#fffbeb' },
-  { id:'ofnlp',     label:'OFNLP',              icon:'🤝', color:'#0e7490', bg:'#ecfeff' },
-];
+// BUDGET_POOLS lives in shared-config.js (single registry). This page's local
+// copy had drifted (missing fncfs + band_rep) — do not re-add one.
 
 
 
@@ -1404,8 +1393,10 @@ function renderRenoApprovalsView() {
                  appr:_getRaApprovalStatusForSow(u, null), cost:0, dismissed: !!u.reno_dismissed});
       return;
     }
+    // Reno score is unit-level — compute once per unit, not once per SOW row
+    // (calcRenoScore does a full-inventory find + SOW read per call).
+    var rs = calcRenoScore(u.id);
     list.forEach(function(sow){
-      var rs = calcRenoScore(u.id);
       var appr = _getRaApprovalStatusForSow(u, sow);
       var cost = (typeof sow.amount === 'number' ? sow.amount
                  : parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))) || 0;

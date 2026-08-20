@@ -108,9 +108,9 @@ async function loadRenosData() {
 (async function initContractorsPage() {
   var token = sessionStorage.getItem('clfn_housing_token');
   if (!token) { window.location.href = 'index.html'; return; }
-  if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('contractors')) {
-    window.location.href = '/housing.html?view=home'; return;
-  }
+  // NOTE: the module gate moved BELOW the data load — checking here ran before
+  // housing_settings hydrated, so a persisted "module off" was never seen and
+  // the gate failed open (any direct URL still worked).
   var savedRole  = sessionStorage.getItem('clfn_housing_role') || 'housing_employee_l1';
   var savedName  = sessionStorage.getItem('clfn_housing_name') || '';
   var savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
@@ -132,6 +132,11 @@ async function loadRenosData() {
   if (typeof setHeaderNavActive === 'function') setHeaderNavActive('contractors');
   if (typeof loadRenosData === 'function') {
     try { await loadRenosData(); } catch(e) { console.warn('[contractors] data load error:', e); }
+  }
+  // Module gate — AFTER settings hydration so a persisted "off" is enforced.
+  // moduleOn lazily hydrates saved overrides from _appSettings (shared-config).
+  if (typeof moduleOn === 'function' && !moduleOn('contractors')) {
+    window.location.href = 'housing.html?view=home'; return;
   }
   showContractors();
 

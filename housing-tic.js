@@ -927,8 +927,11 @@
       }
       savePromise = _ticWrite('PATCH', 'housing_units?id=eq.' + encodeURIComponent(unitId), body)
         .then(function(rows){
-          var saved = (rows && rows[0]) || Object.assign({}, _ticState.unit, body);
-          _ticState.unit = saved;
+          // Merge the CHANGED FIELDS onto the mapped unit — adopting the raw
+          // PostgREST row (rows[0], snake_case + unflattened data jsonb) used
+          // to replace the camelCase unit every other TIC read expects, so
+          // rent/dates/amortization silently blanked until reopen.
+          Object.assign(_ticState.unit, body);
           // Keep the in-memory housingUnits cache in sync so the unit card reflects changes immediately
           if (window.housingUnits) {
             var idx = window.housingUnits.findIndex(function(x){ return x.id === unitId; });

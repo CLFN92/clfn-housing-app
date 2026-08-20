@@ -143,7 +143,7 @@ async function _sowViewFile(path) {
   }
 }
 // Back-compat alias in case any cached markup still calls the old name.
-var _sowDownloadFile = _sowViewFile;
+// (_sowDownloadFile alias removed — zero call sites)
 window._sowViewFile = _sowViewFile;
 async function removeSowFile(path) {
   if (!path) return;
@@ -1269,7 +1269,7 @@ async function _sowPromptWorkOrderEmail(){
     var unit = (_sowUnitId && typeof getAllUnits === 'function')
              ? (getAllUnits().find(function(x){ return x.id === _sowUnitId; }) || null) : null;
     var team = sow.assignedTeam || (sow.contractorId ? 'contractor' : '');
-    var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+    var _esc = escapeHtml; // shared-ui.js (same five-char escape)
     if(team === 'in_house'){
       // In-house: the work order always goes to the Housing Manager; the
       // selected field employee (if any) is added. The employee is optional.
@@ -1353,7 +1353,7 @@ async function _sowPromptTenantEmail(){
     var email = '';
     if(typeof _resolveTenantEmailForUnit === 'function'){ try { email = await _resolveTenantEmailForUnit(unit); } catch(e){ email = ''; } }
     if(!email){ if(typeof showToast === 'function') showToast('No tenant email on file for this unit.'); return; }
-    var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+    var _esc = escapeHtml; // shared-ui.js (same five-char escape)
     var tenantName = unit.assignedName || 'the tenant';
     var r = await showConfirm({
       title:'Email Tenant Copy?',

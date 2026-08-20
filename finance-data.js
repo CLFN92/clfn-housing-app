@@ -143,7 +143,10 @@ var _NATION = function(){
   try {
     if (window.NATION_CONFIG && window.NATION_CONFIG.id) return window.NATION_CONFIG.id;
   } catch(e) {}
-  return 'clfn';
+  // Only reachable if shared-config failed entirely (every directory entry —
+  // including _default — carries an id). Neutral fallback, never another
+  // nation's id (OCAP): 'clfn' here would have cross-tenanted rows.
+  return 'default';
 };
 
 // Rent ledger row ↔ Supabase row.
@@ -534,65 +537,7 @@ function _journalFromRow(r){
   };
 }
 
-function _hydroToRow(h){
-  return {
-    id: h.id, nation_id: _NATION(),
-    unit_id: h.unitId || h.tenantId || '',   // temporary fallback; utility is unit-keyed in schema
-    tenant_id: h.tenantId || null,
-    period_start: h.periodStart || h.date,
-    period_end: h.periodEnd || h.date,
-    meter_start: h.meterStart != null ? Number(h.meterStart) : null,
-    meter_end:   h.meterEnd   != null ? Number(h.meterEnd)   : null,
-    amount_billed: Number(h.amount||h.amountBilled||0),
-    amount_paid: Number(h.amountPaid||0),
-    notes: h.notes || null,
-    voids_id: h.voidsId || null, void_reason: h.voidReason || null,
-    created_by: h.createdBy || _ACTOR()
-  };
-}
-function _hydroFromRow(r){
-  return {
-    id: r.id, unitId: r.unit_id, tenantId: r.tenant_id || '',
-    periodStart: r.period_start, periodEnd: r.period_end,
-    date: r.period_end,
-    meterStart: r.meter_start, meterEnd: r.meter_end,
-    amount: Number(r.amount_billed||0),
-    amountBilled: Number(r.amount_billed||0),
-    amountPaid: Number(r.amount_paid||0),
-    notes: r.notes || '',
-    voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
-  };
-}
 
-function _gasToRow(g){
-  return {
-    id: g.id, nation_id: _NATION(),
-    unit_id: g.unitId || g.tenantId || '',
-    tenant_id: g.tenantId || null,
-    period_start: g.periodStart || g.date,
-    period_end: g.periodEnd || g.date,
-    meter_start: g.meterStart != null ? Number(g.meterStart) : null,
-    meter_end:   g.meterEnd   != null ? Number(g.meterEnd)   : null,
-    amount_billed: Number(g.amount||g.amountBilled||0),
-    amount_paid: Number(g.amountPaid||0),
-    notes: g.notes || null,
-    voids_id: g.voidsId || null, void_reason: g.voidReason || null,
-    created_by: g.createdBy || _ACTOR()
-  };
-}
-function _gasFromRow(r){
-  return {
-    id: r.id, unitId: r.unit_id, tenantId: r.tenant_id || '',
-    periodStart: r.period_start, periodEnd: r.period_end,
-    date: r.period_end,
-    meterStart: r.meter_start, meterEnd: r.meter_end,
-    amount: Number(r.amount_billed||0),
-    amountBilled: Number(r.amount_billed||0),
-    amountPaid: Number(r.amount_paid||0),
-    notes: r.notes || '',
-    voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
-  };
-}
 
 // ── Table registry ─────────────────────────────────────────────────────────
 // Binds each in-memory collection name to its Supabase table + mappers.
@@ -608,8 +553,9 @@ var _FIN_TABLES = [
   { key:'arrPayments',    table:'finance_arr_payments',   orderBy:'payment_date.desc', toRow:_arrPaymentToRow,   fromRow:_arrPaymentFromRow   },
   { key:'collections',    table:'finance_collections',    orderBy:'opened_date.desc', toRow:_collectionToRow,   fromRow:_collectionFromRow   },
   { key:'journalEntries', table:'finance_journal',        orderBy:'entry_date.desc', toRow:_journalToRow,      fromRow:_journalFromRow      },
-  { key:'hydroLedger',    table:'finance_utility_hydro',  orderBy:'period_start.desc', toRow:_hydroToRow,        fromRow:_hydroFromRow        },
-  { key:'gasLedger',      table:'finance_utility_gas',    orderBy:'period_start.desc', toRow:_gasToRow,          fromRow:_gasFromRow          }
+  // (hydroLedger/gasLedger table entries removed — the utility layer was dead
+  //  code with zero UI: no save path, no render, two wasted fetches per boot.
+  //  _emptyStore keeps the keys so any residual d.hydroLedger read stays safe.)
 ];
 
 // ── Fetch helpers ──────────────────────────────────────────────────────────
@@ -1085,21 +1031,7 @@ function _makeReversalEntry(collectionKey, original, reversalId, reason, actor) 
       voidsId: original.id, voidReason: reason
     };
   }
-  if (collectionKey === 'hydroLedger' || collectionKey === 'gasLedger') {
-    return {
-      id: reversalId,
-      unitId: original.unitId, tenantId: original.tenantId || '',
-      periodStart: original.periodStart, periodEnd: original.periodEnd,
-      date: original.date || td,
-      meterStart: null, meterEnd: null,
-      amount: -(original.amount || 0),
-      amountBilled: -(original.amountBilled || original.amount || 0),
-      amountPaid: 0,
-      notes: 'VOID: ' + (original.notes || reason),
-      status: 'void',
-      voidsId: original.id, voidReason: reason, createdBy: actor
-    };
-  }
+  // (hydroLedger/gasLedger reversal branch removed with the dead utility layer)
   return null;
 }
 

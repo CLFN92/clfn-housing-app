@@ -1,3 +1,5 @@
+// NOTE: runAutoEngine (the unreachable monthly auto-engine, ~160 lines incl. its
+// dead in-memory audit pushes) was deleted in the audit cleanup.
 function renderTenantProfile(tid) {
   var t = getTenant(tid);
   if (!t) return;
@@ -789,68 +791,30 @@ function openEntryVoucher(eid) {
   }
 }
 
-var _pendingReversal   = null;
+// (_pendingReversal removed with the retired submitReversal flow)
 var _pendingAdjustment = null;
 
 function reverseEntry(entryId, ledgerType) {
+  // RETIRED the legacy "pending reversal" flow (submitReversal): it pushed a
+  // negative-amount row whose money effect applied IMMEDIATELY despite the
+  // 'pending-ed' label, offered no approve action anywhere, and duplicated the
+  // newer void pattern. This entry point now routes straight to the audited
+  // void flow (reason modal -> voidLedgerEntry -> reversal row + audit).
   var cached = _entryCache[entryId];
   if (!cached) { toast('Entry not found.'); return; }
   var e = cached.entry;
-  var t = getTenant(e.tenantId);
-  _pendingReversal = {entryId: entryId, ledgerType: ledgerType};
-  var det = document.getElementById('rev-entry-details');
-  if (det) det.innerHTML =
-    detailCell('Date', e.date) +
-    detailCell('Description', e.desc||e.memo||'\u2014') +
-    detailCell('Charge', e.charge>0 ? fmt(e.charge) : '\u2014') +
-    detailCell('Payment', (e.payment||e.amount)>0 ? fmt(e.payment||e.amount) : '\u2014') +
-    detailCell('Method', e.method||'\u2014') +
-    detailCell('Tenant', t ? tenantName(t) : '\u2014');
-  var dateEl = document.getElementById('rev-date');
-  var refEl  = document.getElementById('rev-ref');
-  if (dateEl) dateEl.value = today();
-  if (refEl)  refEl.value  = 'REV-' + (e.ref||entryId).slice(-6).toUpperCase();
-  ['rev-reason','rev-approver','rev-approval-code'].forEach(function(id){
-    var el = document.getElementById(id); if(el) el.value='';
+  var key = ledgerType === 'arrangement' ? 'arrPayments'
+          : ledgerType === 'loan'        ? 'loanPayments'
+          : 'rentLedger';
+  showVoidModal({
+    label: 'Void Entry',
+    preview: detailCell('Date', e.date) +
+             detailCell('Description', e.desc || e.memo || '\u2014') +
+             detailCell('Amount', fmt(e.charge > 0 ? e.charge : (e.payment || e.amount || 0)))
+  }, function(reason){
+    voidLedgerEntry(key, entryId, reason);
+    if (e.tenantId) renderTenantProfile(e.tenantId);
   });
-  openModal('modalReverseEntry');
-}
-
-function submitReversal() {
-  if (!_pendingReversal) return;
-  var reason   = (document.getElementById('rev-reason')||{}).value||'';
-  var approver = (document.getElementById('rev-approver')||{}).value||'';
-  var code     = (document.getElementById('rev-approval-code')||{}).value||'';
-  var revDate  = (document.getElementById('rev-date')||{}).value||today();
-  var revRef   = (document.getElementById('rev-ref')||{}).value||'';
-  if (!reason.trim()) { toast('Please enter a reason.'); return; }
-  if (!approver)      { toast('Please select an approving officer.'); return; }
-  if (!code.trim())   { toast('Please enter approval code or initials.'); return; }
-  var d = getData();
-  var ledgerType = _pendingReversal.ledgerType;
-  var entryId    = _pendingReversal.entryId;
-  var ledger = ledgerType==='arrangement' ? d.arrPayments :
-               ledgerType==='loan'        ? d.loanPayments : d.rentLedger;
-  var entry = ledger.find(function(e){ return e.id===entryId; });
-  if (!entry) { toast('Entry not found.'); return; }
-  var approverLabel = approver=== ROLE.ED ? 'Executive Director' : 'CFO / Finance Director';
-  entry.status = 'pending-reversal';
-  ledger.push(Object.assign({}, entry, {
-    id:uid(), date:revDate,
-    desc:'REVERSAL: '+(entry.desc||entry.memo||'')+' \u2014 '+reason,
-    charge:  -(entry.charge||0),
-    payment: -(entry.payment||entry.amount||0),
-    amount:  -(entry.amount||0),
-    status:'pending-ed', ref:revRef,
-    approver:approverLabel, approvalCode:code, reversalReason:reason
-  }));
-  auditLog('update', ledgerType, entryId,
-    'Reversal submitted \u2014 Approver: '+approverLabel+' ('+code+') \u2014 Reason: '+reason,
-    {status:'approved'},{status:'pending-reversal'});
-  saveData(d);
-  closeModal('modalReverseEntry');
-  _pendingReversal = null;
-  if (entry.tenantId) renderTenantProfile(entry.tenantId);
 }
 
 function openAdjustment(entryId, ledgerType) {
@@ -955,7 +919,9 @@ function buildLedgerTable(entries, type) {
 
   rows.forEach(function(r){
     var e = r.e;
-    var isReversed = e.status === 'reversed';
+    // finIsVoided covers both the legacy 'reversed' status and the current
+    // void pattern (status 'void' / voidsId), so voided rows strike through.
+    var isReversed = (typeof finIsVoided === 'function') ? finIsVoided(e) : (e.status === 'reversed');
     var desc = e.desc || e.memo || e.notes || '\u2014';
     var eid  = e.id;
 
@@ -966,7 +932,7 @@ function buildLedgerTable(entries, type) {
 
     var actions = !isReversed
       ? '<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px;" ' +
-            'onclick="reverseEntry(\'' + eid + '\',\'' + type + '\')">\u21BA Reverse</button> ' +
+            'onclick="reverseEntry(\'' + eid + '\',\'' + type + '\')">\u2298 Void</button> ' +
         '<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px;" ' +
             'onclick="openAdjustment(\'' + eid + '\',\'' + type + '\')">\u00B1 Adjust</button>'
       : '';
@@ -1120,161 +1086,9 @@ function auditLog(action, entity, entityId, description, before, after) {
   });
 }
 
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-// AUTO-INVOICING & PAYMENT ENGINE
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-// Status: READY \u2014 activate by calling runAutoEngine()
-// Controls: runDate (YYYY-MM), dryRun (true = preview only)
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// (auto-invoicing/payment engine deleted in the audit cleanup \u2014 it was never
+// reachable from any UI)
 
-function runAutoEngine(runDate, dryRun) {
-  var d = getData();
-  var now = runDate || today().slice(0,7); // YYYY-MM
-  var year = now.slice(0,4);
-  var monthNum = parseInt(now.slice(5,7));
-  var monthNames = ['January','February','March','April','May','June',
-    'July','August','September','October','November','December'];
-  var monthLabel = monthNames[monthNum-1]+' '+year;
-  var results = { invoiced:[], paid:[], skipped:[], errors:[] };
-
-  d.tenants.forEach(function(t) {
-    var tid = t.id;
-    var skip = [];
-
-    // Skip: inactive tenant
-    if (t.active === false) { skip.push('Inactive tenant'); }
-
-    // Skip: in collections
-    if (isInCollections(tid)) { skip.push('Account in collections'); }
-
-    if (skip.length) {
-      results.skipped.push({tenant:tenantName(t), unit:t.unit, reasons:skip});
-      return;
-    }
-
-    // \u2500\u2500 AUTO INVOICE \u2500\u2500
-    // Check if invoice already exists for this month
-    var alreadyInvoiced = d.rentLedger.some(function(r){
-      return r.tenantId===tid && r.type==='invoice' &&
-             r.date.slice(0,7)===now && r.status!=='reversed';
-    });
-
-    var invEntry = null;
-    if (!alreadyInvoiced && t.rent > 0) {
-      invEntry = {
-        id: uid(), tenantId: tid,
-        date: now+'-01',
-        desc: monthLabel+' Rent Invoice',
-        charge: t.rent, payment: 0,
-        type: 'invoice', method: '', status: 'approved',
-        ref: 'AUTO-INV-'+tid+'-'+now,
-        autoGenerated: true
-      };
-      if (!dryRun) {
-        d.rentLedger.push(invEntry);
-        d.auditLog = d.auditLog||[];
-        d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:'Auto Engine',
-          action:'create',entity:'invoice',entityId:invEntry.id,
-          description:'Auto-invoice: '+tenantName(t)+' \u2014 '+monthLabel+' \u2014 '+fmt(t.rent),
-          before:null,after:invEntry});
-      }
-      results.invoiced.push({tenant:tenantName(t), unit:t.unit, amount:t.rent, ref:invEntry.ref, dry:!!dryRun});
-    }
-
-    // \u2500\u2500 AUTO PAYMENT (pre-authorized tenants only) \u2500\u2500
-    if (!t.autoPay) return;
-    var autoMethod = t.autoPayType === 'payroll' ? 'payroll' : 'eft';
-    var autoMethodLabel = t.autoPayType === 'payroll' ? 'Payroll Deduction' : 'EFT';
-
-    // Check if payment already posted this month
-    var alreadyPaid = d.rentLedger.some(function(r){
-      return r.tenantId===tid && r.type==='payment' &&
-             r.date.slice(0,7)===now && (r.method==='auto'||r.method==='eft'||r.method==='payroll') && r.status!=='reversed';
-    });
-
-    if (alreadyPaid) {
-      results.skipped.push({tenant:tenantName(t), unit:t.unit, reasons:['Auto-payment already posted for '+now]});
-      return;
-    }
-
-    // Calculate what to collect: rent + arrangement monthly + loan monthly
-    var totals = calcAllTotals(d);
-    var v = totals[tid]||{};
-    var rentOwing = Math.max(0, v.rent||0);
-    var activeArr = d.arrangements.filter(function(a){return a.tenantId===tid&&a.status==='approved';});
-    var arr = activeArr[0]||null;
-    var arrAmt = arr ? arr.monthlyPayment : 0;
-    var activeLoan = d.loanList.filter(function(l){return l.tenantId===tid&&l.status==='approved';});
-    var loan = activeLoan[0]||null;
-    var loanAmt = loan ? loan.payment : 0;
-    var totalCollect = Math.round((rentOwing + arrAmt + loanAmt)*100)/100;
-
-    if (totalCollect <= 0) {
-      results.skipped.push({tenant:tenantName(t), unit:t.unit, reasons:['Nothing owing \u2014 no payment needed']});
-      return;
-    }
-
-    var payLines = [];
-
-    // Post rent payment
-    if (rentOwing > 0) {
-      var rentPmt = {id:uid(),tenantId:tid,date:now+'-01',
-        desc:'Auto Rent Payment ('+autoMethodLabel+') \u2014 '+monthLabel,
-        charge:0,payment:rentOwing,type:'payment',method:autoMethod,status:'posted',
-        ref:'AUTO-PMT-'+tid+'-'+now, autoGenerated:true};
-      if (!dryRun) {
-        d.rentLedger.push(rentPmt);
-        d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:'Auto Engine',
-          action:'create',entity:'payment',entityId:rentPmt.id,
-          description:'Auto-payment rent: '+tenantName(t)+' \u2014 '+fmt(rentOwing),
-          before:null,after:rentPmt});
-      }
-      payLines.push('Rent: '+fmt(rentOwing));
-    }
-
-    // Post arrangement payment
-    if (arrAmt > 0 && arr) {
-      var arrPmt = {id:uid(),arrId:arr.id,tenantId:tid,date:now+'-01',
-        amount:arrAmt,method:autoMethod,type:'regular',ref:'AUTO-ARR-'+tid+'-'+now,
-        notes:'Auto payment', autoGenerated:true};
-      if (!dryRun) {
-        d.arrPayments.push(arrPmt);
-        d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:'Auto Engine',
-          action:'create',entity:'arrPayment',entityId:arrPmt.id,
-          description:'Auto-payment arrangement: '+tenantName(t)+' \u2014 '+fmt(arrAmt),
-          before:null,after:arrPmt});
-      }
-      payLines.push('Arrangement: '+fmt(arrAmt));
-    }
-
-    // Post loan payment
-    if (loanAmt > 0 && loan) {
-      var loanPmt = {id:uid(),loanId:loan.id,tenantId:tid,date:now+'-01',
-        amount:loanAmt,method:autoMethod,notes:'Auto payment',
-        status:'posted',autoGenerated:true};
-      if (!dryRun) {
-        d.loanPayments.push(loanPmt);
-        d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:'Auto Engine',
-          action:'create',entity:'loanPayment',entityId:loanPmt.id,
-          description:'Auto-payment loan: '+tenantName(t)+' \u2014 '+fmt(loanAmt),
-          before:null,after:loanPmt});
-      }
-      payLines.push('Loan: '+fmt(loanAmt));
-    }
-
-    results.paid.push({
-      tenant:tenantName(t), unit:t.unit,
-      total:totalCollect, lines:payLines, dry:!!dryRun
-    });
-  });
-
-  if (!dryRun && (results.invoiced.length || results.paid.length)) {
-    saveData(d);
-    renderDashboard();
-  }
-
-  return results;
-}
 
 function toggleHomeCare(tid) {
   var d = getData();

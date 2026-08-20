@@ -499,14 +499,8 @@
 
   // ---- Metal press PDF (single-ink K, knockout band) ------------------------
   function _loadJsPdf() {
-    return new Promise(function (resolve, reject) {
-      if (window.jspdf && window.jspdf.jsPDF) return resolve(window.jspdf.jsPDF);
-      var s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload = function () { resolve(window.jspdf && window.jspdf.jsPDF); };
-      s.onerror = function () { reject(new Error('jsPDF load failed')); };
-      document.head.appendChild(s);
-    });
+    // Delegates to the shared lazy-loader in shared.js (single implementation).
+    return window.loadJsPdf();
   }
   // Recolour a logo to a solid-white silhouette (knockout on the black band).
   function _whiteSilhouette(src) {

@@ -1915,21 +1915,8 @@ async function _prjDownloadDoc(doc, prefix) {
 // Lazy-load jsPDF + the autotable plugin (shared by the payment-request
 // claim summary and the project status report).
 function _prjLoadJsPdf(cb, onerr) {
-  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) { cb(); return; }
-  if (window.jspdf && window.jspdf.jsPDF && document.getElementById('prj_jspdf_at')) { cb(); return; }
-  var s1 = document.createElement('script');
-  s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-  s1.onload = function() {
-    var s2 = document.createElement('script');
-    s2.id = 'prj_jspdf_at';
-    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
-    s2.onload = cb;
-    s2.onerror = onerr;
-    document.head.appendChild(s2);
-  };
-  s1.onerror = onerr;
-  if (window.jspdf && window.jspdf.jsPDF) { s1.onload(); return; }
-  document.head.appendChild(s1);
+  // Delegates to the shared lazy-loader in shared.js (single implementation).
+  window.loadJsPdf({ autotable: true }).then(function(){ cb(); }, function(e){ if (onerr) onerr(e); });
 }
 
 function _prjGenerateRequestPdf(req, exp) {
@@ -3038,6 +3025,15 @@ function _prjArchiveProject() {
 
     if (typeof loadHousingData === 'function') {
       try { await loadHousingData(); } catch(e) { console.warn('[projects] data load:', e); }
+    }
+    // Module gate RE-CHECK after settings hydration: the pre-load check above
+    // ran before housing_settings existed, so a persisted "module off" was
+    // never seen there (the gate failed open on direct URLs).
+    if (typeof initModuleEnablement === 'function') try { initModuleEnablement(); } catch(e) {}
+    if (typeof moduleOn === 'function' && !moduleOn('projects')) {
+      if (typeof showModuleDisabledNotice === 'function') showModuleDisabledNotice('Capital Projects');
+      else window.location.href = 'housing.html';
+      return;
     }
     // Units are needed for linking + allocation; fall back to a direct load
     // when loadHousingData didn't populate them on this page.

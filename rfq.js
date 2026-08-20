@@ -41,6 +41,15 @@ var _rfqDocLib           = null; // DocLibrary instance for this RFQ
   window.currentRole    = savedRole;
   if (!window._realRole) window._realRole = savedRole;
 
+  // Verify the role against the staff table — this page previously trusted
+  // sessionStorage alone, so a promotion/demotion never applied here until
+  // re-login (every other sub-page already resolves).
+  if (HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
+    try { await resolveHousingRole(); } catch(e) { console.warn('[RFQ] role resolve:', e); }
+    window.currentRole = HOUSING_SESSION.role || savedRole;
+    window._realRole   = HOUSING_SESSION.role || savedRole;
+  }
+
   // Header is rendered by renderAppHeader() in housing-init.js (standard pattern)
 
   try { await loadRfqPageData(); } catch(e) { console.error('[RFQ] data load failed:', e); }
@@ -934,8 +943,12 @@ function renderContractorCards() {
 
   grid.innerHTML = _lockBanner + cts.map(function(ct) {
     var sel = !!_rfqSelectedCts[ct.id];
-    var wsib = ct.wsib_expiry ? (new Date(ct.wsib_expiry) > new Date() ? 'WSIB valid' : 'WSIB EXPIRED') : 'WSIB unknown';
-    var wsibClass = ct.wsib_expiry ? (new Date(ct.wsib_expiry) > new Date() ? 'rfq-ct-badge-ok' : 'rfq-ct-badge-warn') : 'rfq-ct-badge-warn';
+    // Records store camelCase wsibExpiry — the snake_case field never existed,
+    // so every card read "WSIB unknown". Compare as date STRINGS (YYYY-MM-DD)
+    // like _rfqContractorEligibility does.
+    var _wsibToday = new Date().toISOString().slice(0,10);
+    var wsib = ct.wsibExpiry ? (ct.wsibExpiry >= _wsibToday ? 'WSIB valid' : 'WSIB EXPIRED') : 'WSIB unknown';
+    var wsibClass = ct.wsibExpiry ? (ct.wsibExpiry >= _wsibToday ? 'rfq-ct-badge-ok' : 'rfq-ct-badge-warn') : 'rfq-ct-badge-warn';
     return '<div class="rfq-ct-card' + (sel ? ' is-selected' : '') + '" onclick="toggleContractor(\'' + escapeHtml(ct.id) + '\')">'
       + '<div class="rfq-ct-name">' + escapeHtml(ct.name) + '</div>'
       + '<div class="rfq-ct-trade">' + escapeHtml(ct.trade||'--') + '</div>'
@@ -1131,7 +1144,7 @@ function selectAllMatchingContractors() {
   _rfqScopeItems.filter(function(it){ return !it._hidden && it.category; }).forEach(function(it){ sowCategories[it.category.toLowerCase()] = true; });
   (window._contractors || []).forEach(function(ct) {
     if (!ct || !ct.name) return;
-    if (activeOnly && ct.status !== 'active') return;
+    if (activeOnly && ct.status && ct.status !== 'active') return;   // same predicate as the card grid — no-status contractors count as active
     if (Object.keys(sowCategories).length) {
       var trade = (ct.trade || '').toLowerCase();
       if (!Object.keys(sowCategories).some(function(cat){ return trade.indexOf(cat) !== -1 || cat.indexOf(trade) !== -1; })) return;
@@ -2372,6 +2385,9 @@ async function _rfqRefreshAttachList() {
       +   '</div>'
       + '</label>';
   }).join('');
+  // Async render — switchRfqTab's read-only sweep ran before the awaited
+  // load resolved, leaving live checkboxes/buttons for view-only users.
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 
 function _rfqToggleAttach(path, checked) {
@@ -2444,7 +2460,7 @@ function _rfqShowChecklist(title, items) {
 // caller's form scrape; numFmt is the caller's currency formatter (shared so
 // Schedule B matches the token formatting). Returns the finished PDF Blob.
 async function _rfqBuildContractPdf(tokens, d, savedBody, numFmt) {
-      if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+      await window.loadJsPdf();
       var logoDataUrl = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
       var ctx = _makePdfDoc({
         nationName:     tokens.nationName,
@@ -2884,7 +2900,7 @@ async function _rfqEmailContract(blob, filename, ct, apEmail, rfqId, addr) {
   try {
     if (typeof showConfirm !== 'function' || typeof sendNotification !== 'function') return;
     if (!ct || !ct.email) { if (typeof showToast === 'function') showToast('No contractor email on file — contract not emailed.'); return; }
-    var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+    var _esc = escapeHtml; // shared-ui.js (same five-char escape)
     var r = await showConfirm({
       title:       'Email Contract to Contractor?',
       message:     'Send the generated contract (PDF attached) to the awarded contractor? Uncheck to skip sending.',

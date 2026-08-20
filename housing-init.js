@@ -1030,17 +1030,29 @@ function confirmAssignment() {
   var isTied2 = selectedScore2 >= topScore2 - 1;
   var canOverride2  = APPROVAL_AUTHORITY.can('overrideMatch', role);
   var canAssignTie2 = APPROVAL_AUTHORITY.can('assignTiedBand', role);
-  var isEdOverride2 = canOverride2 && !isTied2;
+
+  // Secondary-eligible units sit OUTSIDE the scored pool (_amAllScored), so
+  // the tied-band math above always read them as score 0 / "below band" —
+  // blocking the HM from completing a secondary assignment the modal's own
+  // "Assign Secondary Unit" button had just offered, and forcing the ED into
+  // the override-notes path the UI labeled optional. They bypass the tied-band
+  // machinery entirely (the explicit oversize gate below still applies).
+  var isSecondary2 = false;
+  if (typeof _isSecondaryEligibleUnit === 'function') {
+    var _secU = getAllUnits().find(function(x){ return x.id === unitId; });
+    isSecondary2 = _secU ? !!_isSecondaryEligibleUnit(_secU) : false;
+  }
+  var isEdOverride2 = canOverride2 && !isTied2 && !isSecondary2;
 
   // Hard gate: assign-tied-only users cannot assign outside the tied score band — overrideMatch only
-  if(!canOverride2 && !isTied2) {
-    showToast('This unit requires Executive Director approval to assign');
+  if(!isSecondary2 && !canOverride2 && !isTied2) {
+    showToast('This unit requires Executive Director approval to assign', { type: 'error' });
     return;
   }
 
   // assign-tied users always require notes; override users require notes only when overriding below tied band
   var overrideNotes = ((document.getElementById('am_override_notes')||{}).value||'').trim();
-  var needsNotes = (canAssignTie2 && !canOverride2 && isTied2) || isEdOverride2;
+  var needsNotes = !isSecondary2 && ((canAssignTie2 && !canOverride2 && isTied2) || isEdOverride2);
   if(needsNotes && !overrideNotes){
     showToast((canAssignTie2 && !canOverride2) ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection');
     var notesEl = document.getElementById('am_override_notes');
@@ -1206,306 +1218,14 @@ function confirmAssignment() {
 // RENO APPROVALS VIEW — HM & ED consolidated SOW queue
 // ══════════════════════════════════════════════════════════════
 
-var _raFilter = '';
-
-
-
-
-
-function _getRaApprovalStatus(u, sow) {
-  var hmLimit = _getHmLimit();
-  if(!sow) return {key:'no_sow', label:'No Request Filed', bg:'#f4f4f0', c:'var(--gray)'};
-  var cost = parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0;
-  var needsED = cost > hmLimit;
-  var hmDec = (u.unitHmSig && u.unitHmSig.decision) || '';
-  var edDec = (u.unitEdSig && u.unitEdSig.decision) || '';
-  var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
-  var pct = prog ? (prog.overallPct||0) : 0;
-  if(pct >= 100) return {key:'complete',    label:'Complete',        bg:'var(--success-bg)', c:'var(--success)'};
-  if(pct > 0)    return {key:'in_progress', label:'In Progress',     bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'};
-  if(edDec === 'approved')                  return {key:'approved',  label:'ED Approved',     bg:'var(--success-bg)', c:'var(--success)'};
-  if(hmDec === 'approved' && !needsED)      return {key:'approved',  label:'HM Approved',     bg:'var(--success-bg)', c:'var(--success)'};
-  if(hmDec === 'approved' && needsED)       return {key:'pending_ed',label:'Pending ED',       bg:'var(--info-blue-bg)', c:'#1d4ed8'};
-  if(hmDec === 'declined' || edDec === 'declined') return {key:'declined', label:'Declined',  bg:'var(--danger-bg)', c:'var(--danger)'};
-  return {key:'pending_hm', label:'Pending HM', bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'};
-}
-
-
-
-function renderRenoApprovalsView() {
-  var role = window.currentRole || 'housing_employee_l1';
-  var relevant = _getAllRenoUnits();
-
-  var rows = relevant.map(function(u) {
-    var sow=null; sow = getSowData(u.id);
-    var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
-    var rs = calcRenoScore(u.id);
-    var appr = _getRaApprovalStatus(u, sow);
-    var cost = sow ? (parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0) : 0;
-    return {u:u, sow:sow, prog:prog, rs:rs, appr:appr, cost:cost};
-  });
-
-  // Filter by status tab
-  var filtered = _raFilter ? rows.filter(function(r){ return r.appr.key===_raFilter; }) : rows;
-
-  // Sort by reno score desc
-  filtered.sort(function(a,b){ return b.rs.score - a.rs.score; });
-
-  // ── Stat chips ──────────────────────────────────────────────
-  var chipsEl = document.getElementById('ra_chips');
-  if(chipsEl) {
-    var counts = {};
-    rows.forEach(function(r){ counts[r.appr.key]=(counts[r.appr.key]||0)+1; });
-    var chipDefs = [
-      {key:'pending_hm', label:'Pending HM',  c:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)'},
-      {key:'pending_ed', label:'Pending ED',  c:'#1d4ed8', bg:'var(--info-blue-bg)'},
-      {key:'approved',   label:'Approved',    c:'var(--success)', bg:'var(--success-bg)'},
-      {key:'in_progress',label:'In Progress', c:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)'},
-      {key:'complete',   label:'Complete',    c:'var(--success)', bg:'var(--success-bg)'},
-      {key:'no_sow',     label:'No Request',  c:'var(--gray)',    bg:'#f4f4f0'},
-    ];
-    chipsEl.innerHTML = chipDefs.map(function(d){
-      var cnt = counts[d.key]||0; if(!cnt) return '';
-      var active = _raFilter===d.key;
-      return '<span data-ra-f="'+(active?'':d.key)+'" style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:'+(active?d.c:d.bg)+';color:'+(active?'#fff':d.c)+';border:2px solid '+d.c+';cursor:pointer;user-select:none;">'+d.label+' '+cnt+'</span>';
-    }).join('');
-  }
-
-  // ── Tab active states ────────────────────────────────────────
-  var tabMap={ra_tab_all:'',ra_tab_nosow:'no_sow',ra_tab_phm:'pending_hm',ra_tab_ped:'pending_ed',ra_tab_app:'approved',ra_tab_prog:'in_progress',ra_tab_done:'complete'};
-  Object.keys(tabMap).forEach(function(id){
-    var el=document.getElementById(id); if(!el) return;
-    var active=_raFilter===tabMap[id];
-    el.style.background=active?'var(--yellow)':''; el.style.color=active?'#111':''; el.style.fontWeight=active?'700':'';
-  });
-
-  // ── KPI strip ────────────────────────────────────────────────────────────
-  var _raKpiEl = document.getElementById('ra_kpi');
-  if (_raKpiEl) {
-    var _raTotalVal = rows.reduce(function(s, r) { return s + r.cost; }, 0);
-    var _raCatCounts = {};
-    rows.forEach(function(r) {
-      if (!r.sow || !r.sow.items) return;
-      r.sow.items.forEach(function(it) {
-        var c = (it.category || 'Other').trim();
-        if (c) _raCatCounts[c] = (_raCatCounts[c] || 0) + 1;
-      });
-    });
-    var _raTopCats = Object.keys(_raCatCounts).sort(function(a, b) { return _raCatCounts[b] - _raCatCounts[a]; }).slice(0, 3);
-    function _raKpiCard(lbl, val, meta, acc) {
-      return '<div class="kpi-card' + (acc ? ' kpi-accent-' + acc : '') + '">'
-        + '<div class="kpi-label">' + lbl + '</div>'
-        + '<div class="kpi-value">' + val + '</div>'
-        + (meta ? '<div class="kpi-meta">' + meta + '</div>' : '')
-        + '</div>';
-    }
-    _raKpiEl.innerHTML =
-      _raKpiCard('Total Requests', rows.length, rows.length === 1 ? '1 maintenance request' : rows.length + ' total') +
-      _raKpiCard('Total Value', _raTotalVal > 0 ? formatCurrency(_raTotalVal) : '—', 'across all requests', 'info') +
-      (_raTopCats[0] ? _raKpiCard(_raTopCats[0], _raCatCounts[_raTopCats[0]], _raCatCounts[_raTopCats[0]] === 1 ? '1 item' : _raCatCounts[_raTopCats[0]] + ' items', 'success') : _raKpiCard('#1 Category', '—', 'no items yet')) +
-      (_raTopCats[1] ? _raKpiCard(_raTopCats[1], _raCatCounts[_raTopCats[1]], _raCatCounts[_raTopCats[1]] === 1 ? '1 item' : _raCatCounts[_raTopCats[1]] + ' items') : '') +
-      (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], _raCatCounts[_raTopCats[2]] === 1 ? '1 item' : _raCatCounts[_raTopCats[2]] + ' items') : '');
-  }
-
-  // ── Table rows ───────────────────────────────────────────────
-  var tbody = document.getElementById('ra_tbody');
-  if(!tbody) return;
-
-  if(!filtered.length) {
-    tbody.innerHTML='<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--muted);">No renovation records match this filter.</td></tr>';
-    return;
-  }
-
-  var hmLimit = _getHmLimit();
-  tbody.innerHTML = filtered.map(function(r) {
-    var u=r.u; var sow=r.sow; var prog=r.prog; var rs=r.rs; var appr=r.appr;
-    var tier = rs.score>=40?{l:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:rs.score>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:rs.score>=12?{l:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{l:'Low',c:'var(--success)',bg:'var(--success-bg)'};
-    var costStr = r.cost>0 ? formatCurrency(r.cost) : '—';
-    var needsED = r.cost > hmLimit;
-    var pct = prog?(prog.overallPct||0):0;
-    var uid = u.id;
-
-    // Inline approve button — role gated via SOW approval authorities
-    var approveBtn = '';
-    if(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
-      approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="hm" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
-    else if(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
-      approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="ed" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
-
-    return '<tr data-ra-uid="'+uid+'" style="border-bottom:1px solid var(--border);cursor:pointer;">'
-      +'<td style="padding:10px 14px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
-        +u.num+' '+u.street
-        +(u.status==='condemned'?' <span style="font-size:9px;background:var(--danger-bg);color:var(--danger);padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>':'')
-      +'</td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);white-space:nowrap;">'+u.bedrooms+'bd·'+(u.type&&u.type!=='0'&&u.type!=='nan'?u.type.replace(' unit','').replace('Detached','Det.').replace('Complex','Cplx'):'—')+'</td>'
-      +'<td style="padding:10px 10px;white-space:nowrap;"><span style="font-size:14px;font-weight:800;color:var(--text);">'+rs.score+'</span> <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:'+tier.bg+';color:'+tier.c+';">'+tier.l+'</span></td>'
-      +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div class="txt-info-bold" style="font-size:9px;">ED auth</div>':'')+'</td>'
-      +'<td class="pad-10"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
-      +'<td class="pad-10"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div><span class="js-lbl-sm">'+pct+'%</span></div></td>'
-      +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
-        +approveBtn
-        +'<button data-ra-sow="'+uid+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);"> Request</button>'
-        +'<button data-ra-prog="'+uid+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">📊</button>'
-      +'</div></td>'
-      +'</tr>';
-  }).join('');
-
-  // Wire all events via delegation
-  tbody.querySelectorAll('tr[data-ra-uid]').forEach(function(row) {
-    var uid = row.getAttribute('data-ra-uid');
-    row.addEventListener('click', function(){ openSowModal(uid); });
-    var sowBtn  = row.querySelector('[data-ra-sow]');
-    var progBtn = row.querySelector('[data-ra-prog]');
-    var appBtn  = row.querySelector('[data-ra-approve]');
-    if(sowBtn)  sowBtn.addEventListener('click',  function(e){e.stopPropagation(); openSowModal(uid);});
-    if(progBtn) progBtn.addEventListener('click', function(e){e.stopPropagation(); openRenoProgress(uid);});
-    if(appBtn)  appBtn.addEventListener('click',  function(e){e.stopPropagation(); raQuickApprove(uid, appBtn.getAttribute('data-ra-role'));});
-  });
-}
-
-function raQuickApprove(unitId, approver) {
-  // Defense-in-depth: even though the inline approve button is gated by the
-  // approval-authority for this row's status, re-check here so callers cannot
-  // shortcut by clicking via a stale/mutated DOM.
-  var _qaRole = window.currentRole || 'staff';
-  var _needAuthority = approver === 'ed' ? 'approveSowOverThreshold' : 'approveSowUnderThreshold';
-  if(!APPROVAL_AUTHORITY.can(_needAuthority, _qaRole)){
-    showToast('You do not have authority to approve this request.');
-    return;
-  }
-  var units = getAllUnits().slice();
-  var idx=units.findIndex(function(u){return u.id===unitId;});
-  if(idx<0){showToast('Unit not found');return;}
-  var u=units[idx]; var role=window.currentRole||'staff'; var today=new Date().toISOString().split('T')[0];
-  var addr=u.num+' '+u.street;
-  var label=CLFN_PERMS.roleLabel(approver==='hm' ? ROLE.HOUSING_MANAGER : ROLE.ED);
-  showConfirm({
-    title:       'Approve Request?',
-    message:     addr + ' &mdash; <strong>' + label + '</strong> approval',
-    confirmText: 'Approve'
-  }).then(function(ok){
-    if (!ok) return;
-    if(approver==='hm') {
-      u.unitHmSig={name:role,date:today,decision:'approved',savedAt:today};
-      auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' request approved by Housing Manager',role);
-    } else {
-      u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
-      auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' request approved by Executive Director',role);
-    }
-    // Auto-flip unit status to under_repair on the FIRST approval (mirrors
-    // the saveSOW path, but for the inline quick-approve button on the Reno
-    // Approvals row). Idempotent: no-op if the unit is already under_repair
-    // or condemned. Captures priorStatus so the lifecycle can revert it
-    // when the last SOW on this unit completes / is archived.
-    if(typeof flipUnitToUnderRepair === 'function' && flipUnitToUnderRepair(u)){
-      auditEntry('UNIT:'+unitId,'unit_status_auto',addr+' → Under Repair (quick-approved by '+(approver==='hm'?'HM':'ED')+')',role);
-    }
-    units[idx]=u;
-    saveUnitWithDraftFallback(u);
-    if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
-    showToast('✓ '+addr+' request approved');
-    renderRenoApprovalsView();
-  });
-}
-
-function exportRenoApprovalsCSV() {
-  var units = _getAllRenoUnits();
-  var hmLimit = _getHmLimit();
-  var headers = ['Address','Unit Status','Beds','Type','Priority Score','Priority Tier','Request Value','ED Auth Required','Approval Status','HM Decision','HM Date','ED Decision','ED Date','Contractor','Progress %'];
-  var csvRows = units.map(function(u) {
-    var sow=null;sow = getSowData(u.id);
-    var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
-    var rs=calcRenoScore(u.id);
-    var tier=rs.score>=40?'Critical':rs.score>=25?'High':rs.score>=12?'Medium':'Low';
-    var appr=_getRaApprovalStatus(u,sow);
-    var cost=sow?(parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0):0;
-    return [
-      u.num+' '+u.street, u.status, u.bedrooms, u.type||'', rs.score, tier,
-      cost||'', cost>hmLimit?'Yes':'No', appr.label,
-      (u.unitHmSig&&u.unitHmSig.decision)||'', (u.unitHmSig&&u.unitHmSig.date)||'',
-      (u.unitEdSig&&u.unitEdSig.decision)||'', (u.unitEdSig&&u.unitEdSig.date)||'',
-      sow&&sow.contractor?sow.contractor:'', prog?(prog.overallPct||0):0
-    ].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');
-  });
-  var csv = [headers.join(',')].concat(csvRows).join('\n');
-  var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  var _ns=nationShort();
-  a.download=_ns+'_Reno_Approvals_'+new Date().toISOString().slice(0,10)+'.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
-
-function exportRenoApprovalsPDF() {
-  var units = _getAllRenoUnits();
-  var hmLimit = _getHmLimit();
-  var logoSrc=(document.querySelector('.app-logo img')||{}).src||'';
-  var today=new Date().toLocaleDateString('en-CA');
-  var relevant = _raFilter ? units.filter(function(u){
-    var sow=null;sow = getSowData(u.id);
-    return _getRaApprovalStatus(u,sow).key===_raFilter;
-  }) : units;
-  relevant.sort(function(a,b){return calcRenoScore(b.id).score-calcRenoScore(a.id).score;});
-
-  var tableRows = relevant.map(function(u,i){
-    var sow=null;sow = getSowData(u.id);
-    var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
-    var rs=calcRenoScore(u.id);
-    var tier=rs.score>=40?{l:'Critical',c:'var(--danger)'}:rs.score>=25?{l:'High',c:'var(--warn-amber-text)'}:rs.score>=12?{l:'Medium',c:'#1d4ed8'}:{l:'Low',c:'var(--success)'};
-    var appr=_getRaApprovalStatus(u,sow);
-    var cost=sow?(parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0):0;
-    var pct=prog?(prog.overallPct||0):0;
-    var bg=i%2===0?'#fff':'#f9f9f7';
-    return '<tr style="background:'+bg+';border-bottom:1px solid var(--border);">'
-      +'<td style="padding:7px 10px;font-size:11px;font-weight:600;">'+u.num+' '+u.street+(u.status==='condemned'?' <span class="txt-danger-bold" style="font-size:9px;">[CONDEMNED]</span>':'')+'</td>'
-      +'<td style="padding:7px 8px;font-size:11px;text-align:center;font-weight:800;color:'+tier.c+';">'+rs.score+'<br/><span style="font-size:9px;font-weight:700;">'+tier.l+'</span></td>'
-      +'<td style="padding:7px 8px;font-size:11px;">'+(cost>0?formatCurrency(cost):'—')+(cost>hmLimit?' <span style="font-size:9px;color:var(--info-blue);">ED</span>':'')+'</td>'
-      +'<td style="padding:7px 8px;font-size:10px;font-weight:700;color:'+appr.c+';">'+appr.label+'</td>'
-      +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+(u.unitHmSig&&u.unitHmSig.decision?u.unitHmSig.decision+(u.unitHmSig.date?' ('+u.unitHmSig.date+')':''):'—')+'</td>'
-      +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+(u.unitEdSig&&u.unitEdSig.decision?u.unitEdSig.decision+(u.unitEdSig.date?' ('+u.unitEdSig.date+')':''):'—')+'</td>'
-      +'<td style="padding:7px 8px;font-size:11px;color:var(--muted);">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
-      +'<td style="padding:7px 8px;font-size:11px;text-align:center;">'+pct+'%</td>'
-      +'</tr>';
-  }).join('');
-
-  var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
-  var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Reno Approvals — '+_natShort+'</title>'
-    +'<style>'+_printThemeStyles()+'*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter landscape;margin:12mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:var(--text);}</style>'
-    +'</head><body>'
-    +'<div style="background:var(--dark);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">'
-      +(logoSrc?'<img src="'+logoSrc+'" style="height:34px;" alt="'+_natShort+'"/>':'<span style="color:var(--yellow);font-weight:700;font-size:14px;">'+_natShort+'</span>')
-      +'<div style="text-align:center;">'
-        +'<div style="font-size:8px;color:var(--yellow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;">'+_natDisp+' — Housing</div>'
-        +'<div style="font-size:15px;font-weight:700;color:#fff;margin-top:2px;">Renovation Approvals Report</div>'
-      +'</div>'
-      +'<div style="text-align:right;font-size:9px;color:var(--muted);">'+today+'<br/>'+relevant.length+' units<br/>Filter: '+(_raFilter||'All')+'</div>'
-    +'</div>'
-    +'<div style="background:var(--yellow);height:3px;margin-bottom:14px;"></div>'
-    +'<table class="std-tbl">'
-      +'<thead><tr style="background:var(--dark);">'
-        +'<th style="padding:8px 10px;text-align:left;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;">Address</th>'
-        +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:60px;">Score</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:80px;">Request Value</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:100px;">Status</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">HM Decision</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">ED Decision</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;">Contractor</th>'
-        +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:55px;">Progress</th>'
-      +'</tr></thead>'
-      +'<tbody>'+tableRows+'</tbody>'
-    +'</table>'
-    +'<div style="margin-top:16px;border-top:2px solid var(--yellow);padding-top:6px;display:flex;justify-content:space-between;font-size:8px;color:var(--muted);">'
-      +'<span>'+escapeHtml(buildNationFooterStrip())+'</span>'
-      +'<span>Printed: '+today+'</span>'
-    +'</div>'
-    +'</body></html>';
-
-  var w=window.open('','_blank','width=1100,height=780,toolbar=0,menubar=0');
-  if(!w){showToast('Allow popups to export PDF');return;}
-  w.document.open(); w.document.write(html); w.document.close();
-  setTimeout(function(){w.focus();w.print();},400);
-}
+// (RETIRED) The pre-multi-SOW reno-approvals implementation that lived here
+// (_raFilter, _getRaApprovalStatus, renderRenoApprovalsView, raQuickApprove,
+// exportRenoApprovalsCSV/PDF — ~300 lines) was deleted in the audit cleanup.
+// renos.html defines the CURRENT per-SOW versions of all of these in its
+// inline script; because renos.html loads housing-init.js FIRST, the copies
+// here silently shadowed-or-were-shadowed purely by load order — the exact
+// divergent-copy trap CLAUDE.md forbids. No other page has the reno-approvals
+// view or its export buttons. Do not re-add page-view logic for renos here.
 
 
 // ══════════════════════════════════════════════════════════════
@@ -2517,7 +2237,9 @@ function _lookupRow(kind, x){
        + '<span class="lookup-result-badge badge-'+kind+'">'+kind+'</span>'
        + '</div>';
 }
-function _esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+// _esc lives in shared-ui.js (delegates to escapeHtml). The top-level copy that
+// was here collided with it on window — last script loaded won, and this copy
+// didn't escape single quotes. Do not re-add a page-level _esc.
 
 function _lookupOpen(kind, id, label){
   if(!id) return;
@@ -2889,14 +2611,12 @@ document.addEventListener('DOMContentLoaded', function(){
       window._viewAsRole = e.target.value || null;
       if(typeof switchRole === 'function') switchRole(newRole);
       _closeAvatarPopover();
-      // Belt-and-suspenders: directly retally and re-render the worklist in
-      // case any earlier _onSwitchRole hook short-circuited (prev() may bail
-      // before our wrap runs in some edge cases). Idempotent when already done.
-      if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
-      var sec = document.getElementById('sec-worklist');
-      if(sec && !sec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
-        renderWorklist();
-      }
+      // Worklist retally + re-render happen once, inside the _onSwitchRole
+      // wrap below (switchRole always invokes it on interactive switches —
+      // _booting is only true during boot). A duplicate "belt-and-suspenders"
+      // block here used to render the worklist a second time per switch; the
+      // wrap's render code runs unconditionally after prev() (whose errors are
+      // caught), so it cannot be skipped.
     }
   });
 });
