@@ -1967,6 +1967,16 @@ body.is-sow-only .modal-overlay { visibility: visible; }
    starts Cancel/Submit at the container's left edge on a fresh row. */
 @media (max-width: 700px) {
   .tic-footer-spacer      { flex-basis: 100%; height: 0; }
+  /* Compact footer on phones — the MR modal's footer can carry 8+ action
+     buttons, and at desktop sizing the stack fills most of the screen.
+     Tighter padding/type plus a two-per-row grid (each button flexes to half
+     the row) roughly halves its height. Text/status children (saved
+     indicator, review-progress label) get their own full-width line, and the
+     single primary action stays full-width for prominence. */
+  .tic-footer             { gap: 6px; padding: 10px 14px; }
+  .tic-footer > div       { flex-basis: 100%; }
+  .tic-footer .btn        { flex: 1 1 calc(50% - 3px); justify-content: center; padding: 7px 8px; font-size: 12px; min-width: 0; }
+  .tic-footer .btn-primary { flex-basis: 100%; }
 }
 
 .tic-tenant-card-btn      { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 3px 6px; border-radius: 5px; }
