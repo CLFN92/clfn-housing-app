@@ -1533,8 +1533,11 @@ window.sowOpenRfq = sowOpenRfq;
 // before clicking this if you have unsaved edits).
 function sowStartNewRequest(){
   var unitId = _sowUnitId;
-  if(!unitId){ if(typeof showToast === 'function') showToast('Open a request on a unit first.'); return; }
-  if(typeof closeSowModal === 'function') closeSowModal();
+  if(!unitId){ if(typeof showToast === 'function') showToast('Open a request on a unit first.', {type:'error'}); return; }
+  // handoff: close WITHOUT the nav-referrer return — closing normally here
+  // navigated back to the origin page (worklist/deep link) before the fresh
+  // form below could open, so "New Request" just closed the modal.
+  if(typeof closeSowModal === 'function') closeSowModal({handoff:true});
   window._sowForceNew = true;          // one-shot: bypass the open-existing / picker path
   openSowModal(unitId);
 }

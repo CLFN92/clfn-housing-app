@@ -3664,9 +3664,17 @@ function closeRenoProgress() {
   window._rpPendingPhotos = [];
   window._rpStoredPhotos = [];
 }
-function closeSowModal() {
+function closeSowModal(opts) {
+  opts = opts || {};
   var modal = document.getElementById('sowModal');
   if(modal) modal.style.display = 'none';
+  // Internal hand-off (e.g. footer "New Request" closes this form only to
+  // immediately reopen a fresh one on the same unit): skip BOTH return
+  // navigations below — they would leave the page before the reopen runs.
+  // The stored referrer/return keys stay set so the eventual real close of
+  // the follow-up form still returns the user to where they came from.
+  // Mirrors closeAddContractorModal's opts.handoff.
+  if (opts.handoff) return;
   // Cross-page handoff back: if we arrived via _ctOpenSowFromList from
   // contractors.html, return to that contractor card.
   try {
