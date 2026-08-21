@@ -298,6 +298,7 @@ function _buildSowModalHTML() {
             '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">' +
               '<button type="button" onclick="addSowItem()" class="sow-add-item-btn">+ Add Work Item</button>' +
               '<button type="button" id="sow_quote_ai_btn" onclick="sowUploadQuoteClick()" class="btn btn-ghost btn-sm" title="Upload a contractor quote (PDF or photo) and let AI fill in the work items">✦ Auto-fill from quote</button>' +
+              '<button type="button" id="sow_scope_ai_btn" onclick="sowDraftScopeClick()" class="btn btn-ghost btn-sm" title="Describe the job in plain words (e.g. bathroom renovation) and AI drafts the scope of work">✦ Draft scope with AI</button>' +
               '<input type="file" id="sow_quote_file" accept="application/pdf,image/*" style="display:none;" onchange="_sowQuotePicked(this)"/>' +
             '</div>' +
           '</div>' +
@@ -1095,7 +1096,7 @@ function _sowQuotePicked(input){
 // which to add (all checked by default) and they are APPENDED to the Work Items
 // list (nothing existing is removed). AI output is a draft — every inserted row
 // stays fully editable.
-function _sowShowQuotePreview(items, summary, fileName){
+function _sowShowQuotePreview(items, summary, fileName, title){
   var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var money = function(n){ return (n==null||n==='') ? '<span style="color:var(--muted);">no price</span>' : ('$' + (parseFloat(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})); };
   window._sowQuoteItems = items;
@@ -1113,7 +1114,7 @@ function _sowShowQuotePreview(items, summary, fileName){
   ov.innerHTML =
     '<div style="background:var(--surface);border-radius:14px;max-width:620px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;">' +
       '<div class="modal-hdr compact"><div>' +
-        '<div class="modal-hdr-title">Quote read by AI</div>' +
+        '<div class="modal-hdr-title">' + esc(title || 'Quote read by AI') + '</div>' +
         '<div class="modal-hdr-sub">'+esc(fileName||'')+' &middot; '+items.length+' item(s) found</div>' +
       '</div></div>' +
       '<div style="padding:14px 18px 4px;">' +
@@ -1156,13 +1157,93 @@ function _sowInsertQuoteItems(){
   }
   if (typeof recalcSowTotal === 'function') recalcSowTotal();
   _sowCloseQuotePreview();
-  if (typeof showToast === 'function') showToast(added ? ('Added ' + added + ' work item(s) from the quote.') : 'No items selected.', { type: added?'info':'error' });
+  if (typeof showToast === 'function') showToast(added ? ('Added ' + added + ' work item(s) to the scope.') : 'No items selected.', { type: added?'info':'error' });
 }
 window.sowUploadQuoteClick   = sowUploadQuoteClick;
 window._sowQuotePicked       = _sowQuotePicked;
 window._sowShowQuotePreview  = _sowShowQuotePreview;
 window._sowCloseQuotePreview = _sowCloseQuotePreview;
 window._sowInsertQuoteItems  = _sowInsertQuoteItems;
+
+// ── AI: draft a scope of work from a plain-language job description ─────────
+// Staff type what the job is ("Bathroom renovation", "Replace exterior windows
+// in bedroom, basement, living room") and the ai-extract-quote Edge Function's
+// draft mode returns a structured work-item breakdown (no prices — costs are
+// set by staff or the tendering process). Items flow through the SAME review
+// modal + insert path as the quote extractor, so every line is reviewed and
+// stays editable. Gated by the ai_assistant module.
+function sowDraftScopeClick(){
+  if (window.CLFN_MODULES && typeof CLFN_MODULES.isEnabled === 'function' && !CLFN_MODULES.isEnabled('ai_assistant')) {
+    if (typeof showToast === 'function') showToast('AI Assistant is disabled for this nation.', { type:'error' });
+    return;
+  }
+  if (document.getElementById('_sowScopeAiOv')) return;
+  var ov = document.createElement('div');
+  ov.id = '_sowScopeAiOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML =
+    '<div style="background:var(--surface);border-radius:14px;max-width:520px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;">' +
+      '<div class="modal-hdr compact"><div>' +
+        '<div class="modal-hdr-title">✦ Draft scope of work with AI</div>' +
+        '<div class="modal-hdr-sub">Describe the job — AI drafts the work items for review</div>' +
+      '</div></div>' +
+      '<div style="padding:16px 18px;">' +
+        '<textarea id="sow_scope_ai_prompt" rows="3" placeholder="e.g. Bathroom renovation&#10;e.g. Replace exterior windows in bedroom, basement and living room" ' +
+          'style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;resize:vertical;background:var(--surface);color:var(--text);"></textarea>' +
+        '<div style="margin-top:6px;font-size:11.5px;color:var(--muted);">No prices are generated — costs stay with staff / contractor quotes. You pick which items to add.</div>' +
+      '</div>' +
+      '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">' +
+        '<button class="btn btn-ghost" onclick="_sowCloseScopeAi()">Cancel</button>' +
+        '<button class="btn btn-primary" id="sow_scope_ai_go" onclick="_sowRunScopeAi()">✦ Draft Scope</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if (e.target === ov) _sowCloseScopeAi(); });
+  var ta = document.getElementById('sow_scope_ai_prompt');
+  if (ta) {
+    ta.focus();
+    // Enter submits; Shift+Enter makes a newline for multi-part descriptions.
+    ta.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _sowRunScopeAi(); }
+    });
+  }
+}
+function _sowCloseScopeAi(){
+  var ov = document.getElementById('_sowScopeAiOv');
+  if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+}
+function _sowRunScopeAi(){
+  var ta = document.getElementById('sow_scope_ai_prompt');
+  var promptText = ((ta && ta.value) || '').trim();
+  if (!promptText) { if (typeof showToast==='function') showToast('Describe the job first — e.g. "Bathroom renovation".', { type:'error' }); return; }
+  var go = document.getElementById('sow_scope_ai_go');
+  if (go) { go.disabled = true; go.textContent = 'Drafting…'; }
+  var token = (window.HOUSING_SESSION && window.HOUSING_SESSION.accessToken) || window.SUPABASE_ANON || '';
+  fetch((window.SUPABASE_URL || '') + '/functions/v1/ai-extract-quote', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + token },
+    body: JSON.stringify({
+      prompt: promptText,
+      categories: (typeof SOW_CATEGORIES !== 'undefined') ? SOW_CATEGORIES : []
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (go) { go.disabled = false; go.textContent = '✦ Draft Scope'; }
+    if (res && res.error) { if (typeof showToast==='function') showToast('Could not draft the scope: ' + res.error, { type:'error' }); return; }
+    var items = (res && res.items) || [];
+    if (!items.length) { if (typeof showToast==='function') showToast('No work items were generated — try describing the job differently.', { type:'error' }); return; }
+    _sowCloseScopeAi();
+    _sowShowQuotePreview(items, (res && res.summary) || '', promptText, 'Scope drafted by AI');
+  })
+  .catch(function(e){
+    if (go) { go.disabled = false; go.textContent = '✦ Draft Scope'; }
+    if (typeof showToast==='function') showToast('Scope draft failed: ' + (e && e.message || e), { type:'error' });
+  });
+}
+window.sowDraftScopeClick = sowDraftScopeClick;
+window._sowCloseScopeAi   = _sowCloseScopeAi;
+window._sowRunScopeAi     = _sowRunScopeAi;
 
 // ── Work Order (execution) tab ────────────────────────────────────────────
 // The editable, functional work-order record kept on the SOW's `workOrder`
@@ -1943,18 +2024,20 @@ function reopenSow(){
 // when the work order was assigned to a contractor with an email on file —
 // offers to send them a cancellation notice.
 function cancelSow(){
+  // Guard toasts carry {type:'error'} — type-less toasts are suppressed
+  // entirely, so these bails used to give NO visible feedback (dead button).
   if(!_sowUnitId || !window._sowEditingProjectNumber){
-    showToast('Save the request before cancelling.');
+    showToast('Save the request before cancelling.', {type:'error'});
     return;
   }
   var _cxRole = window._realRole || window.currentRole || '';
   if(!(typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(_cxRole))){
-    showToast('Only the Housing Manager or Executive Director can cancel a request.');
+    showToast('Only the Housing Manager or Executive Director can cancel a request.', {type:'error'});
     return;
   }
   var pn  = window._sowEditingProjectNumber;
   var sow = getSowByProjectNumber(_sowUnitId, pn);
-  if(!sow){ showToast('Request not found'); return; }
+  if(!sow){ showToast('Request not found', {type:'error'}); return; }
 
   // Resolve an assigned contractor with an email (only for contractor-assigned
   // work — in-house jobs have no external party to notify).

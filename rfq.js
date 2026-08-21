@@ -252,7 +252,10 @@ function _rfqRenderCard(r) {
   var actions = [];
   if (st === 'draft')  actions.push({ text: 'Edit',  ghost: true, onclick: "event.stopPropagation();showRfqForm('" + id + "',null,null)" });
   if (st === 'issued') actions.push({ text: 'Award', ghost: true, onclick: "event.stopPropagation();showAwardModal('" + id + "')" });
-  if (st !== 'cancelled') actions.push({ text: 'Cancel', ghost: true, onclick: "event.stopPropagation();cancelRfq('" + id + "')" });
+  // Editors only — mirrors the form footer's #rfqCancelBtn gate. Non-editors
+  // used to see this button anyway; clicking it bailed on _rfqCanEdit with a
+  // (suppressed) toast, which read as the button being dead.
+  if (st !== 'cancelled' && _rfqCanEdit()) actions.push({ text: 'Cancel', ghost: true, onclick: "event.stopPropagation();cancelRfq('" + id + "')" });
   return _rfqCardTile({
     title: id,
     pill:  { text: st },
@@ -374,7 +377,7 @@ function renderRfqList() {
       +   '<div style="display:inline-flex;gap:4px;align-items:center;">'
       +     (rfq.status === 'draft'  ? '<button class="btn btn-ghost btn-sm" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">Edit</button>' : '')
       +     (rfq.status === 'issued' ? '<button class="btn btn-ghost btn-sm" onclick="showAwardModal(\'' + escapeHtml(rfq.id) + '\')">Award</button>' : '')
-      +     (rfq.status !== 'cancelled' ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
+      +     (rfq.status !== 'cancelled' && _rfqCanEdit() ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
       +   '</div>'
       + '</td>'
       + '</tr>';
@@ -1420,7 +1423,9 @@ async function unlockRfq() {
 
 // ── Cancel RFQ ────────────────────────────────────────────────────────────────
 async function cancelRfq(rfqId) {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  // {type:'error'} is required — type-less toasts are suppressed entirely, so
+  // this guard used to bail with NO visible feedback (button looked dead).
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can cancel this RFQ.', {type:'error'}); return; }
   var rfq = (window._rfqCache || {})[rfqId] || {};
   var wasAwarded = rfq.status === 'awarded' && !!rfq.awarded_contractor_id;
   var awardedCt  = wasAwarded ? (window._contractors || []).find(function(c){ return c && c.id === rfq.awarded_contractor_id; }) : null;
@@ -1479,7 +1484,7 @@ async function cancelRfq(rfqId) {
 
     showToast(rfqId + ' cancelled' + (doNotify ? ' — contractor notified' : ''));
     renderRfqList();
-  } catch(e) { console.error('[rfq] cancel failed:', e); showToast('Cancel failed'); }
+  } catch(e) { console.error('[rfq] cancel failed:', e); showToast('Cancel failed: ' + (e && e.message ? e.message : 'unknown error'), {type:'error'}); }
 }
 
 // ── Award modal ───────────────────────────────────────────────────────────────

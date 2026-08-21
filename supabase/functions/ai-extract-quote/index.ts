@@ -1,13 +1,18 @@
 // ============================================================================
-// ai-extract-quote - extract Scope-of-Work line items from an uploaded quote
+// ai-extract-quote - Scope-of-Work line items, two modes
 // ----------------------------------------------------------------------------
-// POST { file: { name, contentType, dataBase64 }, categories: string[] }
+// Extract mode: POST { file: { name, contentType, dataBase64 }, categories: [] }
+// Draft mode:   POST { prompt: string, categories: [] }
 // -> { items: [ { description, category, cost } ], summary }
 //
-// The client uploads a contractor quote / estimate (PDF or image) from the
-// Maintenance Request (SOW) modal's Scope of Work tab. This function sends the
-// document to Claude and returns structured work line items that the client
-// pre-populates into the Work Items list (the user reviews before inserting).
+// Extract mode: the client uploads a contractor quote / estimate (PDF or
+// image) from the Maintenance Request (SOW) modal's Scope of Work tab and the
+// document's work lines come back structured.
+// Draft mode: staff describe the job in plain words ("bathroom renovation",
+// "replace exterior windows in bedroom, basement, living room") and Claude
+// drafts a professional scope-of-work item list for it (no prices invented).
+// Either way the client pre-populates the Work Items list and the user
+// reviews each line before inserting.
 //
 // Security mirrors ai-chat: requires a valid Supabase user JWT and active staff
 // in the `staff` table; the ANTHROPIC_API_KEY lives only in function secrets.
@@ -80,16 +85,16 @@ const EXTRACT_TOOL = {
   },
 }
 
-async function writeAudit(email: string, name: string, role: string, fileName: string, count: number): Promise<void> {
+async function writeAudit(email: string, name: string, role: string, source: string, count: number, isDraft: boolean): Promise<void> {
   if (!SUPABASE_SERVICE_KEY || !SUPABASE_URL) return
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     const detail = {
-      detail: 'AI quote extract: ' + (fileName || 'file') + ' -> ' + count + ' line item(s)',
-      name: name || email, role, file: fileName, items: count,
+      detail: (isDraft ? 'AI scope draft: "' : 'AI quote extract: ') + (source || 'file') + (isDraft ? '"' : '') + ' -> ' + count + ' line item(s)',
+      name: name || email, role, source, items: count,
     }
     await admin.from('housing_audit_log').insert({
-      entity_type: 'ai', entity_id: 'AI', action: 'ai_extract',
+      entity_type: 'ai', entity_id: 'AI', action: isDraft ? 'ai_scope_draft' : 'ai_extract',
       detail: JSON.stringify(detail), actor: email, created_at: new Date().toISOString(),
     })
   } catch (e) {
@@ -126,35 +131,57 @@ serve(async (req) => {
     const contentType = String(file.contentType || '').toLowerCase()
     const dataB64 = String(file.dataBase64 || '')
     const fileName = String(file.name || 'quote')
+    const draftPrompt = String(body.prompt || '').trim().slice(0, 600)
+    const isDraftMode = !dataB64 && !!draftPrompt
     const categories: string[] = Array.isArray(body.categories) ? body.categories.map((c: unknown) => String(c)) : []
-
-    if (!dataB64) return json({ error: 'No file data provided.' }, 400)
-    if (b64Bytes(dataB64) > MAX_BYTES) return json({ error: 'File is too large (max ~12 MB).' }, 400)
-
-    const isPdf = contentType.indexOf('pdf') >= 0
-    const isImg = contentType.indexOf('image/') === 0
-    if (!isPdf && !isImg) return json({ error: 'Unsupported file type. Upload a PDF or an image (JPG/PNG).' }, 400)
-
-    const sourceBlock = isPdf
-      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: dataB64 } }
-      : { type: 'image',    source: { type: 'base64', media_type: contentType || 'image/jpeg', data: dataB64 } }
-
     const catList = categories.length ? categories.join(', ') : 'Other'
-    const prompt =
-      'This document is a contractor quote or repair estimate for a housing unit. ' +
-      'Extract every distinct work line item / task as a separate entry. For each: a short ' +
-      'plain description of the work; the single best-fit category chosen EXACTLY from this list ' +
-      '(or "Other" if none fits): [' + catList + ']; and the line total in dollars (materials + ' +
-      'labour combined) as a number, or null if the line has no stated price. Do NOT invent items or ' +
-      'prices that are not in the document. Ignore tax, subtotal, and grand-total summary rows - only ' +
-      'return actual work lines. Return at most ' + MAX_ITEMS + ' items via the extract_line_items tool.'
+
+    let userContent: Array<Record<string, unknown>>
+    if (isDraftMode) {
+      // Draft mode: no document - generate a scope of work from the job
+      // description. No prices: staff or the tendering process set those.
+      const prompt =
+        'You are helping First Nation housing staff prepare a Maintenance Request (scope of work) ' +
+        'for a housing unit. The staff member describes the job as: "' + draftPrompt + '". ' +
+        'Draft a practical, complete scope of work for that job as separate line items, the way a ' +
+        'housing manager or general contractor would break it down (include preparation, removal/' +
+        'disposal, rough-in, installation, finishing, and cleanup steps where they apply, and any ' +
+        'code-required items such as GFCI outlets, venting, or flashing). For each item: a short ' +
+        'plain description of the work; and the single best-fit category chosen EXACTLY from this ' +
+        'list (or "Other" if none fits): [' + catList + ']. Set cost to null on every item - do NOT ' +
+        'invent prices. If the description names several rooms or locations, cover each one. ' +
+        'Keep it to the described job only. Return at most ' + MAX_ITEMS + ' items via the ' +
+        'extract_line_items tool, plus a one-sentence summary of the scope.'
+      userContent = [{ type: 'text', text: prompt }]
+    } else {
+      if (!dataB64) return json({ error: 'Provide a file to read, or a prompt describing the job.' }, 400)
+      if (b64Bytes(dataB64) > MAX_BYTES) return json({ error: 'File is too large (max ~12 MB).' }, 400)
+
+      const isPdf = contentType.indexOf('pdf') >= 0
+      const isImg = contentType.indexOf('image/') === 0
+      if (!isPdf && !isImg) return json({ error: 'Unsupported file type. Upload a PDF or an image (JPG/PNG).' }, 400)
+
+      const sourceBlock = isPdf
+        ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: dataB64 } }
+        : { type: 'image',    source: { type: 'base64', media_type: contentType || 'image/jpeg', data: dataB64 } }
+
+      const prompt =
+        'This document is a contractor quote or repair estimate for a housing unit. ' +
+        'Extract every distinct work line item / task as a separate entry. For each: a short ' +
+        'plain description of the work; the single best-fit category chosen EXACTLY from this list ' +
+        '(or "Other" if none fits): [' + catList + ']; and the line total in dollars (materials + ' +
+        'labour combined) as a number, or null if the line has no stated price. Do NOT invent items or ' +
+        'prices that are not in the document. Ignore tax, subtotal, and grand-total summary rows - only ' +
+        'return actual work lines. Return at most ' + MAX_ITEMS + ' items via the extract_line_items tool.'
+      userContent = [sourceBlock as Record<string, unknown>, { type: 'text', text: prompt }]
+    }
 
     const payload = {
       model: MODEL,
       max_tokens: 3000,
       tools: [EXTRACT_TOOL],
       tool_choice: { type: 'tool', name: 'extract_line_items' },
-      messages: [{ role: 'user', content: [sourceBlock, { type: 'text', text: prompt }] }],
+      messages: [{ role: 'user', content: userContent }],
     }
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -189,7 +216,7 @@ serve(async (req) => {
       return { description: desc, category: cat || '', cost: cost }
     }).filter((it) => it.description)
 
-    await writeAudit(email, actorName, role, fileName, items.length)
+    await writeAudit(email, actorName, role, isDraftMode ? draftPrompt : fileName, items.length, isDraftMode)
 
     return json({ items, summary: String(out.summary || '') })
   } catch (err) {
