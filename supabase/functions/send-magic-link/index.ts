@@ -5,7 +5,11 @@
 // Supabase auth email so the message is branded, from the nation, and shows when
 // the person's access ends.
 //
-// POST { email, redirect_to, brand:{ nation_name, brand_color, contact_line } }
+// POST { email, redirect_to, brand:{ nation_name, brand_color, contact_line },
+//        mode: 'email' (default) | 'link' }
+// mode 'email': generate the link and email it through the branded pipeline.
+// mode 'link' : generate the link and RETURN it to the (verified admin) caller
+//               so they can copy/paste it into their own email or message.
 // Auth: caller must be an active management staff member (JWT).
 // Source must stay ASCII-only.
 // ============================================================================
@@ -88,6 +92,13 @@ serve(async (req) => {
     const actionLink = (gen && gen.data && (gen.data as any).properties && (gen.data as any).properties.action_link) || ''
     if (gen.error || !actionLink) {
       return json({ error: 'Could not generate a sign-in link.', detail: gen.error ? gen.error.message : 'no action_link' }, 502)
+    }
+
+    // --- Copy mode: hand the link back to the verified admin instead of
+    //     emailing it. Same authorization + same target-account gates as the
+    //     email path; the caller pastes it into their own email/message. ---
+    if (String(body.mode || '') === 'link') {
+      return json({ ok: true, link: actionLink, expiry: fmtDate(t.access_expires_at) })
     }
 
     // --- Compose the branded inner body (send-notification wraps it in the

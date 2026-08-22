@@ -3969,14 +3969,89 @@ async function sendStaffPasswordReset(email, btn){
     if(btn){btn.disabled=false; btn.textContent='Send Reset';}
   }
 }
-// Issue a passwordless magic-link sign-in email to a magic-link-enabled user.
+// Issue a passwordless magic-link sign-in for a magic-link-enabled user.
 // Admin-only, in-app — there is no public self-request. If a consultant's link
-// expires, they ask an admin to send a new one from Settings -> Users.
-async function sendStaffMagicLink(email, btn){
-  if(!email){ showToast('No email on file'); return; }
+// expires, they ask an admin to issue a new one from Settings -> Users.
+// The row button opens a chooser: EMAIL the link through the nation's branded
+// pipeline (the original behaviour), or COPY the link so the admin can paste
+// it into their own email / Teams / text message.
+function sendStaffMagicLink(email, btn){
+  if(!email){ showToast('No email on file', {type:'error'}); return; }
   if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageStaffRecord', window.currentRole)){
-    showToast('Not permitted'); return;
+    showToast('Not permitted', {type:'error'}); return;
   }
+  if(document.getElementById('_staffMagicOv')) return;
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var ov = document.createElement('div');
+  ov.id = '_staffMagicOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML =
+    '<div style="background:var(--surface);border-radius:14px;max-width:520px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;">' +
+      '<div class="modal-hdr compact"><div>' +
+        '<div class="modal-hdr-title">&#128273; Sign-in link</div>' +
+        '<div class="modal-hdr-sub">' + esc(email) + '</div>' +
+      '</div></div>' +
+      '<div style="padding:16px 18px;font-size:13px;color:var(--text);line-height:1.55;">' +
+        'The link is <strong>single-use</strong> and expires shortly — have them open it on the device they will sign in on.' +
+        '<div id="_staffMagicLinkWrap" style="display:none;margin-top:12px;">' +
+          '<input id="_staffMagicLinkInput" type="text" readonly onclick="this.select()" ' +
+            'style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11.5px;font-family:monospace;background:var(--bg);color:var(--text);"/>' +
+          '<div id="_staffMagicLinkNote" style="margin-top:6px;font-size:11.5px;color:var(--muted);"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">' +
+        '<button class="btn btn-ghost" onclick="_staffMagicClose()">Close</button>' +
+        '<button class="btn btn-ghost" id="_staffMagicCopyBtn" onclick="_staffMagicCopy(\'' + esc(email).replace(/'/g,"\\'") + '\')">&#128203; Copy link</button>' +
+        '<button class="btn btn-primary" id="_staffMagicEmailBtn" onclick="_staffMagicEmail(\'' + esc(email).replace(/'/g,"\\'") + '\')">&#128231; Email the link</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if(e.target === ov) _staffMagicClose(); });
+}
+function _staffMagicClose(){
+  var ov = document.getElementById('_staffMagicOv');
+  if(ov && ov.parentNode) ov.parentNode.removeChild(ov);
+}
+// COPY path: generate the link server-side (same admin + target gates as the
+// email path) and hand it to the admin — clipboard first, with the visible
+// selectable input as the always-works fallback.
+async function _staffMagicCopy(email){
+  var btn = document.getElementById('_staffMagicCopyBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
+  try {
+    var token = (window.HOUSING_SESSION && HOUSING_SESSION.accessToken) || '';
+    var r = await fetch(SUPABASE_URL + '/functions/v1/send-magic-link', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body:    JSON.stringify({ email: email, redirect_to: window.location.origin + '/index.html', mode: 'link' })
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if(!r.ok || !data.ok || !data.link){
+      showToast(data.error || 'Could not generate a sign-in link — try again', {type:'error'});
+      return;
+    }
+    var wrap = document.getElementById('_staffMagicLinkWrap');
+    var inp  = document.getElementById('_staffMagicLinkInput');
+    var note = document.getElementById('_staffMagicLinkNote');
+    if(wrap && inp){
+      wrap.style.display = '';
+      inp.value = data.link;
+      if(note) note.textContent = (data.expiry ? 'Their access is valid until ' + data.expiry + '. ' : '') + 'Paste this into your own email or message.';
+    }
+    var copied = false;
+    try { if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(data.link); copied = true; } } catch(e){}
+    if(!copied && inp){ inp.focus(); inp.select(); try { copied = document.execCommand('copy'); } catch(e){} }
+    showToast(copied ? 'Sign-in link copied — paste it into your email or message.' : 'Link generated — select and copy it from the box.', {type:'info'});
+    auditEntry('SETTINGS','settings_user_copy_magic_link','Magic-link sign-in link generated (copy) for '+email, window.currentRole||'ed');
+  } catch(e){
+    showToast('Error: '+e.message, {type:'error'});
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '📋 Copy link'; }
+  }
+}
+// EMAIL path — the original behaviour (branded pipeline, expiry line included).
+async function _staffMagicEmail(email){
+  var btn = document.getElementById('_staffMagicEmailBtn');
   if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
   try {
     // Send through the send-magic-link Edge Function, which generates the link
@@ -4003,18 +4078,22 @@ async function sendStaffMagicLink(email, btn){
     });
     var data = await r.json().catch(function(){ return {}; });
     if(r.ok && data.ok){
-      showToast('Sign-in link sent to '+email);
+      showToast('Sign-in link sent to '+email, {type:'info'});
       auditEntry('SETTINGS','settings_user_send_magic_link','Magic-link sign-in link sent to '+email, window.currentRole||'ed');
+      _staffMagicClose();
     } else {
-      showToast(data.error || 'Could not send sign-in link — try again');
+      showToast(data.error || 'Could not send sign-in link — try again', {type:'error'});
     }
   } catch(e){
-    showToast('Error: '+e.message);
+    showToast('Error: '+e.message, {type:'error'});
   } finally {
-    if(btn){ btn.disabled=false; btn.textContent='Send Sign-in Link'; }
+    if(btn){ btn.disabled=false; btn.textContent='📧 Email the link'; }
   }
 }
 window.sendStaffMagicLink = sendStaffMagicLink;
+window._staffMagicClose   = _staffMagicClose;
+window._staffMagicCopy    = _staffMagicCopy;
+window._staffMagicEmail   = _staffMagicEmail;
 async function _sbEditStaffModal(id) {
   // Fetch current staff record
   var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id+'&select=*', { headers: HOUSING_HEADERS });

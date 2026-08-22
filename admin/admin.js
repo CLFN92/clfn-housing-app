@@ -816,6 +816,27 @@
       +   '<div id="cn-supportkey"><div class="empty">Loading key status...</div></div>'
       + '</div>';
 
+    // Per-nation email delivery config -> nations.email jsonb, published via
+    // nations_public and consumed by the nation app at boot (NATION_CONFIG.
+    // email_config -> sendNotification passes provider/from per message). NO
+    // SECRETS here: API keys live in the nation project's Edge Function
+    // secrets, and send-notification only honours a provider whose keys are
+    // actually configured server-side.
+    var nEmail = (n.email && typeof n.email === 'object') ? n.email : {};
+    var provOpt = function(v,l){ return '<option value="' + v + '"' + (String(nEmail.provider||'graph') === v ? ' selected' : '') + '>' + l + '</option>'; };
+    var pEmail =
+        '<div class="card"><h3>Email delivery</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">How this nation\'s workflow email goes out (application confirmations, work orders, RFQ letters, magic links). This picks the <b>provider and From identity</b> the app requests per message. The matching <b>API keys must be set on the nation\'s own Supabase project</b> (Settings &rarr; Edge Functions &rarr; Secrets: <code>EMAIL_PROVIDER</code>, <code>RESEND_API_KEY</code>/<code>SENDGRID_API_KEY</code> or the <code>GRAPH_*</code> set) &mdash; the function ignores a requested provider whose keys are missing. See the <b>Provision &rarr; Email delivery setup</b> card for the walkthroughs.</p>'
+      +   '<label>Provider</label>'
+      +   '<select id="cn-em-provider">' + provOpt('graph','Microsoft 365 (Graph) — sends from the nation mailbox') + provOpt('resend','Resend — sends from a verified domain') + provOpt('sendgrid','SendGrid — sends from a verified domain') + '</select>'
+      +   '<div style="' + g2 + '">'
+      +     '<div><label>From address</label><input id="cn-em-from" placeholder="demo@fnhub.app" value="' + esc(nEmail.from || '') + '"/></div>'
+      +     '<div><label>From name</label><input id="cn-em-from-name" placeholder="FN Hub Demo Housing" value="' + esc(nEmail.from_name || '') + '"/></div>'
+      +   '</div>'
+      +   '<label>Reply-to (a monitored mailbox)</label><input id="cn-em-reply" placeholder="housing@nation.ca" value="' + esc(nEmail.reply_to || '') + '"/>'
+      +   '<p class="sub" style="margin:6px 0 0;font-size:11px;">Resend/SendGrid: the From address must be on a domain verified with that provider (SPF + DKIM), or mail lands in spam. Graph ignores From here &mdash; it sends from the mailbox in the nation project\'s <code>GRAPH_FROM_USER</code> secret. Saved with the <b>Save changes</b> button below; takes effect on the nation\'s next page load.</p>'
+      + '</div>';
+
     var pNotes =
         '<div class="card"><h3>Notes</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Internal log for this nation (calls, decisions, follow-ups). Visible to platform admins only.</p>'
@@ -898,11 +919,11 @@
       +   '<div class="nic-strip-tile"><div class="l">Outstanding</div><div class="v" id="cn-sum-inv" style="color:var(--muted);">&mdash;</div></div>'
       + '</div>'
       + '<div class="nic-tabs">'
-      +   tab('overview', 'Overview', true) + tab('supabase', 'Supabase') + tab('agreement', 'Agreement')
+      +   tab('overview', 'Overview', true) + tab('supabase', 'Supabase') + tab('email', 'Email') + tab('agreement', 'Agreement')
       +   tab('billing', 'Billing') + tab('invoices', 'Invoices') + tab('notes', 'Notes') + tab('documents', 'Documents')
       + '</div>'
       + '<div class="nic-body">'
-      +   panel('overview', pOverview, true) + panel('supabase', pSupabase)
+      +   panel('overview', pOverview, true) + panel('supabase', pSupabase) + panel('email', pEmail)
       +   panel('agreement', pAgreement) + panel('billing', pBilling) + panel('invoices', pInvoices)
       +   panel('notes', pNotes) + panel('documents', pDocuments)
       + '</div>'
@@ -923,6 +944,16 @@
     if (!name || !short){ setMsg('cn-msg','Display name and short code are required.'); return; }
     var mods = {};
     Array.prototype.forEach.call(document.querySelectorAll('.cn-mod'), function(c){ mods[c.value] = c.checked; });
+    // Email delivery config -> nations.email jsonb (published via
+    // nations_public). Saved null when untouched (graph default + all blank)
+    // so nations that never configured email keep a clean row.
+    var emProvider = get('cn-em-provider') || 'graph';
+    var emFrom     = get('cn-em-from').trim();
+    var emFromName = get('cn-em-from-name').trim();
+    var emReply    = get('cn-em-reply').trim();
+    var emailCfg = (emProvider === 'graph' && !emFrom && !emFromName && !emReply)
+      ? null
+      : { provider: emProvider, from: emFrom || null, from_name: emFromName || null, reply_to: emReply || null };
     var patch = {
       display_name: name, short: short,
       primary_color: get('cn-color').trim() || null,
@@ -932,6 +963,7 @@
       supabase_url:  get('cn-url').trim() || null,
       supabase_anon: get('cn-anon').trim() || null,
       credentials_note: get('cn-cred').trim() || null,
+      email: emailCfg,
       modules_licensed: mods,
       status: get('cn-status') || 'provisioning',
       updated_at: new Date().toISOString()
