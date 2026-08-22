@@ -297,6 +297,11 @@
       + '<div class="nic-hero">'
       +   '<h1>Platform Admin</h1>'
       +   '<div class="nic-sub">Home Land Homes control plane &middot; signed in as <code>' + esc(meEmail) + '</code></div>'
+      // The control-plane project ref, one click to copy — it's needed for the
+      // platform SQL editor, workflow inputs, and function deploys, and was
+      // otherwise only findable by dissecting the Supabase URL.
+      +   '<div class="nic-sub" style="margin-top:4px;">Platform project ref: <code id="plat-ref">' + esc(_refFromUrl(window.PLATFORM_SUPABASE_URL || '') || '') + '</code> '
+      +     '<button class="btn sm ghost" type="button" data-act="copy-text" data-copy="' + esc(_refFromUrl(window.PLATFORM_SUPABASE_URL || '') || '') + '" style="padding:2px 10px;font-size:11px;">Copy</button></div>'
       + '</div>'
       + '<div class="nic-strip">'
       +   tile('Nations', String(nations.length))
@@ -309,7 +314,13 @@
       + '</div>'
       + '<div class="nic-body">'
       +   panel('nations',   nationsCard(nations, usageBySub), true)
-      +   panel('provision', provisionCard() + addNationStepsCard() + emailSetupCard() + supportLoginSetupCard(), false)
+      // The wizard stays expanded; the three long reference guides collapse
+      // into <details> cards so the tab is scannable (they had grown into one
+      // very long scroll).
+      +   panel('provision', provisionCard()
+              + foldCard('Adding a nation — step by step', 'The full workflow across Supabase, GitHub, and Cloudflare', addNationStepsCard())
+              + foldCard('Email delivery setup — Microsoft 365 (Graph) & Resend', 'Provider-side setup; day-to-day config lives in each nation\'s Email Config tab', emailSetupCard())
+              + foldCard('Support login setup — the "Enter" button', 'Per-nation signing keys for platform support sessions', supportLoginSetupCard()), false)
       +   panel('addnation', addNationCard(), false)
       +   panel('migrations', migrationsCard(nations), false)
       +   panel('admins',    adminsCard(admins, meEmail), false)
@@ -368,7 +379,6 @@
     var totLive = 0, totBase = 0, totOver = 0;
     var rows = nations.length ? nations.map(function(n){
       var st = n.status || 'provisioning';
-      var url = 'https://' + esc(n.subdomain) + '.fnhub.app';
       var mods = Object.keys(n.modules_licensed || {}).filter(function(k){ return n.modules_licensed[k]; });
       var u = usageBySub[n.subdomain];
       var c = estCost(n, u);
@@ -384,13 +394,10 @@
         + '<td><span class="pill ' + esc(st) + '">' + esc(st) + '</span></td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(mods.join(', ') || '—') + '</td>'
         + '<td style="font-size:12px;">' + usageCell(u) + costLine + '</td>'
+        // One action per row — Open / Enter / Suspend moved into the nation's
+        // information card (Dashboard -> Overview tab) to declutter the list.
         + '<td><div class="row-actions">'
         +   '<button class="btn sm ghost" type="button" data-act="configure" data-id="' + esc(n.id) + '">Dashboard</button>'
-        +   '<a class="btn sm ghost" href="' + url + '" target="_blank" rel="noopener">Open</a>'
-        +   (n.supabase_url ? '<button class="btn sm ghost" type="button" data-act="enter" data-id="' + esc(n.id) + '" title="Sign in to this nation as Platform Support (logged both sides)">Enter</button>' : '')
-        +   (st === 'suspended'
-              ? '<button class="btn sm ghost" data-act="status" data-status="active" data-id="' + esc(n.id) + '">Resume</button>'
-              : '<button class="btn sm danger" data-act="status" data-status="suspended" data-id="' + esc(n.id) + '">Suspend</button>')
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="5" class="empty">No nations yet. Add one below.</td></tr>';
     var grand = Math.round((totBase + totOver) * 100) / 100;
@@ -416,6 +423,18 @@
       ? '<span class="pill" style="font-size:9px;background:#dcfce7;color:#166534;">Automated</span>'
       : '<span class="pill" style="font-size:9px;background:#f4f4f0;color:#696960;">Manual</span>';
   }
+  // Collapsible reference card (native <details>): title + one-line subtitle
+  // always visible; the body expands on click. Keeps the Provision tab short.
+  function foldCard(title, sub, bodyHtml){
+    return '<details class="card" style="margin-top:12px;">'
+      + '<summary style="cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+      +   '<h3 style="margin:0;display:inline;">' + title + '</h3>'
+      +   '<span style="font-size:11px;color:var(--muted);">' + sub + ' &middot; <u>show / hide</u></span>'
+      + '</summary>'
+      + '<div style="margin-top:10px;">' + bodyHtml + '</div>'
+      + '</details>';
+  }
+
   function addNationStepsCard(){
     // [ title, kind('auto'|'manual'), html ]
     var steps = [
@@ -425,12 +444,12 @@
         'Stand up a fresh <b>database-per-nation</b> project: ' + extLink(LINKS.supaNew, 'Supabase &rarr; New project') + '. Then grab the ref, URL, anon + service_role keys from ' + extLink(LINKS.supaApi, 'Settings &rarr; API') + '.'],
       ['Provision (schema, bucket, first ED)', 'auto',
         'Click <b>Provision this nation</b> below. The platform replays the bootstrap schema, creates the <code>housing-files</code> storage bucket, seeds the first ED, and writes the registry row &mdash; one action. (Requires <code>SB_MGMT_TOKEN</code> set on the platform function.) The service_role key is used once and never stored.'],
-      ['Set the project\'s Edge Function secrets', 'manual',
-        'On the new project, add the non-email function secrets (e.g. <code>ANTHROPIC_API_KEY</code> for the AI assistant): ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. Email secrets are the next step. Also run the <code>hs_data_usage</code> migration there so this panel\'s usage column fills in.'],
-      ['Set up email notifications (Microsoft 365 / Azure or Resend)', 'manual',
-        'Transactional email goes through the <code>send-notification</code> function; each nation picks a provider with the <code>EMAIL_PROVIDER</code> secret, then adds the matching secrets in ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. <b>See the &ldquo;Email delivery setup&rdquo; card below</b> for the full Microsoft 365 (Graph) and Resend walkthroughs, secret-by-secret.'],
+      ['Set the AI Assistant key (from this panel)', 'auto',
+        'Open the nation\'s <b>Dashboard &rarr; Config &rarr; AI Assistant key</b> and paste the Anthropic key &mdash; the panel writes it onto the nation project for you (no Supabase dashboard visit). Also run the <code>hs_data_usage</code> migration on the project (the <b>Migrations</b> tab can push it fleet-wide) so this panel\'s usage column fills in.'],
+      ['Set up email notifications (from this panel)', 'auto',
+        'Open the nation\'s <b>Dashboard &rarr; Email Config</b>: pick the provider, fill the From identity + reply-to, <b>Save changes</b>, then click <b>Apply to project</b> (with the provider API key) &mdash; the panel writes the <code>EMAIL_*</code> secrets onto the nation project. The provider-side setup (Entra app for Graph, domain verification for Resend) is manual &mdash; <b>see the &ldquo;Email delivery setup&rdquo; guide below</b>.'],
       ['Deploy the Edge Functions to the project', 'manual',
-        'The ' + extLink(LINKS.gh, 'GitHub Actions') + ' deploy targets one project via the <code>SUPABASE_PROJECT_ID</code> repo secret. For a new nation, deploy to its ref: <code>supabase functions deploy --project-ref &lt;ref&gt;</code> (' + extLink(LINKS.supaCli, 'docs') + '), or point that secret at it and push. Control-plane-only functions (<code>provision-nation</code>, <code>report-nation-usage</code>) are excluded from that workflow by design.'],
+        'In ' + extLink(LINKS.gh, 'GitHub Actions') + ' run the <b>&ldquo;Deploy Supabase Edge Functions&rdquo;</b> workflow with the nation\'s <b>project ref</b> in the <code>project_ref</code> input (copy the ref from <b>Dashboard &rarr; Config</b>). Pushes to <code>main</code> auto-deploy only to the <code>SUPABASE_PROJECT_ID</code> repo-secret project, so other nations need this manual run per functions change. CLI alternative: <code>supabase functions deploy --project-ref &lt;ref&gt;</code> (' + extLink(LINKS.supaCli, 'docs') + '). Control-plane-only functions (<code>provision-nation</code>, <code>report-nation-usage</code>) are excluded by design.'],
       ['Point the subdomain at the app (Cloudflare)', 'manual',
         'The app itself deploys once and serves <b>every</b> nation by hostname &mdash; but <code>&lt;subdomain&gt;.fnhub.app</code> won\'t resolve until you attach it. In the ' + extLink(LINKS.cf, 'Cloudflare dashboard') + ': <b>Workers &amp; Pages &rarr; clfn-housing-app &rarr; Settings &rarr; Domains &amp; Routes &rarr; Add &rarr; Custom Domain</b>, enter <code>&lt;subdomain&gt;.fnhub.app</code>. Cloudflare creates the DNS record + TLS cert (~1-2 min). <b>Skip this per-nation step</b> by setting up a wildcard once: a proxied <code>*.fnhub.app</code> DNS record + a <code>*.fnhub.app/*</code> Worker route (plan permitting) &mdash; then new subdomains resolve automatically.'],
       ['Set the auth sign-in policy (so staff can log in)', 'manual',
@@ -438,9 +457,9 @@
         + 'Supabase\'s built-in email is rate-limited and often does not deliver, so with Confirm-email <b>ON but no SMTP</b> a new staff member never receives the verification email and <b>cannot log in</b>. With it <b>OFF</b>, the account is active immediately and the Add-Staff success box shows the <b>default password</b> to share (<code>SHORT + FirstName + 2026!</code>). '
         + '(Auth <i>redirect URLs</i> are already set automatically during provisioning; this is a separate setting.)'],
       ['License the modules', 'manual',
-        'Open the nation\'s <b>Dashboard</b> and tick which optional modules this nation may use (Finance, RFQ, Inspections, Capital Projects, …).'],
+        'Open the nation\'s <b>Dashboard &rarr; Overview</b> and tick which optional modules this nation may use (Finance, RFQ, Inspections, Capital Projects, …).'],
       ['Set status to Active', 'manual',
-        'Only <b>active</b> nations publish to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>. Flip status to Active in Configure.'],
+        'Only <b>active</b> nations publish to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>. Flip status to Active in the nation\'s <b>Dashboard &rarr; Overview</b> (Status card &mdash; Suspend/Resume live there too).'],
       ['Hand off to the nation\'s ED', 'manual',
         'The ED signs in at <code>&lt;subdomain&gt;.fnhub.app</code> and adds their own staff. Done &mdash; the nation manages itself from here.']
     ];
@@ -451,10 +470,9 @@
         + '<div style="font-size:12px;color:var(--muted);line-height:1.55;">' + s[2] + '</div></div>'
         + '</li>';
     }).join('');
-    return '<div class="card"><h3>Adding a nation &mdash; step by step</h3>'
-      + '<p class="sub" style="margin:2px 0 6px;"><span class="pill" style="font-size:9px;background:#dcfce7;color:#166534;">Automated</span> steps the platform already handles; <span class="pill" style="font-size:9px;background:#f4f4f0;color:#696960;">Manual</span> steps you do in Supabase, GitHub, or Cloudflare. Links open each destination.</p>'
-      + '<ol style="list-style:none;margin:4px 0 0;padding:0;">' + items + '</ol>'
-      + '</div>';
+    // Body only — the Provision tab wraps this in a collapsible foldCard.
+    return '<p class="sub" style="margin:2px 0 6px;"><span class="pill" style="font-size:9px;background:#dcfce7;color:#166534;">Automated</span> steps the platform already handles; <span class="pill" style="font-size:9px;background:#f4f4f0;color:#696960;">Manual</span> steps you do in Supabase, GitHub, or Cloudflare. Links open each destination.</p>'
+      + '<ol style="list-style:none;margin:4px 0 0;padding:0;">' + items + '</ol>';
   }
 
   // Detailed, provider-by-provider email setup reference (Microsoft 365 / Graph
@@ -492,28 +510,27 @@
     );
     var resend = providerBlock(
       'Resend', 'resend',
-      'For a nation <b>without</b> Microsoft 365. Sends from your own verified domain over an email service.',
+      'For a nation <b>without</b> Microsoft 365. Sends from your own verified domain over an email service. The platform domain <code>fnhub.app</code> is already verified, so a nation can send from <code>&lt;nation&gt;@fnhub.app</code> with no new domain work.',
       [
-        'At ' + extLink(LINKS.resend, 'Resend &rarr; Domains') + ' &rarr; <b>Add Domain</b>, enter the sending domain (e.g. <code>mail.yournation.ca</code>).',
-        'Add the DNS records Resend shows (<b>SPF</b>, <b>DKIM</b>, and the return-path record) at your DNS host, then wait for the domain to read <b>Verified</b>. (Unverified domains cannot send.)',
+        'At ' + extLink(LINKS.resend, 'Resend &rarr; Domains') + ' &rarr; <b>Add Domain</b>, enter the sending domain (e.g. <code>mail.yournation.ca</code>). Skip this if sending from the already-verified <code>fnhub.app</code>.',
+        'Add the DNS records Resend shows (<b>SPF</b>, <b>DKIM</b>, and the return-path record) at your DNS host &mdash; on Cloudflare the <b>Auto configure</b> button adds them for you &mdash; then wait for <b>Verified</b>. Add a <code>_dmarc</code> TXT record too (Auto-configure does not).',
         '<b>API Keys</b> &rarr; <b>Create API Key</b> with sending access &rarr; copy it.',
-        'Pick a FROM address <b>on the verified domain</b> (e.g. <code>housing@mail.yournation.ca</code>) and the nation\'s display name.'
+        'Pick a FROM address <b>on the verified domain</b> and the nation\'s display name, then enter it all in the nation\'s <b>Dashboard &rarr; Email Config</b> and click <b>Apply to project</b> (paste the API key there) &mdash; the panel writes the secrets for you.'
       ],
-      'Secrets to set',
-      secretList(['RESEND_API_KEY', 'EMAIL_FROM (a from-address on the verified domain)', 'EMAIL_FROM_NAME (the nation\'s display name)'])
+      'Secrets it sets',
+      secretList(['EMAIL_PROVIDER', 'RESEND_API_KEY', 'EMAIL_FROM (a from-address on the verified domain)', 'EMAIL_FROM_NAME (the nation\'s display name)', 'EMAIL_REPLY_TO'])
     );
     var shared = '<div style="margin-top:14px;padding:11px 13px;background:var(--accent-light);border:1px solid var(--hair);border-radius:9px;font-size:12px;line-height:1.6;">'
       + '<div style="font-weight:800;margin-bottom:4px;">For either provider</div>'
-      + '<div>&bull; Set <code>EMAIL_REPLY_TO</code> (reply-to) and <code>EMAIL_BRAND</code> (footer wordmark) <b>per nation</b> &mdash; don\'t leave them blank, or the function falls back to its built-in defaults. The nation app also injects these from its own config on each send.</div>'
-      + '<div>&bull; <code>EMAIL_PROVIDER</code> defaults to <code>graph</code> if unset.</div>'
-      + '<div>&bull; <b>SendGrid</b> is also supported (<code>EMAIL_PROVIDER=sendgrid</code>) with <code>SENDGRID_API_KEY</code> + <code>EMAIL_FROM</code> + <code>EMAIL_FROM_NAME</code>.</div>'
-      + '<div>&bull; After adding or changing any secret, <b>redeploy <code>send-notification</code></b> to that project so it reads the new values.</div>'
+      + '<div>&bull; Day-to-day config lives in the nation\'s <b>Dashboard &rarr; Email Config</b> tab: provider + From identity + reply-to, saved to the registry (the app reads it at boot) and applied to the project\'s secrets with <b>Apply to project</b>. The Supabase dashboard is only needed for the <code>GRAPH_*</code> credentials.</div>'
+      + '<div>&bull; <code>EMAIL_PROVIDER</code> defaults to <code>graph</code> if unset; the function only honours a provider whose keys are actually configured.</div>'
+      + '<div>&bull; <b>SendGrid</b> is also supported (<code>EMAIL_PROVIDER=sendgrid</code>) with <code>SENDGRID_API_KEY</code> + <code>EMAIL_FROM</code> + <code>EMAIL_FROM_NAME</code> &mdash; same Apply-to-project flow.</div>'
+      + '<div>&bull; New/changed secrets are picked up automatically within about a minute &mdash; no redeploy needed.</div>'
       + '<div>&bull; Verify it: the nation app\'s <b>Settings &rarr; Admin &rarr; Config &rarr; Email pipeline</b> shows the resolved provider + from-address (read-only) for that nation.</div>'
       + '</div>';
-    return '<div class="card"><h3>Email delivery setup &mdash; Microsoft 365 (Graph) &amp; Resend</h3>'
-      + '<p class="sub" style="margin:2px 0 4px;">Each nation sends its own workflow email through the <code>send-notification</code> Edge Function on <b>that nation\'s Supabase project</b>. Pick <b>one</b> provider per nation via <code>EMAIL_PROVIDER</code>, then add its secrets in ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions &rarr; Secrets') + ' (never in code).</p>'
-      + graph + resend + shared
-      + '</div>';
+    // Body only — the Provision tab wraps this in a collapsible foldCard.
+    return '<p class="sub" style="margin:2px 0 4px;">Each nation sends its own workflow email through the <code>send-notification</code> Edge Function on <b>that nation\'s Supabase project</b>. Pick <b>one</b> provider per nation. This guide covers the <b>provider-side</b> setup; the per-nation config + secrets are applied from the nation\'s <b>Dashboard &rarr; Email Config</b> tab.</p>'
+      + graph + resend + shared;
   }
   // Render a set of secret names as inline code chips.
   function secretList(names){
@@ -532,18 +549,18 @@
         + items.map(function(t){ return '<li style="margin-bottom:5px;">' + t + '</li>'; }).join('')
         + '</ol>';
     }
-    return '<div class="card"><h3>Support login setup &mdash; the &ldquo;Enter&rdquo; button</h3>'
-      + '<p class="sub" style="margin:2px 0 6px;">The <b>Enter</b> button (next to a nation\'s <b>Open</b>) opens a signed-in <b>Platform Support</b> session on that nation\'s app for troubleshooting &mdash; full access, logged on both sides, refusable by the nation, and the nation\'s ED is emailed each time. Each nation has its <b>own signing key</b>: the private key stays on the control plane; the nation holds only its <b>public</b> key (useless if stolen), so there is <b>no shared secret</b>.</p>'
+    // Body only — the Provision tab wraps this in a collapsible foldCard.
+    return '<p class="sub" style="margin:2px 0 6px;">The <b>Enter as Platform Support</b> button (in a nation\'s <b>Dashboard &rarr; Overview &rarr; Access</b> card) opens a signed-in <b>Platform Support</b> session on that nation\'s app for troubleshooting &mdash; full access, logged on both sides, refusable by the nation, and the nation\'s ED is emailed each time. Each nation has its <b>own signing key</b>: the private key stays on the control plane; the nation holds only its <b>public</b> key (useless if stolen), so there is <b>no shared secret</b>.</p>'
       + '<div style="border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-top:10px;">'
       +   '<div style="font-weight:800;font-size:13px;">Per-nation setup (once each)</div>'
       +   numList([
-              'Open the nation in <b>Configure &rarr; Supabase</b> and click <b>Generate keypair</b> under &ldquo;Support login key.&rdquo; The private key is stored here; the public key is shown (and locked).',
+              'Open the nation in <b>Dashboard &rarr; Config</b> and click <b>Generate keypair</b> under &ldquo;Support login key.&rdquo; The private key is stored here; the public key is shown (and locked).',
               'Copy that <b>public key</b> into the nation project &rarr; ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions &rarr; Secrets') + ' as <code>SUPPORT_LOGIN_PUBKEY</code>.',
               'Deploy the functions (CI does this on push to <code>main</code>): <code>enter-nation</code> + <code>gen-support-key</code> to the platform project, and <code>support-login</code> to <b>each</b> nation project (deployed with <code>--no-verify-jwt</code>; the nation-functions workflow targets one project at a time via its <code>project_ref</code> input).',
-              'Auth redirect URLs are set <b>automatically during provisioning</b> now (Site URL + <code>https://&lt;subdomain&gt;.fnhub.app/**</code>). For a nation provisioned <i>before</i> this, re-run provisioning once (Configure &rarr; Supabase &rarr; Re-run provisioning) or set them by hand in the nation project\'s Auth settings &mdash; otherwise the magic link redirects to <code>localhost</code>.',
+              'Auth redirect URLs are set <b>automatically during provisioning</b> now (Site URL + <code>https://&lt;subdomain&gt;.fnhub.app/**</code>). For a nation provisioned <i>before</i> this, re-run provisioning once (Dashboard &rarr; Config &rarr; Re-run provisioning) or set them by hand in the nation project\'s Auth settings &mdash; otherwise the magic link redirects to <code>localhost</code>.',
               '(One-time, platform DB) run <code>supabase/platform/nation_support_keys.sql</code> in the platform SQL Editor so the keys have somewhere to live.'
             ])
-      +   '<div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);">No shared secret to manage. Only <code>SUPPORT_LOGIN_PUBKEY</code> (a <b>public</b> key) sits on the nation. Rotate anytime from the Supabase tab &mdash; it locks the old key until you re-copy the new public key.</div>'
+      +   '<div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);">No shared secret to manage. Only <code>SUPPORT_LOGIN_PUBKEY</code> (a <b>public</b> key) sits on the nation. Rotate anytime from the Config tab &mdash; it locks the old key until you re-copy the new public key.</div>'
       + '</div>'
       + '<div style="margin-top:12px;padding:11px 13px;background:var(--accent-light);border:1px solid var(--hair);border-radius:9px;font-size:12px;line-height:1.6;">'
       +   '<div style="font-weight:800;margin-bottom:4px;">Good to know</div>'
@@ -551,7 +568,6 @@
       +   '<div>&bull; The nation\'s <b>ED is emailed</b> on every entry, via that nation\'s own email provider (skipped only if the nation hasn\'t set up email &mdash; the entry is still audited).</div>'
       +   '<div>&bull; A nation can <b>refuse</b> support login: their ED toggles <b>Settings &rarr; Admin &rarr; Config &rarr; Platform Support Access</b> off. Then Enter returns &ldquo;support login is turned off.&rdquo;</div>'
       +   '<div>&bull; Every entry is audited: <code>entered_nation</code> (control plane) + <code>support_session_started</code> (the nation\'s Audit Log). Access is a full super_user session that lapses the same day.</div>'
-      + '</div>'
       + '</div>';
   }
 
@@ -751,8 +767,18 @@
     var modCount = Object.keys(n.modules_licensed || {}).filter(function(k){ return n.modules_licensed[k]; }).length;
 
     // Panel content (existing card markup, regrouped under tabs).
+    // Access + status actions live here (moved off the nations-list rows,
+    // which now carry only the Dashboard button).
+    var nUrl = 'https://' + esc(n.subdomain) + '.fnhub.app';
     var pOverview =
-        '<div class="card"><h3>Branding &amp; contact</h3>'
+        '<div class="card"><h3>Access</h3>'
+      +   '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      +     '<a class="btn sm ghost" href="' + nUrl + '" target="_blank" rel="noopener">Open ' + esc(n.subdomain) + '.fnhub.app &rarr;</a>'
+      +     (n.supabase_url ? '<button class="btn sm ghost" type="button" data-act="enter" data-id="' + esc(n.id) + '" title="Sign in to this nation as Platform Support (logged both sides; the nation\'s ED is emailed)">Enter as Platform Support</button>' : '')
+      +   '</div>'
+      +   '<p class="sub" style="margin:6px 0 0;font-size:11px;">Enter opens a signed-in support session on the nation\'s app &mdash; full access, audited on both sides, and the nation\'s ED is notified each time.</p>'
+      + '</div>'
+      + '<div class="card"><h3>Branding &amp; contact</h3>'
       +   '<div style="' + g2 + '">'
       +     '<div><label>Display name</label><input id="cn-name" value="' + esc(n.display_name) + '"/></div>'
       +     '<div><label>Short code</label><input id="cn-short" value="' + esc(n.short) + '"/></div>'
@@ -779,13 +805,22 @@
       +   '<label>Registry status</label>'
       +   '<select id="cn-status">' + stOpt('provisioning','Provisioning') + stOpt('active','Active') + stOpt('suspended','Suspended') + '</select>'
       +   '<p class="sub" style="margin:6px 0 0;">Only <b>active</b> nations are published to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>.</p>'
+      +   '<div style="margin-top:10px;">'
+      +     (String(n.status||'') === 'suspended'
+              ? '<button class="btn sm ghost" type="button" data-act="status" data-status="active" data-id="' + esc(n.id) + '">Resume this nation</button>'
+              : '<button class="btn sm danger" type="button" data-act="status" data-status="suspended" data-id="' + esc(n.id) + '">Suspend this nation</button>')
+      +   '</div>'
       + '</div>';
 
     var pSupabase =
         '<div class="card"><h3>Supabase project</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">The nation\'s own database-per-nation project. The anon key is publishable.</p>'
       +   '<label>Supabase URL</label><input id="cn-url" placeholder="https://xxxx.supabase.co" value="' + esc(n.supabase_url || '') + '"/>'
-      +   '<label>Project ref</label><input id="cn-ref-view" value="' + esc(_refFromUrl(n.supabase_url) || '') + '" readonly style="background:var(--bg);color:var(--muted);" title="Derived from the Supabase URL (the code in https://<ref>.supabase.co). This is what the cost tracker and provisioning key off."/>'
+      +   '<label>Project ref</label>'
+      +   '<div style="display:flex;gap:6px;align-items:center;">'
+      +     '<input id="cn-ref-view" value="' + esc(_refFromUrl(n.supabase_url) || '') + '" readonly style="background:var(--bg);color:var(--muted);flex:1;" title="Derived from the Supabase URL (the code in https://<ref>.supabase.co). This is what the cost tracker, provisioning, and the function-deploy workflow input key off."/>'
+      +     '<button class="btn sm ghost" type="button" data-act="copy-text" data-copy="' + esc(_refFromUrl(n.supabase_url) || '') + '">Copy</button>'
+      +   '</div>'
       +   '<label>Supabase anon key</label><input id="cn-anon" placeholder="eyJ..." value="' + esc(n.supabase_anon || '') + '"/>'
       +   '<label>Credentials stored in (reference only — never the secret)</label><input id="cn-cred" placeholder="e.g. 1Password › Supabase › ' + esc(n.subdomain) + '" value="' + esc(n.credentials_note || '') + '"/>'
       +   '<p class="sub" style="margin:4px 0 0;font-size:11px;">Points to where this project\'s <b>database password</b> and <b>service-role key</b> live (a password manager). <b>Do not paste secrets here</b> — this panel is not a secret store; any value saved is readable by a signed-in admin\'s browser.</p>'
@@ -926,7 +961,7 @@
       +   '<div class="nic-strip-tile"><div class="l">Outstanding</div><div class="v" id="cn-sum-inv" style="color:var(--muted);">&mdash;</div></div>'
       + '</div>'
       + '<div class="nic-tabs">'
-      +   tab('overview', 'Overview', true) + tab('supabase', 'Supabase') + tab('email', 'Email') + tab('agreement', 'Agreement')
+      +   tab('overview', 'Overview', true) + tab('supabase', 'Config') + tab('email', 'Email Config') + tab('agreement', 'Agreement')
       +   tab('billing', 'Billing') + tab('invoices', 'Invoices') + tab('notes', 'Notes') + tab('documents', 'Documents')
       + '</div>'
       + '<div class="nic-body">'
@@ -990,6 +1025,31 @@
 
   // https://<ref>.supabase.co -> <ref>, so the wizard can prefill Project ref
   // from the URL already stored on the registry row.
+  // Copy a data-copy value to the clipboard with visible button feedback.
+  // Clipboard API first; execCommand-on-a-temp-textarea as the fallback.
+  window.copyTextBtn = function(btn){
+    var text = (btn && btn.getAttribute('data-copy')) || '';
+    if (!text) return;
+    function done(ok){
+      if (!btn) return;
+      var orig = btn.textContent;
+      btn.textContent = ok ? 'Copied ✓' : 'Copy failed';
+      setTimeout(function(){ btn.textContent = orig; }, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
+      return;
+    }
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;';
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      done(ok);
+    } catch(e){ done(false); }
+  };
+
   function _refFromUrl(url){
     var m = /^https?:\/\/([a-z0-9-]+)\.supabase\.co/i.exec(String(url || '').trim());
     return m ? m[1] : '';
@@ -1161,8 +1221,8 @@
     if (!r.ok || !d.action_link){
       var msg = d.message || d.error || ('HTTP ' + r.status);
       if (d.error === 'support_disabled') msg = esc(n.display_name) + ' has turned OFF platform support login. Ask the nation to re-enable it in Settings before you can enter.';
-      else if (d.error === 'no_support_key') msg = 'No support key for this nation yet. Generate one in Configure → Supabase → Support login key, then set SUPPORT_LOGIN_PUBKEY on the nation project.';
-      else if (d.error === 'pubkey_not_set') msg = 'This nation has no SUPPORT_LOGIN_PUBKEY set. Copy its public key (Configure → Supabase → Support login key) into the nation project\'s Edge Function secrets, then redeploy support-login.';
+      else if (d.error === 'no_support_key') msg = 'No support key for this nation yet. Generate one in Dashboard → Config → Support login key, then set SUPPORT_LOGIN_PUBKEY on the nation project.';
+      else if (d.error === 'pubkey_not_set') msg = 'This nation has no SUPPORT_LOGIN_PUBKEY set. Copy its public key (Dashboard → Config → Support login key) into the nation project\'s Edge Function secrets, then redeploy support-login.';
       dlgAlert('Could not enter: ' + msg, { title: 'Support login' });
       return;
     }
@@ -2305,6 +2365,7 @@
       case 'note-add':      window.addNationNote(el.getAttribute('data-sub') || ''); break;
       case 'ai-key-save':   window.saveNationAiKey(el.getAttribute('data-sub') || ''); break;
       case 'email-apply':   window.applyNationEmailSecrets(el.getAttribute('data-sub') || ''); break;
+      case 'copy-text':     window.copyTextBtn(el); break;
       case 'inv-add-line':  window.invAddLine(); break;
       case 'inv-add-catalog': window.invAddCatalogLine(); break;
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
