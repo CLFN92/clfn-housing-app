@@ -3504,7 +3504,16 @@ window.sendNotification = async function(opts) {
     if(opts.reply_to == null && _nc.email) opts.reply_to = _nc.email;
     // Branded email shell inputs (read by the send-notification Edge Function).
     if(opts.nation_name == null && _nc.display_name) opts.nation_name = _nc.display_name;
+    // Email header colour: registry primary_color first, else the LIVE theme
+    // accent (what the ED actually set in Settings -> Themes and what the app
+    // renders on screen). Without this fallback, nations whose branding lives
+    // only in their saved theme (no registry primary_color) got the Edge
+    // Function's slate-blue default header on every email.
     if(opts.brand_color == null && _nc.primary_color) opts.brand_color = _nc.primary_color;
+    if(opts.brand_color == null && typeof window._themeAccentHex === 'function'){
+      var _acc = window._themeAccentHex();
+      if(/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(_acc||'').trim())) opts.brand_color = String(_acc).trim();
+    }
     if(opts.contact_line == null){
       var _cp = [];
       if(_nc.phone) _cp.push(_nc.phone);
