@@ -26,7 +26,19 @@ const MGMT_TOKEN   = Deno.env.get('SB_MGMT_TOKEN') || Deno.env.get('SUPABASE_MGM
 const MGMT_BASE    = 'https://api.supabase.com'
 
 // Only these secret names may be set through this endpoint.
-const ALLOWED = new Set(['ANTHROPIC_API_KEY'])
+// - ANTHROPIC_API_KEY: the AI Assistant key card.
+// - EMAIL_*/RESEND/SENDGRID: the Email tab's "Apply to project" button, so
+//   email onboarding for a nation is one screen instead of a dashboard visit.
+//   GRAPH_* is deliberately NOT settable here: those are a nation's own Entra
+//   tenant credentials, provisioned by that tenant's admin in their dashboard.
+const ALLOWED = new Set([
+  'ANTHROPIC_API_KEY',
+  'EMAIL_PROVIDER', 'EMAIL_FROM', 'EMAIL_FROM_NAME', 'EMAIL_REPLY_TO', 'EMAIL_BRAND',
+  'RESEND_API_KEY', 'SENDGRID_API_KEY',
+])
+// Secrets that are credentials (enforce a minimum length); the rest are plain
+// config values ('resend', an email address) that just need to be non-empty.
+const KEY_LIKE = new Set(['ANTHROPIC_API_KEY', 'RESEND_API_KEY', 'SENDGRID_API_KEY'])
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -69,11 +81,22 @@ serve(async (req) => {
   let body: any = {}
   try { body = await req.json() } catch (_e) { return json({ error: 'bad_json' }, 400) }
   const sub = String(body.subdomain || '').trim().toLowerCase()
-  const name = String(body.name || 'ANTHROPIC_API_KEY').trim()
-  const value = String(body.value || '')
   if (!SUB_RE.test(sub)) return json({ error: 'bad_subdomain' }, 400)
-  if (!ALLOWED.has(name)) return json({ error: 'secret_not_allowed' }, 400)
-  if (!value || value.length < 8) return json({ error: 'missing_or_short_value' }, 400)
+
+  // Accept a single { name, value } (the AI-key card) or a batch
+  // { secrets: [{ name, value }, ...] } (the Email tab's Apply button).
+  let entries: Array<{ name: string; value: string }>
+  if (Array.isArray(body.secrets)) {
+    entries = body.secrets.map((s: any) => ({ name: String((s && s.name) || '').trim(), value: String((s && s.value) || '') }))
+  } else {
+    entries = [{ name: String(body.name || 'ANTHROPIC_API_KEY').trim(), value: String(body.value || '') }]
+  }
+  if (!entries.length || entries.length > 10) return json({ error: 'bad_secret_count' }, 400)
+  for (const e of entries) {
+    if (!ALLOWED.has(e.name)) return json({ error: 'secret_not_allowed', name: e.name }, 400)
+    if (!e.value) return json({ error: 'missing_value', name: e.name }, 400)
+    if (KEY_LIKE.has(e.name) && e.value.length < 8) return json({ error: 'missing_or_short_value', name: e.name }, 400)
+  }
 
   // Resolve the nation's project ref from the registry.
   const { data: rows } = await admin.from('nations').select('subdomain, supabase_url').eq('subdomain', sub).limit(1)
@@ -82,27 +105,35 @@ serve(async (req) => {
   const ref = refFromUrl(nation.supabase_url || '')
   if (!ref) return json({ error: 'nation_has_no_project' }, 400)
 
-  // Set the secret on the nation's project via the Management API.
+  // Set the secret(s) on the nation's project via the Management API.
   const setRes = await fetch(MGMT_BASE + '/v1/projects/' + ref + '/secrets', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + MGMT_TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ name, value }]),
+    body: JSON.stringify(entries),
   })
   if (!setRes.ok) {
     const t = await setRes.text().catch(() => '')
     return json({ error: 'mgmt_set_secret_failed', status: setRes.status, detail: t.slice(0, 300) }, 502)
   }
 
-  // Record a masked marker on the nations row (never the full key).
-  const last4 = value.slice(-4)
-  try {
-    await admin.from('nations').update({ ai_key_last4: last4, ai_key_updated_at: new Date().toISOString() }).eq('subdomain', sub)
-  } catch (_e) { /* marker is best-effort */ }
+  // Record a masked marker on the nations row (never the full key) - AI key only.
+  const aiEntry = entries.find((e) => e.name === 'ANTHROPIC_API_KEY')
+  const last4 = aiEntry ? aiEntry.value.slice(-4) : ''
+  if (aiEntry) {
+    try {
+      await admin.from('nations').update({ ai_key_last4: last4, ai_key_updated_at: new Date().toISOString() }).eq('subdomain', sub)
+    } catch (_e) { /* marker is best-effort */ }
+  }
 
-  // Audit (best-effort).
+  // Audit (best-effort). Never the values - only which names were set.
+  const names = entries.map((e) => e.name).join(', ')
   try {
-    await admin.from('platform_audit').insert({ action: 'nation_ai_key_set', subdomain: sub, detail: name + ' set by ' + caller + ' (...' + last4 + ')' })
+    await admin.from('platform_audit').insert({
+      action: aiEntry ? 'nation_ai_key_set' : 'nation_email_secrets_set',
+      subdomain: sub,
+      detail: names + ' set by ' + caller + (last4 ? ' (...' + last4 + ')' : ''),
+    })
   } catch (_e) { /* ignore */ }
 
-  return json({ ok: true, subdomain: sub, ref, name, last4 })
+  return json({ ok: true, subdomain: sub, ref, applied: entries.map((e) => e.name), last4 })
 })

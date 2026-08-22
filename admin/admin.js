@@ -835,6 +835,13 @@
       +   '</div>'
       +   '<label>Reply-to (a monitored mailbox)</label><input id="cn-em-reply" placeholder="housing@nation.ca" value="' + esc(nEmail.reply_to || '') + '"/>'
       +   '<p class="sub" style="margin:6px 0 0;font-size:11px;">Resend/SendGrid: the From address must be on a domain verified with that provider (SPF + DKIM), or mail lands in spam. Graph ignores From here &mdash; it sends from the mailbox in the nation project\'s <code>GRAPH_FROM_USER</code> secret. Saved with the <b>Save changes</b> button below; takes effect on the nation\'s next page load.</p>'
+      + '</div>'
+      + '<div class="card"><h3>Apply to project</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Writes the matching <b>Edge Function secrets</b> straight onto this nation\'s Supabase project via the Management API (like the AI Assistant key) &mdash; no dashboard visit. Sets <code>EMAIL_PROVIDER</code> + the filled-in <code>EMAIL_FROM</code>/<code>EMAIL_FROM_NAME</code>/<code>EMAIL_REPLY_TO</code> from the fields above, plus the provider API key below. Values are written to the project and <b>never stored here</b>.</p>'
+      +   '<label>Provider API key (Resend/SendGrid)</label><input id="cn-em-key" type="password" autocomplete="off" placeholder="re_... / SG...."/>'
+      +   '<p class="sub" style="margin:4px 0 0;font-size:11px;">Leave the key blank to re-apply only the non-secret values (an already-set key on the project is kept). For <b>Graph</b>, this button sets <code>EMAIL_PROVIDER=graph</code> only &mdash; the <code>GRAPH_*</code> credentials belong to the nation\'s own Microsoft tenant and are set in the Supabase dashboard by hand. Functions pick up new secrets within about a minute.</p>'
+      +   '<div class="msg" id="cn-em-msg"></div>'
+      +   '<button class="btn sm" type="button" data-act="email-apply" data-sub="' + esc(n.subdomain) + '">Apply to project</button>'
       + '</div>';
 
     var pNotes =
@@ -1749,6 +1756,44 @@
     } catch (e){ setMsg('cn-ai-msg', 'Network error: ' + String(e).slice(0, 120)); }
   };
 
+  // Email tab -> "Apply to project": write EMAIL_PROVIDER + From identity (and
+  // the provider API key, when entered) onto the nation project's Edge Function
+  // secrets through set-nation-secret's batch mode. Mirrors saveNationAiKey.
+  window.applyNationEmailSecrets = async function(sub){
+    var get = function(x){ return ((document.getElementById(x) || {}).value || '').trim(); };
+    var provider = get('cn-em-provider') || 'graph';
+    var from     = get('cn-em-from');
+    var fromName = get('cn-em-from-name');
+    var replyTo  = get('cn-em-reply');
+    var key      = get('cn-em-key');
+    var secrets = [{ name: 'EMAIL_PROVIDER', value: provider }];
+    if (from)     secrets.push({ name: 'EMAIL_FROM',      value: from });
+    if (fromName) secrets.push({ name: 'EMAIL_FROM_NAME', value: fromName });
+    if (replyTo)  secrets.push({ name: 'EMAIL_REPLY_TO',  value: replyTo });
+    if (key){
+      if (provider === 'resend')        secrets.push({ name: 'RESEND_API_KEY',   value: key });
+      else if (provider === 'sendgrid') secrets.push({ name: 'SENDGRID_API_KEY', value: key });
+      else { setMsg('cn-em-msg', 'Graph does not use an API key here - clear the key field (GRAPH_* secrets are set in the Supabase dashboard).'); return; }
+    }
+    if ((provider === 'resend' || provider === 'sendgrid') && !from){
+      setMsg('cn-em-msg', 'Enter a From address above first - ' + provider + ' needs EMAIL_FROM on a verified domain.'); return;
+    }
+    setMsg('cn-em-msg', 'Applying to project...', 'ok');
+    try {
+      var r = await fetch(PBASE + '/functions/v1/set-nation-secret', {
+        method: 'POST',
+        headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subdomain: sub, secrets: secrets })
+      });
+      var d = await r.json().catch(function(){ return {}; });
+      if (!r.ok){ setMsg('cn-em-msg', (d && d.error) ? ('Failed: ' + d.error + (d.name ? ' (' + d.name + ')' : '') + (d.detail ? ' - ' + String(d.detail).slice(0,160) : '')) : ('Failed: HTTP ' + r.status)); return; }
+      var kEl = document.getElementById('cn-em-key'); if (kEl) kEl.value = '';
+      setMsg('cn-em-msg', 'Applied to the project: ' + (d.applied || []).join(', ') + '. Functions pick this up within about a minute.'
+        + (key ? '' : ' (No API key entered - any existing key on the project is unchanged.)'), 'ok');
+      await audit('nation_email_secrets_set', sub, (d.applied || []).join(', '));
+    } catch (e){ setMsg('cn-em-msg', 'Network error: ' + String(e).slice(0, 120)); }
+  };
+
   window.addNationNote = async function(sub){
     var ta = document.getElementById('cn-note-body');
     var body = (ta && ta.value || '').trim();
@@ -2259,6 +2304,7 @@
       case 'nic-tab':       window.nicTab(el.getAttribute('data-tab') || ''); break;
       case 'note-add':      window.addNationNote(el.getAttribute('data-sub') || ''); break;
       case 'ai-key-save':   window.saveNationAiKey(el.getAttribute('data-sub') || ''); break;
+      case 'email-apply':   window.applyNationEmailSecrets(el.getAttribute('data-sub') || ''); break;
       case 'inv-add-line':  window.invAddLine(); break;
       case 'inv-add-catalog': window.invAddCatalogLine(); break;
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
