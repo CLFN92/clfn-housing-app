@@ -608,6 +608,14 @@
   }
   window.runFleetMigration = async function(dryRun){
     var file  = ((document.getElementById('fm-file')  || {}).value || '').trim();
+    // Be forgiving about pasted paths: the server accepts a bare filename only
+    // (its safe-name check rejects slashes with bad_migration_name), but the
+    // natural thing to paste is "supabase/migrations/<file>.sql" - strip any
+    // leading path and reflect the cleaned value back into the field.
+    if (file.indexOf('/') >= 0 || file.indexOf('\\') >= 0){
+      file = file.split(/[\\/]/).pop();
+      var _fEl = document.getElementById('fm-file'); if (_fEl) _fEl.value = file;
+    }
     var sql   = ((document.getElementById('fm-sql')   || {}).value || '');
     var label = ((document.getElementById('fm-label') || {}).value || '').trim();
     var force = !!(document.getElementById('fm-force') || {}).checked;
