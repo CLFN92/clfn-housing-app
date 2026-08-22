@@ -4036,12 +4036,47 @@ async function _staffMagicCopy(email){
     if(wrap && inp){
       wrap.style.display = '';
       inp.value = data.link;
-      if(note) note.textContent = (data.expiry ? 'Their access is valid until ' + data.expiry + '. ' : '') + 'Paste this into your own email or message.';
+      if(note) note.textContent = (data.expiry ? 'Their access is valid until ' + data.expiry + '. ' : '')
+        + 'Pasted into an email it appears as a "Sign in" link, not the raw address; plain-text fields get the full URL.';
     }
+    // Copy BOTH flavors: text/html (a friendly named hyperlink — what Outlook/
+    // Gmail/Teams/Word render on paste) and text/plain (the raw URL, for
+    // plain-text fields). The URL itself can't be shortened — it carries the
+    // one-time sign-in token.
+    var _esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+    var label = 'Sign in to ' + ((typeof nationShort === 'function') ? nationShort() : 'the') + ' Housing system';
+    var linkHtml = '<a href="' + _esc(data.link) + '">' + _esc(label) + '</a>';
     var copied = false;
-    try { if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(data.link); copied = true; } } catch(e){}
-    if(!copied && inp){ inp.focus(); inp.select(); try { copied = document.execCommand('copy'); } catch(e){} }
-    showToast(copied ? 'Sign-in link copied — paste it into your email or message.' : 'Link generated — select and copy it from the box.', {type:'info'});
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html':  new Blob([linkHtml],  { type: 'text/html' }),
+          'text/plain': new Blob([data.link], { type: 'text/plain' })
+        })]);
+        copied = true;
+      }
+    } catch(e){}
+    if(!copied){
+      // Fallback 1: copy a selected contenteditable region (carries the HTML
+      // flavor on most older browsers).
+      try {
+        var host = document.createElement('div');
+        host.contentEditable = 'true';
+        host.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+        host.innerHTML = linkHtml;
+        document.body.appendChild(host);
+        var range = document.createRange(); range.selectNodeContents(host);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        copied = document.execCommand('copy');
+        sel.removeAllRanges(); document.body.removeChild(host);
+      } catch(e){}
+    }
+    if(!copied){
+      // Fallback 2: plain URL only.
+      try { if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(data.link); copied = true; } } catch(e){}
+      if(!copied && inp){ inp.focus(); inp.select(); try { copied = document.execCommand('copy'); } catch(e){} }
+    }
+    showToast(copied ? 'Sign-in link copied — pasting into an email shows "' + label + '" as a clickable link.' : 'Link generated — select and copy it from the box.', {type:'info'});
     auditEntry('SETTINGS','settings_user_copy_magic_link','Magic-link sign-in link generated (copy) for '+email, window.currentRole||'ed');
   } catch(e){
     showToast('Error: '+e.message, {type:'error'});

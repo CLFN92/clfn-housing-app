@@ -2784,11 +2784,18 @@ function renderNotificationsTab() {
   // signed-in admin through the full send-notification path, so a nation's
   // email setup (provider, secrets, DNS) can be verified without staging a
   // workflow event. Errors surface verbatim for troubleshooting.
+  // Recipient is editable: the signed-in address is only a default, because
+  // seeded/demo logins (e.g. ed@demo.fnhub.app) are identities, not real
+  // mailboxes — and an editable recipient also makes mail-tester.com checks
+  // a one-click job (paste its throwaway address, send).
   var _myEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
   var testStrip =
       '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:9px;">'
-    +   '<span style="font-size:12.5px;color:var(--text);"><strong>Test the email pipeline</strong> — sends a branded test message to <code>' + _ntfEsc(_myEmail || 'your account') + '</code> via this nation\'s configured provider.</span>'
+    +   '<span style="font-size:12.5px;color:var(--text);flex-shrink:0;"><strong>Test the email pipeline</strong> — send a branded test to:</span>'
+    +   '<input type="email" id="ntf_test_to" value="' + _ntfEsc(_myEmail) + '" placeholder="you@example.com" '
+    +     'style="flex:1;min-width:200px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12.5px;background:var(--surface);color:var(--text);"/>'
     +   '<button type="button" id="ntf_test_btn" onclick="ntfSendTestEmail()" class="btn btn-primary btn-sm">📧 Send test email</button>'
+    +   '<span style="font-size:11px;color:var(--muted);flex-basis:100%;">Sends through this nation\'s configured provider. Use a real mailbox you can check — or paste a mail-tester.com address to score spam-readiness.</span>'
     + '</div>';
 
   body.innerHTML =
@@ -2807,8 +2814,9 @@ function renderNotificationsTab() {
 // provider). Success/failure toasts carry the server's actual error so a
 // misconfigured provider is diagnosable from the app.
 function ntfSendTestEmail() {
-  var me = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
-  if (!me) { if (typeof showToast === 'function') showToast('No signed-in email to send to.', {type:'error'}); return; }
+  var inp = document.getElementById('ntf_test_to');
+  var me = ((inp && inp.value) || (window.HOUSING_SESSION && HOUSING_SESSION.email) || '').trim();
+  if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(me)) { if (typeof showToast === 'function') showToast('Enter a valid recipient email address first.', {type:'error'}); return; }
   var btn = document.getElementById('ntf_test_btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   var nation = (typeof nationDisplay === 'function') ? nationDisplay() : 'Housing';
