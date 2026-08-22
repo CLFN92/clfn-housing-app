@@ -100,7 +100,7 @@
     supaFns:  'https://supabase.com/dashboard/project/_/settings/functions', // Edge Function secrets
     supaCli:  'https://supabase.com/docs/guides/functions/deploy',        // functions deploy docs
     cf:       'https://dash.cloudflare.com',                              // Cloudflare (DNS + Workers)
-    gh:       'https://github.com/CLFN92/clfn-housing-app/actions',       // deploy workflows
+    gh:       'https://github.com/fnhub-app/fnhub-platform/actions',       // deploy workflows
     azure:    'https://portal.azure.com',                                // Entra app registrations
     resend:   'https://resend.com/domains'                               // verify domain + API keys
   };

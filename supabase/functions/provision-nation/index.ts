@@ -37,7 +37,7 @@ const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const MGMT_TOKEN   = Deno.env.get('SB_MGMT_TOKEN') || Deno.env.get('SUPABASE_MGMT_TOKEN') || ''
 const MGMT_BASE    = 'https://api.supabase.com'
 const SCHEMA_URL   = Deno.env.get('BOOTSTRAP_SCHEMA_URL') ||
-  'https://raw.githubusercontent.com/CLFN92/clfn-housing-app/main/supabase/bootstrap/schema.sql'
+  'https://raw.githubusercontent.com/fnhub-app/fnhub-platform/main/supabase/bootstrap/schema.sql'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
