@@ -3506,13 +3506,23 @@ window.sendNotification = async function(opts) {
     if(opts.nation_name == null && _nc.display_name) opts.nation_name = _nc.display_name;
     // Email header colour: registry primary_color first, else the LIVE theme
     // accent (what the ED actually set in Settings -> Themes and what the app
-    // renders on screen). Without this fallback, nations whose branding lives
-    // only in their saved theme (no registry primary_color) got the Edge
-    // Function's slate-blue default header on every email.
-    if(opts.brand_color == null && _nc.primary_color) opts.brand_color = _nc.primary_color;
-    if(opts.brand_color == null && typeof window._themeAccentHex === 'function'){
-      var _acc = window._themeAccentHex();
-      if(/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(_acc||'').trim())) opts.brand_color = String(_acc).trim();
+    // renders on screen). The Edge Function's sanitizer accepts ONLY #rgb/
+    // #rrggbb and silently falls back to its slate default otherwise, so
+    // normalise here: trim, auto-prefix a missing '#', drop anything that
+    // still isn't valid hex (so a bad registry value can't shadow the good
+    // theme accent). Without this, nations whose branding lives only in the
+    // saved theme - or whose registry colour was entered as 'f8e41a' - got
+    // the slate-blue default header on every email.
+    var _normHex = function(v){
+      var s = String(v == null ? '' : v).trim();
+      if(/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s)) s = '#' + s;
+      return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s) ? s : '';
+    };
+    if(opts.brand_color != null) opts.brand_color = _normHex(opts.brand_color) || opts.brand_color;
+    if(opts.brand_color == null){
+      var _bc = _normHex(_nc.primary_color);
+      if(!_bc && typeof window._themeAccentHex === 'function') _bc = _normHex(window._themeAccentHex());
+      if(_bc) opts.brand_color = _bc;
     }
     if(opts.contact_line == null){
       var _cp = [];
