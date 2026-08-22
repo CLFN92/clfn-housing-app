@@ -104,7 +104,7 @@
     contractors:  "Contractor approvals, insurance and WSIB expiries are tracked so nothing lapses unnoticed.",
     inspections:  "Room-by-room condition reports with photos, on a phone, that can spawn work orders on the spot.",
     projects:     "Capital projects tracked from funding to finished homes — milestone budgets, multi-grant funding, and one-click claim packages with every invoice, EFT and bank statement your funder demands.",
-    finance:      "Rent, arrears, arrangements and collections reconcile in the same system the housing team uses.",
+    finance:      "Rent, arrears, arrangements and collections reconcile in the same system the housing team uses — statements and receipts email to tenants as PDFs.",
     portal:       "Tenants and applicants apply, upload documents and get status updates online — without calling the office.",
     council:      "The leadership Reports dashboard gives Chief & Council a live, read-only picture — no more assembling reports by hand.",
     ai:           "Staff ask plain-language questions and get answers from your nation's own records — read-only and permission-aware.",
