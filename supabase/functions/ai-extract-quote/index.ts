@@ -133,6 +133,10 @@ serve(async (req) => {
     const fileName = String(file.name || 'quote')
     const draftPrompt = String(body.prompt || '').trim().slice(0, 600)
     const isDraftMode = !dataB64 && !!draftPrompt
+    // Detail level for draft mode: 'summary' = a handful of broad items (big
+    // jobs like a whole-house reno stay readable); anything else = the full
+    // contractor-style breakdown (tender-safe default).
+    const isSummary = String(body.detail || '') === 'summary'
     const categories: string[] = Array.isArray(body.categories) ? body.categories.map((c: unknown) => String(c)) : []
     const catList = categories.length ? categories.join(', ') : 'Other'
 
@@ -140,18 +144,26 @@ serve(async (req) => {
     if (isDraftMode) {
       // Draft mode: no document - generate a scope of work from the job
       // description. No prices: staff or the tendering process set those.
+      const granularity = isSummary
+        ? ('Draft a concise, HIGH-LEVEL scope of work for that job as 4 to 8 broad line items - ' +
+           'one line per major piece of work, the way it would read on a quote summary. Roll ' +
+           'preparation, removal/disposal, finishing, and cleanup into the main line for that work ' +
+           'instead of listing them separately; fold code-required details (GFCI outlets, venting, ' +
+           'flashing) into the relevant line rather than giving them their own lines. If the ' +
+           'description names several rooms or locations, one line per room is enough. Return at ' +
+           'most 12 items')
+        : ('Draft a practical, complete scope of work for that job as separate line items, the way a ' +
+           'housing manager or general contractor would break it down (include preparation, removal/' +
+           'disposal, rough-in, installation, finishing, and cleanup steps where they apply, and any ' +
+           'code-required items such as GFCI outlets, venting, or flashing). If the description names ' +
+           'several rooms or locations, cover each one. Return at most ' + MAX_ITEMS + ' items')
       const prompt =
         'You are helping First Nation housing staff prepare a Maintenance Request (scope of work) ' +
         'for a housing unit. The staff member describes the job as: "' + draftPrompt + '". ' +
-        'Draft a practical, complete scope of work for that job as separate line items, the way a ' +
-        'housing manager or general contractor would break it down (include preparation, removal/' +
-        'disposal, rough-in, installation, finishing, and cleanup steps where they apply, and any ' +
-        'code-required items such as GFCI outlets, venting, or flashing). For each item: a short ' +
-        'plain description of the work; and the single best-fit category chosen EXACTLY from this ' +
-        'list (or "Other" if none fits): [' + catList + ']. Set cost to null on every item - do NOT ' +
-        'invent prices. If the description names several rooms or locations, cover each one. ' +
-        'Keep it to the described job only. Return at most ' + MAX_ITEMS + ' items via the ' +
-        'extract_line_items tool, plus a one-sentence summary of the scope.'
+        granularity + ' via the extract_line_items tool, plus a one-sentence summary of the scope. ' +
+        'For each item: a short plain description of the work; and the single best-fit category ' +
+        'chosen EXACTLY from this list (or "Other" if none fits): [' + catList + ']. Set cost to ' +
+        'null on every item - do NOT invent prices. Keep it to the described job only.'
       userContent = [{ type: 'text', text: prompt }]
     } else {
       if (!dataB64) return json({ error: 'Provide a file to read, or a prompt describing the job.' }, 400)

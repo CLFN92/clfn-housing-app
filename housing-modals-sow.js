@@ -1190,6 +1190,12 @@ function sowDraftScopeClick(){
       '<div style="padding:16px 18px;">' +
         '<textarea id="sow_scope_ai_prompt" rows="3" placeholder="e.g. Bathroom renovation&#10;e.g. Replace exterior windows in bedroom, basement and living room" ' +
           'style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;resize:vertical;background:var(--surface);color:var(--text);"></textarea>' +
+        '<div style="margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+          '<span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);">Detail</span>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-sow-detail="summary" onclick="_sowSetScopeDetail(\'summary\')">Summary</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-sow-detail="full" onclick="_sowSetScopeDetail(\'full\')">Full breakdown</button>' +
+          '<span id="sow_scope_detail_hint" style="font-size:11px;color:var(--muted);"></span>' +
+        '</div>' +
         '<div style="margin-top:6px;font-size:11.5px;color:var(--muted);">No prices are generated — costs stay with staff / contractor quotes. You pick which items to add.</div>' +
       '</div>' +
       '<div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">' +
@@ -1199,6 +1205,10 @@ function sowDraftScopeClick(){
     '</div>';
   document.body.appendChild(ov);
   ov.addEventListener('click', function(e){ if (e.target === ov) _sowCloseScopeAi(); });
+  // Detail toggle: restore this device's last choice ('full' first time).
+  var savedDetail = 'full';
+  try { savedDetail = localStorage.getItem('clfn_sow_ai_detail') || 'full'; } catch(e){}
+  _sowSetScopeDetail(savedDetail === 'summary' ? 'summary' : 'full');
   var ta = document.getElementById('sow_scope_ai_prompt');
   if (ta) {
     ta.focus();
@@ -1207,6 +1217,23 @@ function sowDraftScopeClick(){
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _sowRunScopeAi(); }
     });
   }
+}
+// Selected detail level lives on window so _sowRunScopeAi can read it; the
+// buttons restyle to show which is active, and the choice is remembered
+// per device (localStorage) so field staff aren't re-picking every time.
+function _sowSetScopeDetail(v){
+  window._sowScopeAiDetail = (v === 'summary') ? 'summary' : 'full';
+  try { localStorage.setItem('clfn_sow_ai_detail', window._sowScopeAiDetail); } catch(e){}
+  var ov = document.getElementById('_sowScopeAiOv');
+  if (!ov) return;
+  ov.querySelectorAll('[data-sow-detail]').forEach(function(b){
+    var on = b.getAttribute('data-sow-detail') === window._sowScopeAiDetail;
+    b.className = on ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+  });
+  var hint = document.getElementById('sow_scope_detail_hint');
+  if (hint) hint.textContent = window._sowScopeAiDetail === 'summary'
+    ? '4–8 broad items — good for big jobs like a whole-house reno'
+    : 'Complete step-by-step breakdown — good for tenders';
 }
 function _sowCloseScopeAi(){
   var ov = document.getElementById('_sowScopeAiOv');
@@ -1224,6 +1251,7 @@ function _sowRunScopeAi(){
     headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + token },
     body: JSON.stringify({
       prompt: promptText,
+      detail: window._sowScopeAiDetail === 'summary' ? 'summary' : 'full',
       categories: (typeof SOW_CATEGORIES !== 'undefined') ? SOW_CATEGORIES : []
     })
   })
@@ -1244,6 +1272,7 @@ function _sowRunScopeAi(){
 window.sowDraftScopeClick = sowDraftScopeClick;
 window._sowCloseScopeAi   = _sowCloseScopeAi;
 window._sowRunScopeAi     = _sowRunScopeAi;
+window._sowSetScopeDetail = _sowSetScopeDetail;
 
 // ── Work Order (execution) tab ────────────────────────────────────────────
 // The editable, functional work-order record kept on the SOW's `workOrder`
