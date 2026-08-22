@@ -162,21 +162,44 @@
 
   function _configCard() {
     var c = S.cfg || {};
-    var ecOpts = ['L', 'M', 'Q', 'H'].map(function (x) { return '<option value="' + x + '"' + ((c.qr_error_level || 'M') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('');
+    // Error-correction level = how much of the code can be damaged/dirty and
+    // still scan. Higher recovery packs MORE modules into the same square, so
+    // each module prints smaller (harder to scan at small label sizes) — L
+    // gives the biggest modules, H the densest code.
+    var EC_LEVELS = [
+      ['L', 'L — Low (7%)',      'Recovers up to 7% damage. Least dense code = biggest modules, easiest scan at small sizes. Best when the module-size gate reads Marginal.'],
+      ['M', 'M — Medium (15%)',  'Recovers up to 15% damage. The default — a good balance of durability and module size.'],
+      ['Q', 'Q — Quartile (25%)','Recovers up to 25% damage. Denser code, smaller modules. For labels likely to get scuffed or dirty.'],
+      ['H', 'H — High (30%)',    'Recovers up to 30% damage. Densest code = smallest modules; only for large labels in harsh conditions.']
+    ];
+    var ecOpts = EC_LEVELS.map(function (o) {
+      return '<option value="' + o[0] + '" title="' + esc(o[2]) + '"' + ((c.qr_error_level || 'M') === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+    }).join('');
+    var ecTitle = 'How much of the printed code can be damaged or dirty and still scan. Higher recovery = denser code = smaller squares (harder to scan on small labels). '
+      + EC_LEVELS.map(function (o) { return o[1] + ': ' + o[2]; }).join('  ');
+    // Prefill from the nation's own config when nothing is saved yet — the
+    // values were previously only greyed placeholders, so a fresh nation saw
+    // an apparently-empty form even though the app already knows its mailbox,
+    // display name, portal URL, and theme accent. Everything comes from
+    // NATION_CONFIG / the live theme (no nation literals); staff can still
+    // edit any value before saving.
+    var _nc = window.NATION_CONFIG || {};
+    var _accDefault = (typeof window._themeAccentHex === 'function' ? window._themeAccentHex() : '') || '#F8E41A';
     return '<div class="std-table-card" style="padding:16px;margin-bottom:16px;">'
       + '<div class="lbl-yellow" style="margin-bottom:10px;">Label configuration</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-      +   _fieldRow('Department label', 'lbl_dept', c.department_label, 'Housing Department')
+      +   _fieldRow('Department label', 'lbl_dept', c.department_label || 'Housing Department', 'Housing Department')
       +   _fieldRow('CTA text', 'lbl_cta', c.cta_text || 'SCAN TO REPORT AN ISSUE', 'SCAN TO REPORT AN ISSUE')
-      +   _fieldRow('Housing email', 'lbl_email', c.housing_email, 'housing@nation.ca', 'email')
-      +   _fieldRow('Housing phone', 'lbl_phone', c.housing_phone, '705-555-1234')
-      +   _fieldRow('Default community', 'lbl_comm', c.default_community, (typeof nationDisplay === 'function' ? nationDisplay() : ''))
-      +   _fieldRow('QR base URL', 'lbl_qrbase', c.qr_base_url, qrBase())
+      +   _fieldRow('Housing email', 'lbl_email', c.housing_email || _nc.housing_email || '', 'housing@nation.ca', 'email')
+      +   _fieldRow('Housing phone', 'lbl_phone', c.housing_phone || _nc.phone || '', '705-555-1234')
+      +   _fieldRow('Default community', 'lbl_comm', c.default_community || (typeof nationDisplay === 'function' ? nationDisplay() : ''), (typeof nationDisplay === 'function' ? nationDisplay() : ''))
+      +   _fieldRow('QR base URL', 'lbl_qrbase', c.qr_base_url || qrBase(), qrBase())
       + '</div>'
       + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;">'
-      +   '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">QR error level</label>'
-      +     '<select id="lbl_ec" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;">' + ecOpts + '</select></div>'
-      +   _fieldRow('Accent colour', 'lbl_accent', c.accent_colour || '#F8E41A', '#F8E41A')
+      +   '<div><label title="' + esc(ecTitle) + '" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;cursor:help;">QR error level <span style="font-weight:400;">&#9432;</span></label>'
+      +     '<select id="lbl_ec" title="' + esc(ecTitle) + '" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;">' + ecOpts + '</select>'
+      +     '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.4;">Lower = bigger squares, easier scan. Drop to L if the QR gate reads Marginal.</div></div>'
+      +   _fieldRow('Accent colour', 'lbl_accent', c.accent_colour || _accDefault, _accDefault)
       +   _fieldRow('Label width (in)', 'lbl_w', c.label_width_in != null ? c.label_width_in : 2.0, '2.00', 'number')
       +   _fieldRow('Label height (in)', 'lbl_h', c.label_height_in != null ? c.label_height_in : 1.0, '1.00', 'number')
       + '</div>'
@@ -285,7 +308,12 @@
     var qh = host.querySelector('.lbl-qr-host');
     if (qh && typeof QRCode !== 'undefined') {
       qh.innerHTML = '';
-      new QRCode(qh, { text: qrUrl(u), width: 150, height: 150, correctLevel: QRCode.CorrectLevel[(S.cfg && S.cfg.qr_error_level) || 'M'] });
+      // Draw at the host's ACTUAL rendered size — a fixed 150px QR overflowed
+      // the ~40px preview slot and smeared across the address text and the
+      // contact band. The print/PDF paths are untouched (they render at full
+      // physical size); this only affects the on-screen preview.
+      var _qs = Math.max(24, Math.round(qh.getBoundingClientRect().width) || parseInt(qh.style.width, 10) || 40);
+      new QRCode(qh, { text: qrUrl(u), width: _qs, height: _qs, correctLevel: QRCode.CorrectLevel[(S.cfg && S.cfg.qr_error_level) || 'M'] });
     }
   }
 
@@ -293,7 +321,9 @@
   function _labelHtml(u, pxW) {
     var g = geom();
     var scale = pxW / g.W;                      // px per inch for this render
-    var accent = (S.cfg && S.cfg.accent_colour) || '#F8E41A';
+    var accent = (S.cfg && S.cfg.accent_colour)
+      || (typeof window._themeAccentHex === 'function' ? window._themeAccentHex() : '')
+      || '#F8E41A';
     var qrPx = g.qr * scale, bandPx = g.band * scale, padPx = g.pad * scale;
     var contacts = S.contacts.filter(function (c) { return (c.label || c.phone); });
     var bandLines = contacts.map(function (c) {
@@ -472,7 +502,9 @@
 
   // One label for the print sheet (exact inches).
   function _labelPrintHtml(u, qrSrc, g) {
-    var accent = (S.cfg && S.cfg.accent_colour) || '#F8E41A';
+    var accent = (S.cfg && S.cfg.accent_colour)
+      || (typeof window._themeAccentHex === 'function' ? window._themeAccentHex() : '')
+      || '#F8E41A';
     var contacts = S.contacts.filter(function (c) { return (c.label || c.phone); });
     var bandLines = contacts.map(function (c) {
       return '<div style="color:' + esc(accent) + ';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc((c.label ? c.label + ': ' : '') + (c.phone || '')) + '</div>';
