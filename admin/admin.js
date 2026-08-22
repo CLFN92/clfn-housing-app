@@ -623,6 +623,10 @@
     if (!file && !sql.trim()){ setMsg('fm-msg', 'Enter a migration filename or paste SQL.'); return; }
     if (!targets.length){ setMsg('fm-msg', 'Select at least one target nation.'); return; }
     setMsg('fm-msg', dryRun ? 'Previewing...' : 'Applying...', 'ok');
+    // Clear the previous run's results table so a failed attempt can't sit
+    // above a stale success table (or vice versa) — message and table always
+    // describe the SAME run.
+    var _resEl = document.getElementById('fm-results'); if (_resEl) _resEl.innerHTML = '';
     var payload = { targets: targets, dryRun: !!dryRun, force: force };
     if (file) payload.migration = file; else { payload.sql = sql; if (label) payload.label = label; }
     var r;
