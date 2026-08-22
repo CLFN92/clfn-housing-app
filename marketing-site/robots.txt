@@ -1,5 +1,0 @@
-# Production domain: homelandhomes.ca
-User-agent: *
-Allow: /
-
-Sitemap: https://homelandhomes.ca/sitemap.xml
