@@ -877,6 +877,7 @@
       +   '<p class="sub" style="margin:4px 0 0;font-size:11px;">Leave the key blank to re-apply only the non-secret values (an already-set key on the project is kept). For <b>Graph</b>, this button sets <code>EMAIL_PROVIDER=graph</code> only &mdash; the <code>GRAPH_*</code> credentials belong to the nation\'s own Microsoft tenant and are set in the Supabase dashboard by hand. Functions pick up new secrets within about a minute.</p>'
       +   '<div class="msg" id="cn-em-msg"></div>'
       +   '<button class="btn sm" type="button" data-act="email-apply" data-sub="' + esc(n.subdomain) + '">Apply to project</button>'
+      +   '<p class="sub" style="margin:10px 0 0;font-size:11px;"><b>Verify it end-to-end:</b> use <b>Overview &rarr; Enter as Platform Support</b>, then on the nation\'s app go to <b>Settings &rarr; Notifications &rarr; &ldquo;Send test email&rdquo;</b> &mdash; one click sends a branded test to your address through the nation\'s real pipeline, and failures show the server\'s actual error. (The nation project must have the current Edge Functions deployed.)</p>'
       + '</div>';
 
     var pNotes =

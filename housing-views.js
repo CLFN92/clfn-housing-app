@@ -104,7 +104,10 @@ function _cardTile(o) {
     +   (badges ? '<div style="margin-top:4px;">' + badges + '</div>' : '')
     +   metas
     + '</div>'
-    + (actions ? '<div style="display:flex;gap:6px;margin-top:11px;">' + actions + '</div>' : '')
+    // flex-wrap: three+ actions (e.g. Override/Archive/Progress on the reno
+    // kanban's narrow columns) wrap to a second row instead of overflowing the
+    // card — the buttons are nowrap by design, so wrapping is the relief valve.
+    + (actions ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;">' + actions + '</div>' : '')
     + '</div>';
 }
 

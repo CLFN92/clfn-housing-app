@@ -2780,8 +2780,20 @@ function renderNotificationsTab() {
   // Default to the first event in the registry on first open.
   if (!_ntfSelectedEvent) _ntfSelectedEvent = EMAIL_EVENT_REGISTRY[0] && EMAIL_EVENT_REGISTRY[0].key;
 
+  // Pipeline test strip — one click sends a real branded email to the
+  // signed-in admin through the full send-notification path, so a nation's
+  // email setup (provider, secrets, DNS) can be verified without staging a
+  // workflow event. Errors surface verbatim for troubleshooting.
+  var _myEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  var testStrip =
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:9px;">'
+    +   '<span style="font-size:12.5px;color:var(--text);"><strong>Test the email pipeline</strong> — sends a branded test message to <code>' + _ntfEsc(_myEmail || 'your account') + '</code> via this nation\'s configured provider.</span>'
+    +   '<button type="button" id="ntf_test_btn" onclick="ntfSendTestEmail()" class="btn btn-primary btn-sm">📧 Send test email</button>'
+    + '</div>';
+
   body.innerHTML =
-      '<div class="ntf-grid">'
+      testStrip
+    + '<div class="ntf-grid">'
     +   '<div class="ntf-event-list" id="ntf_event_list">' + _ntfRenderEventListHtml() + '</div>'
     +   '<div class="ntf-editor"      id="ntf_editor">'    + _ntfRenderEditorHtml(_ntfSelectedEvent) + '</div>'
     + '</div>';
@@ -2789,6 +2801,35 @@ function renderNotificationsTab() {
   _ntfWireEventListClicks();
   _ntfWireEditor();
 }
+
+// Send a real test email to the signed-in user through the normal pipeline
+// (sendNotification -> send-notification Edge Function -> the nation's
+// provider). Success/failure toasts carry the server's actual error so a
+// misconfigured provider is diagnosable from the app.
+function ntfSendTestEmail() {
+  var me = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  if (!me) { if (typeof showToast === 'function') showToast('No signed-in email to send to.', {type:'error'}); return; }
+  var btn = document.getElementById('ntf_test_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  var nation = (typeof nationDisplay === 'function') ? nationDisplay() : 'Housing';
+  window.sendNotification({
+    to: me,
+    subject: 'Test email — ' + nation + ' Housing notifications',
+    bodyHtml:
+        '<p style="font-size:14px;line-height:1.65;color:#374151;margin:0 0 12px;">This is a <strong>test message</strong> from the '
+      +   _ntfEsc(nation) + ' Housing system, sent ' + new Date().toLocaleString('en-CA') + '.</p>'
+      + '<p style="font-size:13px;line-height:1.6;color:#374151;margin:0;">If you received this, the email pipeline is working: the provider is configured, the sending domain authenticates, and workflow notifications will deliver.</p>',
+    event: 'test_email', entity_type: 'settings', entity_id: 'TEST'
+  }).then(function(){
+    if (typeof showToast === 'function') showToast('Test email sent to ' + me + ' — check your inbox (and spam folder on the first send).', {type:'info'});
+    if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'test_email_sent', 'Test email sent to ' + me, window.currentRole || 'staff');
+  }).catch(function(e){
+    if (typeof showToast === 'function') showToast('Test email failed: ' + (e && e.message ? e.message : 'unknown error'), {type:'error'});
+  }).finally(function(){
+    if (btn) { btn.disabled = false; btn.textContent = '📧 Send test email'; }
+  });
+}
+window.ntfSendTestEmail = ntfSendTestEmail;
 
 // Left column — one row per registry entry. Wired (live) events get
 // a green dot; pending events get a grey dot so the ED can pre-author
