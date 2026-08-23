@@ -1301,24 +1301,29 @@ function renderThemesPanel() {
   // actually applied now (some are derived from the accent).
   function _liveVar(name, fb){ try { var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v || fb; } catch(e){ return fb; } }
   body.innerHTML =
-      _themeFieldRow('yellow',  'Brand Accent',       'Accent FILLS — buttons, pills, chips, bars (not text on light)', theme.yellow,  _brandAccent)
-    + _themeFieldRow('accentInk','Accent Ink',        'Accent as TEXT on light — links, active tabs, focus (auto-darkened to stay readable)', theme.accentInk, _brandInkText)
-    + _themeFieldRow('accentHover','Accent Hover',    'Hover / pressed state for accent fills', theme.accentHover, _liveVar('--yellow-mid', '#E0D800'))
-    + _themeFieldRow('action',  'Action Button',       'Create / avatar / sign-in buttons on the dark header (white pops there)', theme.action, defaults.action || '#FFFFFF')
-    + _themeFieldRow('tint',    'Tint / Highlight',    'Soft hover/highlight background (rows, chips, menus)', theme.tint, defaults.tint || '#F3E4D8')
-    + _themeFieldRow('dark',    'Header / Dark Surface','Derived from the Brand Accent — override to pin a custom header colour',   theme.dark,    _brandDark)
-    + _themeFieldRow('text',    'Body Text',            'Default text color across the app',           theme.text,    defaults.text)
-    + _themeFieldRow('bg',      'Page Background',      'Main background behind all cards',            theme.bg,      defaults.bg)
-    + _themeFieldRow('surface', 'Card Surface',         'Card and panel background color',             theme.surface, defaults.surface)
-    + _themeFieldRow('border',  'Borders',              'Lines separating sections and cards',         theme.border,  defaults.border)
-    + _themeFieldRow('borderStrong','Strong Border',    'Table rules and dividers that must be seen',  theme.borderStrong, _liveVar('--border-strong', '#C9C8BE'))
-    + _themeFieldRow('inputBorder','Input Border',      'Text inputs, selects, checkboxes (WCAG contrast)', theme.inputBorder, _liveVar('--input-border', '#767670'))
-    + _themeFieldRow('muted',   'Muted Text',           'Secondary labels and helper text',            theme.muted,   defaults.muted)
-    + _themeFieldRow('success', 'Success',              'Approved / paid / complete status',           theme.success, _liveVar('--success', '#1E6E3C'))
-    + _themeFieldRow('warning', 'Warning',              'Overdue / pending / needs review status',     theme.warning, _liveVar('--warn-amber', '#8A5A00'))
-    + _themeFieldRow('danger',  'Danger',               'Errors / rejected / delete actions',          theme.danger, _liveVar('--danger', '#B3261E'))
-    + _themeFieldRow('info',    'Info',                 'Neutral notices and help callouts',           theme.info, _liveVar('--info-blue', '#1C5B8C'))
-    + _themeRangeRow('radius',  'Border Radius',        'Roundness of cards, buttons, and inputs (0–24 px)', 0, 24, theme.radius, defaults.radius)
+      _themeGroupHdr('Brand & Headers', 'The nation’s identity colours — these drive buttons, headers, and email branding, and most other colours derive from the Brand Accent automatically.')
+    + _themeFieldRow('yellow',  'Brand Accent',       'The primary brand colour. Fills primary buttons, selected pills and chips, progress bars, the underline on dark section headers, and the header of outgoing emails.', theme.yellow,  _brandAccent)
+    + _themeFieldRow('accentInk','Accent Ink',        'The accent auto-darkened into readable TEXT on light backgrounds — links, section titles (like “BRAND THEME” above), active tab labels, and focus outlines. Override only if the derived shade reads poorly.', theme.accentInk, _brandInkText)
+    + _themeFieldRow('accentHover','Accent Hover',    'What accent-filled buttons turn while hovered or pressed.', theme.accentHover, _liveVar('--yellow-mid', '#E0D800'))
+    + _themeFieldRow('dark',    'Header / Dark Surface','The dark bar behind the top navigation, page headers, and card/section headers. Auto-derived from the Brand Accent — set a value to pin an exact colour instead.',   theme.dark,    _brandDark)
+    + _themeFieldRow('action',  'Action Button',       'The Create, avatar, and sign-in buttons that sit ON the dark header — white stands out best there.', theme.action, defaults.action || '#FFFFFF')
+    + _themeGroupHdr('Text & Backgrounds', 'Reading colours and the surfaces behind them.')
+    + _themeFieldRow('text',    'Body Text',            'The main reading colour: paragraphs, table cell values, and text typed into inputs.',           theme.text,    defaults.text)
+    + _themeFieldRow('muted',   'Muted Text',           'Secondary text: helper lines under fields, column headings, timestamps, and de-emphasized values.',            theme.muted,   defaults.muted)
+    + _themeFieldRow('bg',      'Page Background',      'The page canvas behind every card (the cream area around content).',            theme.bg,      defaults.bg)
+    + _themeFieldRow('surface', 'Card Surface',         'The background of cards, panels, modals, and input fields.',             theme.surface, defaults.surface)
+    + _themeFieldRow('tint',    'Tint / Highlight',    'The soft accent-toned wash behind hovered rows, selected menu items, highlighted chips, and dashed “+ Add” buttons.', theme.tint, defaults.tint || '#F3E4D8')
+    + _themeGroupHdr('Tables, Lines & Inputs', 'Rules and outlines that keep lists and forms readable.')
+    + _themeFieldRow('border',  'Borders',              'Hairlines around cards, between list rows, and separating sections.',         theme.border,  defaults.border)
+    + _themeFieldRow('borderStrong','Strong Border',    'Heavier rules: table grid lines and dividers that must stay clearly visible.',  theme.borderStrong, _liveVar('--border-strong', '#C9C8BE'))
+    + _themeFieldRow('inputBorder','Input Border',      'The outline of text boxes, dropdowns, and checkboxes — kept dark enough to meet WCAG contrast.', theme.inputBorder, _liveVar('--input-border', '#767670'))
+    + _themeGroupHdr('Status Colours', 'Semantic colours for state badges and notices — shared by every list, pill, and message box.')
+    + _themeFieldRow('success', 'Success',              'Green states: Approved / Paid / Complete badges and confirmation notices.',           theme.success, _liveVar('--success', '#1E6E3C'))
+    + _themeFieldRow('warning', 'Warning',              'Amber states: Pending / Overdue / Needs-review badges and caution banners.',     theme.warning, _liveVar('--warn-amber', '#8A5A00'))
+    + _themeFieldRow('danger',  'Danger',               'Red states: error messages, Declined / Cancelled badges, and delete buttons.',          theme.danger, _liveVar('--danger', '#B3261E'))
+    + _themeFieldRow('info',    'Info',                 'Blue states: neutral notices, informational badges, and help callouts.',           theme.info, _liveVar('--info-blue', '#1C5B8C'))
+    + _themeGroupHdr('Shape & Type', 'The feel of the interface — corner roundness and typefaces.')
+    + _themeRangeRow('radius',  'Border Radius',        'How rounded corners are on cards, buttons, and inputs (0 = square, 24 = very round)', 0, 24, theme.radius, defaults.radius)
     + _themeSelectRow('sans',  'Body Font',            'Used for all body copy, labels, and UI text',
         [{value:'DM Sans',label:'DM Sans (default)'},{value:'Inter',label:'Inter'},
          {value:'Roboto',label:'Roboto'},{value:'Open Sans',label:'Open Sans'},
@@ -1330,6 +1335,7 @@ function renderThemesPanel() {
          {value:'Lora',label:'Lora'},{value:'Merriweather',label:'Merriweather'},
          {value:'Georgia',label:'Georgia (system)'}],
         theme.serif, defaults.serif)
+    + _themeGroupHdr('Logo & Wordmark', 'Shown in the app header, login screen, browser tab icon, PDF letterheads, and unit labels.')
     + '<div class="theme-logo-zone upload-zone p-16"'
     +   ' id="theme_logo_zone"'
     +   ' ondragover="photoDragOver(event,\'theme_logo_zone\')"'
@@ -1361,6 +1367,15 @@ function renderThemesPanel() {
   // Sync preview's transparency state with the saved setting (the just-rendered
   // <img> doesn't have the class yet — _applyTheme ran before the panel existed)
   _themeOnTransparentChange();
+}
+
+// Group header for the Themes editor — standard borderless style with the
+// accent underline (matches the section-header convention used app-wide).
+function _themeGroupHdr(title, sub) {
+  return '<div style="margin:24px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--yellow);">'
+    + '<div style="font-size:12px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--accent-ink);">' + title + '</div>'
+    + (sub ? '<div style="font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45;">' + sub + '</div>' : '')
+    + '</div>';
 }
 
 // Range slider → update live readout + apply CSS variable immediately
