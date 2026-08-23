@@ -723,7 +723,7 @@ function headerSignOut() {
     }).then(function(ok){ if (ok) doLogout(); });
   } else {
     switchRole('housing_employee_l1');
-    showToast('Signed out.');
+    showToast('Signed out.', {type:'info'});
   }
 }
 

@@ -511,7 +511,7 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
 // Navigate back to the maintenance request (SOW) this RFQ was created from.
 // Opens renos.html deep-linked to the specific request (unit + project number).
 function rfqBackToSow(){
-  if(!_rfqSowUnitId){ if(typeof showToast === 'function') showToast('No linked maintenance request for this RFQ.'); return; }
+  if(!_rfqSowUnitId){ if(typeof showToast === 'function') showToast('No linked maintenance request for this RFQ.', {type:'info'}); return; }
   var url = 'renos.html?sow=' + encodeURIComponent(_rfqSowUnitId)
           + (_rfqSowPn ? '&pn=' + encodeURIComponent(_rfqSowPn) : '');
   window.location.href = url;
@@ -596,7 +596,7 @@ function showRfqForm(rfqId, unitId, sowPn) {
   if (rfqId) {
     // Editing existing
     var rfq = (window._rfqCache || {})[rfqId];
-    if (!rfq) { showToast('RFQ not found'); showRfqList(); return; }
+    if (!rfq) { showToast('RFQ not found', {type:'error'}); showRfqList(); return; }
     _rfqSowUnitId = rfq.sow_unit_id;
     _rfqSowPn     = rfq.sow_project_number;
     (rfq.recipient_contractor_ids || []).forEach(function(id){ _rfqSelectedCts[id] = true; });
@@ -980,7 +980,7 @@ function _rfqBiddingClosed() {
 
 function toggleContractor(ctId) {
   if (_rfqBiddingClosed()) {
-    if (typeof showToast === 'function') showToast('Bidding has closed for this RFQ - recipients are locked. An ED can Unlock the RFQ to change them.');
+    if (typeof showToast === 'function') showToast('Bidding has closed for this RFQ - recipients are locked. An ED can Unlock the RFQ to change them.', {type:'info'});
     return;
   }
   if (_rfqSelectedCts[ctId]) delete _rfqSelectedCts[ctId];
@@ -1076,14 +1076,14 @@ async function _rfqAttachBidFile(id, inputEl) {
   // Hard guard: the dropzone is a <label ondrop> — disabling its child file
   // input does not neutralize the drop handler, so a view-only user could
   // still trigger an (orphan) Storage upload via drag-and-drop.
-  if (typeof _rfqCanEdit === 'function' && !_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  if (typeof _rfqCanEdit === 'function' && !_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ', {type:'error'}); return; }
   var file = inputEl && inputEl.files && inputEl.files[0];
   if (!file) return;
-  if (typeof window.sbUploadFile !== 'function') { showToast('File upload is not available on this page'); return; }
+  if (typeof window.sbUploadFile !== 'function') { showToast('File upload is not available on this page', {type:'error'}); return; }
   var rfqId = _rfqCurrentId || (document.getElementById('rfq_number') || {}).value || 'draft';
   var safe  = String(file.name).replace(/[^\w.\-]+/g, '_');
   var path  = 'rfq/' + rfqId + '/bids/' + id + '_' + safe;
-  showToast('Uploading ' + file.name + '…');
+  showToast('Uploading ' + file.name + '…', {type:'info'});
   try {
     await window.sbUploadFile(path, file);
     if (!_rfqBids[id]) _rfqBids[id] = {};
@@ -1095,7 +1095,7 @@ async function _rfqAttachBidFile(id, inputEl) {
     if (_rfqSowUnitId && typeof saveRfqDraft === 'function') {
       try { await saveRfqDraft(); } catch(e) { console.warn('[rfq] post-attach save failed:', e); }
     }
-    showToast('✓ Quote attached for ' + (( (window._contractors||[]).find(function(c){return c&&c.id===id;})||{}).name || 'contractor'));
+    showToast('✓ Quote attached for ' + (( (window._contractors||[]).find(function(c){return c&&c.id===id;})||{}).name || 'contractor'), {type:'info'});
   } catch(e) {
     console.warn('[rfq] bid file upload failed:', e);
     showToast('Upload failed — see console', { type: 'error' });
@@ -1106,7 +1106,7 @@ async function _rfqAttachBidFile(id, inputEl) {
 function _rfqViewBidFile(id) {
   var bid = _rfqBids[id] || {};
   if (!bid.doc_path) return;
-  if (typeof window.sbGetSignedUrl !== 'function') { showToast('Cannot open file'); return; }
+  if (typeof window.sbGetSignedUrl !== 'function') { showToast('Cannot open file', {type:'error'}); return; }
   // Open the tab synchronously (before the await) so the browser doesn't block it.
   var w = window.open('', '_blank');
   window.sbGetSignedUrl(bid.doc_path).then(function(url) {
@@ -1129,8 +1129,8 @@ function _rfqRemoveBidFile(id) {
 async function _rfqAwardFromBid(id) {
   var bid = _rfqBids[id] || {};
   var amt = parseFloat(bid.amount) || 0;
-  if (!(amt > 0)) { showToast('Enter a bid amount first'); return; }
-  if (!_rfqCurrentId) { showToast('Save and issue the RFQ before awarding'); return; }
+  if (!(amt > 0)) { showToast('Enter a bid amount first', {type:'error'}); return; }
+  if (!_rfqCurrentId) { showToast('Save and issue the RFQ before awarding', {type:'error'}); return; }
   // Persist the recorded bids first so the award (and the regret emails to the
   // other bidders) see them in the cached RFQ record.
   if (typeof saveRfqDraft === 'function') { try { await saveRfqDraft(); } catch(e){ console.warn('[rfq] pre-award save failed:', e); } }
@@ -1139,7 +1139,7 @@ async function _rfqAwardFromBid(id) {
 
 function selectAllMatchingContractors() {
   if (_rfqBiddingClosed()) {
-    if (typeof showToast === 'function') showToast('Bidding has closed for this RFQ - recipients are locked.');
+    if (typeof showToast === 'function') showToast('Bidding has closed for this RFQ - recipients are locked.', {type:'info'});
     return;
   }
   var activeOnly = document.getElementById('rfq_filter_active') && document.getElementById('rfq_filter_active').checked;
@@ -1255,9 +1255,9 @@ function _buildRfqPayload() {
 
 // ── Save draft ────────────────────────────────────────────────────────────────
 async function saveRfqDraft() {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ', {type:'error'}); return; }
   var payload = _buildRfqPayload();
-  if (!payload.sow_unit_id) { showToast('No SOW linked to this RFQ'); return; }
+  if (!payload.sow_unit_id) { showToast('No SOW linked to this RFQ', {type:'info'}); return; }
   // Visible feedback: the corner message panel is easy to miss, so the button
   // itself goes busy and a footer indicator confirms the save inline.
   var saveBtn = document.getElementById('rfqSaveDraftBtn');
@@ -1309,7 +1309,7 @@ async function saveRfqDraft() {
     if (typeof auditEntry === 'function') auditEntry('RFQ:' + payload.id, 'created', 'RFQ draft saved', window.currentRole || 'staff');
     if (savedInd) savedInd.textContent = '✓ Draft saved ' + new Date().toLocaleTimeString();
     if (saveBtn) { saveBtn.textContent = '✓ Saved'; setTimeout(function(){ saveBtn.textContent = btnLabel; }, 1600); }
-    showToast('Draft saved — ' + payload.id);
+    showToast('Draft saved — ' + payload.id, {type:'info'});
   } catch(e) {
     console.error('[rfq] save failed:', e);
     if (savedInd) savedInd.textContent = '⚠ Save failed — try again';
@@ -1323,7 +1323,7 @@ async function saveRfqDraft() {
 // ── Preview PDF ───────────────────────────────────────────────────────────────
 function previewRfqPdf() {
   var payload = _buildRfqPayload();
-  if (typeof buildRfqDocumentHtml !== 'function') { showToast('Document builder not available'); return; }
+  if (typeof buildRfqDocumentHtml !== 'function') { showToast('Document builder not available', {type:'error'}); return; }
   var sow = _rfqSowData;
   var unit = _rfqUnitData;
   var html = buildRfqDocumentHtml(payload, sow, unit);
@@ -1336,14 +1336,14 @@ function previewRfqPdf() {
 
 // ── Issue RFQ ─────────────────────────────────────────────────────────────────
 async function issueRfq() {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ', {type:'error'}); return; }
   var payload = _buildRfqPayload();
   // Validate
-  if (!payload.sow_unit_id)                         { showToast('No SOW linked'); return; }
-  if (!payload.closes_at)                           { showToast('Bid closing date is required'); return; }
-  if (new Date(payload.closes_at) <= new Date())    { showToast('Closing date must be in the future'); return; }
-  if (!payload.data.scope_snapshot.length)          { showToast('Add at least one scope item'); return; }
-  if (!payload.recipient_contractor_ids.length)     { showToast('Select at least one recipient'); return; }
+  if (!payload.sow_unit_id)                         { showToast('No SOW linked', {type:'info'}); return; }
+  if (!payload.closes_at)                           { showToast('Bid closing date is required', {type:'error'}); return; }
+  if (new Date(payload.closes_at) <= new Date())    { showToast('Closing date must be in the future', {type:'info'}); return; }
+  if (!payload.data.scope_snapshot.length)          { showToast('Add at least one scope item', {type:'error'}); return; }
+  if (!payload.recipient_contractor_ids.length)     { showToast('Select at least one recipient', {type:'error'}); return; }
 
   var n = payload.recipient_contractor_ids.length;
   var confirmed = await showConfirm({
@@ -1354,7 +1354,7 @@ async function issueRfq() {
   });
   if (!confirmed) return;
 
-  showToast('Issuing RFQ to ' + n + ' contractor' + (n===1?'':'s') + '...');
+  showToast('Issuing RFQ to ' + n + ' contractor' + (n===1?'':'s') + '...', {type:'info'});
 
   try {
     // NEVER-SAVED RFQ: claim the number through saveRfqDraft's collision-safe
@@ -1388,12 +1388,12 @@ async function issueRfq() {
       await sendRfqToRecipients(payload, cts);
     }
     document.getElementById('rfqIssueBtn').disabled = true;
-  } catch(e) { console.error('[rfq] issue failed:', e); showToast('Issue failed — see console'); }
+  } catch(e) { console.error('[rfq] issue failed:', e); showToast('Issue failed — see console', {type:'error'}); }
 }
 
 // ── Unlock RFQ (ED only) ───────────────────────────────────────────────────────
 async function unlockRfq() {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ', {type:'error'}); return; }
   var rfqId = _rfqCurrentId;
   if (!rfqId) return;
   var confirmed = await showConfirm({
@@ -1409,15 +1409,15 @@ async function unlockRfq() {
       headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
       body: JSON.stringify({ status: 'draft', issued_at: null, updated_at: new Date().toISOString() })
     });
-    if (!r.ok) { showToast('Failed to unlock RFQ'); return; }
+    if (!r.ok) { showToast('Failed to unlock RFQ', {type:'error'}); return; }
     var rows = await r.json();
     if (rows && rows[0] && window._rfqCache) window._rfqCache[rfqId] = rows[0];
     if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'unlocked', 'RFQ returned to draft', window.currentRole || 'staff');
-    showToast('RFQ unlocked — now in draft');
+    showToast('RFQ unlocked — now in draft', {type:'info'});
     showRfqForm(rfqId, null, null);
   } catch(e) {
     console.warn('[rfq] unlock failed:', e);
-    showToast('Failed to unlock RFQ');
+    showToast('Failed to unlock RFQ', {type:'error'});
   }
 }
 
@@ -1482,7 +1482,7 @@ async function cancelRfq(rfqId) {
       }
     }
 
-    showToast(rfqId + ' cancelled' + (doNotify ? ' — contractor notified' : ''));
+    showToast(rfqId + ' cancelled' + (doNotify ? ' — contractor notified' : ''), {type:'info'});
     renderRfqList();
   } catch(e) { console.error('[rfq] cancel failed:', e); showToast('Cancel failed: ' + (e && e.message ? e.message : 'unknown error'), {type:'error'}); }
 }
@@ -1546,12 +1546,12 @@ function _rfqContractorEligibility(ct) {
 }
 
 async function confirmAward() {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ', {type:'error'}); return; }
   var ctId   = document.getElementById('award_ct_id').value;
   var amount = document.getElementById('award_amount').value;
   var notes  = document.getElementById('award_notes').value.trim();
-  if (!ctId)   { showToast('Select a contractor'); return; }
-  if (!amount) { showToast('Enter the award amount'); return; }
+  if (!ctId)   { showToast('Select a contractor', {type:'error'}); return; }
+  if (!amount) { showToast('Enter the award amount', {type:'error'}); return; }
   // Capture the RFQ id BEFORE closeAwardModal() clears _rfqAwardingId — otherwise
   // awardRfq() was being handed null.
   var rfqId = _rfqAwardingId;
@@ -1597,14 +1597,14 @@ async function confirmAward() {
 // the Scope Award card, marks the linked SOW approved, and jumps to Contracting
 // WITHOUT issuing the RFQ or emailing anyone.
 async function _rfqManualAward() {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ', {type:'error'}); return; }
   var ctId = (document.getElementById('rfq_awarded_to') || {}).value || '';
   var amt  = _rfqParseNum((document.getElementById('rfq_award_amount') || {}).value);
-  if (!ctId)       { showToast('Select the awarded contractor above (Awarded To)'); return; }
-  if (!(amt > 0))  { showToast('Enter the award amount'); return; }
+  if (!ctId)       { showToast('Select the awarded contractor above (Awarded To)', {type:'error'}); return; }
+  if (!(amt > 0))  { showToast('Enter the award amount', {type:'error'}); return; }
   // The award patches the cached RFQ record, so make sure it exists first.
   if (typeof saveRfqDraft === 'function') { try { await saveRfqDraft(); } catch(e){ console.warn('[rfq] manual-award pre-save failed:', e); } }
-  if (!_rfqCurrentId) { showToast('Save the RFQ first'); return; }
+  if (!_rfqCurrentId) { showToast('Save the RFQ first', {type:'info'}); return; }
   var ct   = (window._contractors || []).find(function(c){ return c && c.id === ctId; });
   var elig = (typeof _rfqContractorEligibility === 'function') ? _rfqContractorEligibility(ct) : [];
   var msg  = escapeHtml((ct && ct.name) || 'This contractor') + ' will be recorded as the awarded contractor for '
@@ -2035,7 +2035,7 @@ function _rfqSeedDefaultMilestonesIfEmpty() {
 // "Reset to default schedule" button — re-applies the tiered defaults for the
 // CURRENT contract value, replacing whatever is there (HM/ED only).
 function resetMilestonesToDefault() {
-  if (typeof _rfqCanEdit === 'function' && !_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  if (typeof _rfqCanEdit === 'function' && !_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ', {type:'error'}); return; }
   _rfqMilestoneRows = _rfqDefaultMilestones(_rfqContractValueForMilestones());
   renderMilestoneRows();
   if (typeof _rfqCheckMilestoneTotal === 'function') _rfqCheckMilestoneTotal();
@@ -2725,7 +2725,7 @@ async function _rfqFileContractPdf(blob, filename) {
       if (typeof showToast === 'function') {
         showToast(savedToRfq
           ? 'Contract PDF saved — added to RFQ and unit documents'
-          : 'Contract PDF saved — also added to unit documents');
+          : 'Contract PDF saved — also added to unit documents', {type:'info'});
       }
 }
 
@@ -2736,7 +2736,7 @@ async function _rfqFileContractPdf(blob, filename) {
 // Orchestrator: permission + readiness gates → token build →
 // _rfqBuildContractPdf → _rfqFileContractPdf.
 async function generateContractorContract() {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can generate a contract'); return; }
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can generate a contract', {type:'error'}); return; }
   // Readiness gate — hard-block on missing contract essentials.
   var _missing = _rfqContractMissing();
   if (_missing.length) { _rfqShowChecklist('Not ready to generate', _missing); return; }
@@ -2770,7 +2770,7 @@ async function generateContractorContract() {
     if (!_goSig) return;
   }
 
-  if (typeof showToast === 'function') showToast('Generating contract PDF…');
+  if (typeof showToast === 'function') showToast('Generating contract PDF…', {type:'info'});
 
   // Build data directly from current form state — don't depend on saveRfqDraft
   // completing successfully or _rfqCache being up to date. Save is fire-and-forget.
@@ -2869,7 +2869,7 @@ async function generateContractorContract() {
   // ── jsPDF path ─────────────────────────────────────────────────────────
   var savedBody = (typeof getContractBody === 'function') ? getContractBody('contractor_agreement') : '';
   if (!savedBody || !savedBody.trim()) {
-    if (typeof showToast === 'function') showToast('Contract body not found — check Settings → Contracts');
+    if (typeof showToast === 'function') showToast('Contract body not found — check Settings → Contracts', {type:'error'});
     return;
   }
   try {
@@ -2880,7 +2880,7 @@ async function generateContractorContract() {
       await _rfqEmailContract(blob, filename, ct, (d.ap_email || ''), rfqId, addr);
   } catch(e) {
     console.error('[contract] generation failed:', e);
-    if (typeof showToast === 'function') showToast('Contract PDF failed: ' + e.message);
+    if (typeof showToast === 'function') showToast('Contract PDF failed: ' + e.message, {type:'error'});
   }
 }
 
@@ -2904,7 +2904,7 @@ function _rfqBlobToBase64(blob) {
 async function _rfqEmailContract(blob, filename, ct, apEmail, rfqId, addr) {
   try {
     if (typeof showConfirm !== 'function' || typeof sendNotification !== 'function') return;
-    if (!ct || !ct.email) { if (typeof showToast === 'function') showToast('No contractor email on file — contract not emailed.'); return; }
+    if (!ct || !ct.email) { if (typeof showToast === 'function') showToast('No contractor email on file — contract not emailed.', {type:'error'}); return; }
     var _esc = escapeHtml; // shared-ui.js (same five-char escape)
     var r = await showConfirm({
       title:       'Email Contract to Contractor?',
@@ -2941,10 +2941,10 @@ async function _rfqEmailContract(blob, filename, ct, apEmail, rfqId, addr) {
     if (rfq) { rfq.data = rfq.data || {}; rfq.data.contract_emailed = true; }
     if (typeof saveRfqDraft === 'function') saveRfqDraft().catch(function(){});
     if (typeof _rfqRefreshAttachList === 'function') _rfqRefreshAttachList();
-    if (typeof showToast === 'function') showToast('✓ Contract emailed to ' + (ct.name || 'contractor'));
+    if (typeof showToast === 'function') showToast('✓ Contract emailed to ' + (ct.name || 'contractor'), {type:'info'});
   } catch(e) {
     console.warn('[contract] email failed:', e);
-    if (typeof showToast === 'function') showToast('Contract email failed: ' + (e.message || 'unknown error'));
+    if (typeof showToast === 'function') showToast('Contract email failed: ' + (e.message || 'unknown error'), {type:'error'});
   }
 }
 

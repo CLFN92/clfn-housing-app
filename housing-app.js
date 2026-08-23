@@ -1854,7 +1854,7 @@ function printApplicationPreview() {
   showPrintPanel(doc, 'Application Preview');
   } catch(err) {
     console.error('printApplicationPreview error:', err);
-    showToast('Print error — see browser console (F12)');
+    showToast('Print error — see browser console (F12)', {type:'error'});
   }
 }
 
@@ -1864,9 +1864,9 @@ function printApplicationPreview() {
 // ═══════════════════════════════════════════════════════════════
 
 function _openAppNotesStep() {
-  if (!_isStaffSession()) { showToast && showToast('Notes are staff-only.'); return; }
+  if (!_isStaffSession()) { showToast && showToast('Notes are staff-only.', {type:'info'}); return; }
   if (!currentAppId) {
-    showToast && showToast('Save the application first to add notes.');
+    showToast && showToast('Save the application first to add notes.', {type:'info'});
     return;
   }
 
@@ -2038,7 +2038,7 @@ function unlockSignaturesOverride() {
     var bar = document.getElementById('sig_override_bar');
     if (bar) bar.style.display = 'none';
     if (typeof auditEntry === 'function') auditEntry(currentAppId, 'sig_lock_override', _role + ' overrode applicant signature lock');
-    if (typeof showToast  === 'function') showToast('Signature lock removed.');
+    if (typeof showToast  === 'function') showToast('Signature lock removed.', {type:'info'});
   });
 }
 
@@ -2129,7 +2129,7 @@ function submitAppNote() {
     auditEntry && auditEntry(currentAppId, 'note_added', 'Internal note added (' + body.length + ' chars)');
     if(ok) {
       renderAppNotes();
-      showToast && showToast('Note added.');
+      showToast && showToast('Note added.', {type:'info'});
     } else {
       showToast && showToast('Note saved locally — will sync when network is available.', { type:'info', duration:3500 });
     }

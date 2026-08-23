@@ -377,7 +377,7 @@ function showDash() {
 function showSettings() {
   var role = window.currentRole || 'housing_employee_l1';
   if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
-    showToast('Settings are only accessible to the Housing Manager and Executive Director.');
+    showToast('Settings are only accessible to the Housing Manager and Executive Director.', {type:'info'});
     return;
   }
   window.location.href = 'housing.html#settings';
@@ -385,7 +385,7 @@ function showSettings() {
 function showAddHousingStaff() {
   var role = window.currentRole || 'housing_employee_l1';
   if(!APPROVAL_AUTHORITY.can('manageStaff', role)) {
-    showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
+    showToast('Staff management is only accessible to the Housing Manager and Executive Director.', {type:'info'});
     return;
   }
   window.location.href = 'housing.html#settings-users';
@@ -1028,7 +1028,7 @@ function saveRenoBudgetApproval() {
     var edName = get('rba_ed_name');
     var edNotes = get('rba_ed_notes');
     if(!edName || !edNotes) {
-      showToast('Over-budget requests require ED name and written justification.');
+      showToast('Over-budget requests require ED name and written justification.', {type:'info'});
       return;
     }
   }
@@ -1057,7 +1057,7 @@ function saveRenoBudgetApproval() {
   }).catch(function(e){ console.warn('Reno budget save failed:',e); });
   closeRenoBudget();
   renderRenosView(); if (typeof renderRenoApprovalsView === 'function') renderRenoApprovalsView();
-  showToast(overBudget ? 'Over-budget approval saved — ED sign-off recorded' : 'Budget approval granted');
+  showToast(overBudget ? 'Over-budget approval saved — ED sign-off recorded' : 'Budget approval granted', {type:'info'});
 }
 
 // openSowModal / saveSOW are intentionally NOT defined here. The canonical,
@@ -1076,7 +1076,7 @@ function saveRenoProgress() {
 
   // Block non-ED writes when any SOW for this unit is completed.
   if(!canEditProgressFor(unitId)){
-    showToast('This unit has a completed Maintenance Request. Only the Executive Director can update progress on completed work.');
+    showToast('This unit has a completed Maintenance Request. Only the Executive Director can update progress on completed work.', {type:'error'});
     return;
   }
 
@@ -1150,7 +1150,7 @@ function saveRenoProgress() {
 
   closeRenoProgress();
   renderRenosView(); if (typeof renderRenoApprovalsView === 'function') renderRenoApprovalsView();
-  showToast('Progress updated');
+  showToast('Progress updated', {type:'info'});
 }
 
 
@@ -1786,20 +1786,20 @@ function _raShowCancelled(){ try { return localStorage.getItem('clfn_ra_show_can
 window._raToggleShowCancelled = function(el){ try { localStorage.setItem('clfn_ra_show_cancelled', (el&&el.checked)?'1':'0'); } catch(e){} renderRenoApprovalsView(); };
 window._renoDismissUnit = function(unitId){
   var u = (typeof getAllUnits==='function' ? getAllUnits() : (window.housingUnits||[])).find(function(x){ return String(x.id)===String(unitId); });
-  if(!u){ if(typeof showToast==='function') showToast('Unit not found'); return; }
+  if(!u){ if(typeof showToast==='function') showToast('Unit not found', {type:'error'}); return; }
   u.reno_dismissed = true;
   if(typeof sbSaveUnit==='function') sbSaveUnit(u);
   if(typeof auditEntry==='function') auditEntry('UNIT:'+unitId, 'reno_dismissed', 'Dismissed from renovations pipeline (no request filed)', window.currentRole||'');
-  if(typeof showToast==='function') showToast('Removed from the renovations pipeline. Use "Show dismissed" to restore.');
+  if(typeof showToast==='function') showToast('Removed from the renovations pipeline. Use "Show dismissed" to restore.', {type:'info'});
   renderRenoApprovalsView();
 };
 window._renoRestoreUnit = function(unitId){
   var u = (typeof getAllUnits==='function' ? getAllUnits() : (window.housingUnits||[])).find(function(x){ return String(x.id)===String(unitId); });
-  if(!u){ if(typeof showToast==='function') showToast('Unit not found'); return; }
+  if(!u){ if(typeof showToast==='function') showToast('Unit not found', {type:'error'}); return; }
   u.reno_dismissed = false;
   if(typeof sbSaveUnit==='function') sbSaveUnit(u);
   if(typeof auditEntry==='function') auditEntry('UNIT:'+unitId, 'reno_restored', 'Restored to renovations pipeline', window.currentRole||'');
-  if(typeof showToast==='function') showToast('Restored to the renovations pipeline.');
+  if(typeof showToast==='function') showToast('Restored to the renovations pipeline.', {type:'info'});
   renderRenoApprovalsView();
 };
 // Archive / restore a REAL saved request (e.g. an approved-but-empty input
@@ -1814,9 +1814,9 @@ window._raArchiveSow = function(unitId, projectNumber){
   }).then(function(ok){
     if(!ok) return;
     var role = window.currentRole || 'staff';
-    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.'); return; }
+    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.', {type:'error'}); return; }
     var sow = archiveSow(unitId, projectNumber, role);
-    if(!sow){ showToast('Request not found'); return; }
+    if(!sow){ showToast('Request not found', {type:'error'}); return; }
     if(typeof auditEntry==='function') auditEntry('SOW:'+unitId, 'sow_archived', 'SOW '+projectNumber+' archived (from renovations)', role);
     // If this emptied the unit's active-SOW set, revert its status.
     try {
@@ -1825,17 +1825,17 @@ window._raArchiveSow = function(unitId, projectNumber){
         saveUnitWithDraftFallback(u);
       }
     } catch(e){}
-    if(typeof showToast==='function') showToast('✓ Request '+projectNumber+' archived');
+    if(typeof showToast==='function') showToast('✓ Request '+projectNumber+' archived', {type:'info'});
     renderRenoApprovalsView();
   });
 };
 window._raUnarchiveSow = function(unitId, projectNumber){
   if(!unitId || !projectNumber) return;
-  if(typeof unarchiveSow !== 'function'){ showToast('Unarchive helper missing.'); return; }
+  if(typeof unarchiveSow !== 'function'){ showToast('Unarchive helper missing.', {type:'error'}); return; }
   var sow = unarchiveSow(unitId, projectNumber);
-  if(!sow){ showToast('Request not found'); return; }
+  if(!sow){ showToast('Request not found', {type:'error'}); return; }
   if(typeof auditEntry==='function') auditEntry('SOW:'+unitId, 'sow_unarchived', 'SOW '+projectNumber+' restored (from renovations)', window.currentRole||'staff');
-  if(typeof showToast==='function') showToast('✓ Request '+projectNumber+' restored');
+  if(typeof showToast==='function') showToast('✓ Request '+projectNumber+' restored', {type:'info'});
   renderRenoApprovalsView();
 };
 function _raViewToggleHtml(){
@@ -1867,12 +1867,12 @@ function raQuickApprove(unitId, approver, projectNumber) {
   var _qaRole = window.currentRole || 'staff';
   var _needAuthority = approver === 'ed' ? 'approveSowOverThreshold' : 'approveSowUnderThreshold';
   if(!APPROVAL_AUTHORITY.can(_needAuthority, _qaRole)){
-    showToast('You do not have authority to approve this Maintenance Request.');
+    showToast('You do not have authority to approve this Maintenance Request.', {type:'info'});
     return;
   }
   var units = getAllUnits().slice();
   var idx=units.findIndex(function(u){return u.id===unitId;});
-  if(idx<0){showToast('Unit not found');return;}
+  if(idx<0){showToast('Unit not found', {type:'error'});return;}
   var u=units[idx]; var role=window.currentRole||'staff'; var today=new Date().toISOString().split('T')[0];
   var addr=u.num+' '+u.street;
   var label=CLFN_PERMS.roleLabel(approver==='hm' ? ROLE.HOUSING_MANAGER : ROLE.ED);
@@ -1917,7 +1917,7 @@ function raQuickApprove(unitId, approver, projectNumber) {
       if(touched) saveSowList(unitId, list);
     }
 
-    showToast('✓ '+addr+projLabel+' Maintenance Request approved');
+    showToast('✓ '+addr+projLabel+' Maintenance Request approved', {type:'info'});
     renderRenoApprovalsView();
   });
 }
@@ -2057,7 +2057,7 @@ function exportRenoApprovalsPDF() {
     +'</body></html>';
 
   var w=window.open('','_blank','width=1100,height=780,toolbar=0,menubar=0');
-  if(!w){showToast('Allow popups to export PDF');return;}
+  if(!w){showToast('Allow popups to export PDF', {type:'error'});return;}
   w.document.open(); w.document.write(html); w.document.close();
   setTimeout(function(){w.focus();w.print();},400);
 }

@@ -140,7 +140,7 @@ function showApp(){
 function showSettings(){
   var role = window.currentRole || 'housing_employee_l1';
   if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
-    showToast('Settings are only accessible to the Housing Manager and Executive Director.');
+    showToast('Settings are only accessible to the Housing Manager and Executive Director.', {type:'info'});
     return;
   }
   // Settings view lives in housing.html — if we're on a sub-page (inventory,
@@ -167,7 +167,7 @@ function showSettings(){
 function showFinance(){
   if(!(window.CLFN_MODULES && window.CLFN_MODULES.isEnabled('finance'))){
     console.warn('[housing] showFinance: finance module not enabled');
-    showToast('Finance module is not enabled for this nation.');
+    showToast('Finance module is not enabled for this nation.', {type:'error'});
     return;
   }
   // Gate on finance-role access. Use the same authoritative source as
@@ -181,7 +181,7 @@ function showFinance(){
   var canAccess = window.CLFN_PERMS.hasFinanceAccess(gateRole);
   if(!canAccess){
     console.warn('[housing] showFinance: role "'+gateRole+'" blocked from finance module');
-    showToast('Your role does not have access to the Finance module.');
+    showToast('Your role does not have access to the Finance module.', {type:'info'});
     return;
   }
   try {
@@ -887,7 +887,7 @@ function renderMatchView(){
 // (record preserved + audited), then refreshes Match.
 function _matchDeleteApp(appId){
   if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole)){
-    if(typeof showToast === 'function') showToast('You are not authorized to delete applications.');
+    if(typeof showToast === 'function') showToast('You are not authorized to delete applications.', {type:'info'});
     return;
   }
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
@@ -1835,7 +1835,7 @@ async function _reclassifyApp(appId, newType){
   if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
   else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
   if (typeof auditEntry === 'function') auditEntry(a.id, 'app_reclassified', 'Application type changed from ' + prev + ' to ' + newType + ' (Likely-Already-Housed review)', role);
-  if (typeof showToast === 'function') showToast(name + ' reclassified to ' + typeLbl + '.');
+  if (typeof showToast === 'function') showToast(name + ' reclassified to ' + typeLbl + '.', {type:'info'});
   if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
   showLikelyHousedReport();  // refresh — the reclassified row drops off the list
 }
@@ -1849,7 +1849,7 @@ async function _reclassifyAllHoused(){
     return;
   }
   var list = _housingLikelyHousedApps();
-  if (!list.length) { if (typeof showToast === 'function') showToast('Nothing to reclassify.'); return; }
+  if (!list.length) { if (typeof showToast === 'function') showToast('Nothing to reclassify.', {type:'info'}); return; }
   var go = (typeof showConfirm === 'function')
     ? await showConfirm({ title:'Reclassify all to File Update?', message:'Set all ' + list.length + ' housed applications to File Update (existing tenant)? They will drop off the New Applications count. This does not change their unit or tenancy.', confirmText:'Reclassify all', cancelText:'Cancel' })
     : window.confirm('Reclassify all ' + list.length + ' to File Update?');
@@ -1865,7 +1865,7 @@ async function _reclassifyAllHoused(){
     if (typeof auditEntry === 'function') auditEntry(a.id, 'app_reclassified', 'Application type changed from ' + prev + ' to existing_tenant (bulk Likely-Already-Housed cleanup)', role);
     done++;
   });
-  if (typeof showToast === 'function') showToast(done + ' application' + (done===1?'':'s') + ' reclassified to File Update.');
+  if (typeof showToast === 'function') showToast(done + ' application' + (done===1?'':'s') + ' reclassified to File Update.', {type:'info'});
   if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
   showLikelyHousedReport();  // refresh — the list should now be empty
 }
@@ -2089,7 +2089,7 @@ async function _reconClearLink(appId){
   if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
   else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
   if (typeof auditEntry === 'function') auditEntry(a.id, 'status_change', 'Stale unit link cleared via reconciliation', role);
-  if (typeof showToast === 'function') showToast('Unit link cleared for ' + name + '.');
+  if (typeof showToast === 'function') showToast('Unit link cleared for ' + name + '.', {type:'info'});
   if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
   showReconcileReport();
 }
@@ -2104,7 +2104,7 @@ async function _reconMarkVacant(){
     return;
   }
   var targets = _housingReconcile().buckets.other;
-  if (!targets.length) { if (typeof showToast === 'function') showToast('Nothing to update.'); return; }
+  if (!targets.length) { if (typeof showToast === 'function') showToast('Nothing to update.', {type:'info'}); return; }
   var go = (typeof showConfirm === 'function')
     ? await showConfirm({ title:'Set to Vacant?', message:'Set ' + targets.length + ' unit' + (targets.length===1?'':'s') + ' that have no tenant and no clear status to Vacant (available for assignment)? Units under renovation or reserved are not touched.', confirmText:'Set to Vacant', cancelText:'Cancel' })
     : window.confirm('Set ' + targets.length + ' units to Vacant?');
@@ -2118,7 +2118,7 @@ async function _reconMarkVacant(){
     if (typeof auditEntry === 'function') auditEntry('UNIT:'+u.id, 'unit_status_change', 'Status set to vacant via reconciliation (was ' + was + ')', role);
     done++;
   });
-  if (typeof showToast === 'function') showToast(done + ' unit' + (done===1?'':'s') + ' set to Vacant.');
+  if (typeof showToast === 'function') showToast(done + ' unit' + (done===1?'':'s') + ' set to Vacant.', {type:'info'});
   if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
   showReconcileReport();
 }
@@ -2141,7 +2141,7 @@ function _reconMergePrompt(idsCsv){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
   var ids  = String(idsCsv||'').split(',').filter(Boolean);
   var group = ids.map(function(id){ return apps.find(function(a){ return a && a.id === id; }); }).filter(Boolean);
-  if (group.length < 2) { if (typeof showToast === 'function') showToast('Nothing to merge.'); return; }
+  if (group.length < 2) { if (typeof showToast === 'function') showToast('Nothing to merge.', {type:'info'}); return; }
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
   var best = _reconBestApp(group);
   var rowsHtml = group.map(function(a){
@@ -2180,7 +2180,7 @@ async function _reconDoMerge(){
     : APPROVAL_AUTHORITY.can('deleteApplication', role);
   if (!canMerge) { if (typeof showToast === 'function') showToast('You are not authorized to merge applications.', { type:'error' }); return; }
   var sel = document.querySelector('#modalReconMerge input[name="recon_keep"]:checked');
-  if (!sel) { if (typeof showToast === 'function') showToast('Pick the application to keep.'); return; }
+  if (!sel) { if (typeof showToast === 'function') showToast('Pick the application to keep.', {type:'info'}); return; }
   var canonicalId = sel.value;
   var ids  = window._reconMergeIds || [];
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
@@ -2210,7 +2210,7 @@ async function _reconDoMerge(){
   if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(canon);
   else if(typeof sbSaveApplication === 'function') sbSaveApplication(canon).catch(function(){});
   if(typeof auditEntry === 'function') auditEntry(canon.id, 'application_merged', 'Absorbed '+dups.length+' duplicate application(s) via reconciliation', role);
-  if(typeof showToast === 'function') showToast('Merged '+dups.length+' duplicate'+(dups.length===1?'':'s')+' into '+cname+'.');
+  if(typeof showToast === 'function') showToast('Merged '+dups.length+' duplicate'+(dups.length===1?'':'s')+' into '+cname+'.', {type:'info'});
   var m=document.getElementById('modalReconMerge'); if(m) m.remove();
   if(typeof _renderLandingKpis === 'function') _renderLandingKpis();
   showReconcileReport();

@@ -479,7 +479,7 @@
       subject: natShort + ' Housing — Maintenance Request' + (unitLabel ? ': ' + unitLabel : ''),
       bodyHtml: html
     }).then(function(){
-      if(typeof showToast === 'function') showToast('Copy emailed to the tenant.');
+      if(typeof showToast === 'function') showToast('Copy emailed to the tenant.', {type:'info'});
     }).catch(function(err){
       console.warn('[reno-q] tenant email failed:', err);
       if(typeof showToast === 'function') showToast('Could not email the tenant: ' + (err && err.message || err), { type:'error' });
@@ -488,7 +488,7 @@
 
   function _submit(){
     _capture();
-    if(!S.issues.length){ if(typeof showToast==='function') showToast('Add at least one issue first.'); return; }
+    if(!S.issues.length){ if(typeof showToast==='function') showToast('Add at least one issue first.', {type:'error'}); return; }
     if(typeof openSowModal !== 'function'){ if(typeof showToast==='function') showToast('Maintenance Request form is not available on this page.', {type:'error'}); return; }
 
     // Tenant email handling
@@ -515,7 +515,7 @@
       hsFlags: _issuesToHsFlags(issues)
     };
     openSowModal(unitId);
-    if(typeof showToast === 'function') showToast(issues.length + ' issue' + (issues.length>1?'s':'') + ' added to the maintenance request.');
+    if(typeof showToast === 'function') showToast(issues.length + ' issue' + (issues.length>1?'s':'') + ' added to the maintenance request.', {type:'info'});
   }
 
   // Map the worst captured severity to the SOW "Overall Condition" select.

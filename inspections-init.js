@@ -598,7 +598,7 @@ async function saveInspection(approveAction) {
     // Update unit inspection dates (shared with the guided questionnaire's save).
     _inspUpdateUnitDates(unitId, date, type);
 
-    if(typeof showToast==='function') showToast(approveAction === 'approve' ? 'Inspection approved.' : approveAction === 'revoke' ? 'Approval revoked.' : 'Inspection saved.');
+    if(typeof showToast==='function') showToast(approveAction === 'approve' ? 'Inspection approved.' : approveAction === 'revoke' ? 'Approval revoked.' : 'Inspection saved.', {type:'info'});
 
     // Check if any items need attention — prompt to create a Maintenance Request.
     // BOTH 'repair' (needs-repair) AND 'fail' items generate a request; previously
@@ -682,7 +682,7 @@ function _inspPromptSOW(insp, repairItems) {
     notes: 'Generated from inspection' + (insp.id ? ' ' + insp.id : '') + '.'
   };
   openSowModal(insp.unit_id);
-  if(typeof showToast==='function') showToast('Repair items pre-loaded into the Maintenance Request.');
+  if(typeof showToast==='function') showToast('Repair items pre-loaded into the Maintenance Request.', {type:'info'});
 }
 
 // Map an inspection checklist row to the closest SOW_CATEGORIES entry
@@ -721,7 +721,7 @@ function _inspConfirmDelete() {
     window._inspections = (window._inspections||[]).filter(function(i){ return i.id !== window._inspEditId; });
     closeInspectionModal();
     renderInspectionsList();
-    if(typeof showToast==='function') showToast('Inspection deleted.');
+    if(typeof showToast==='function') showToast('Inspection deleted.', {type:'info'});
   }).catch(function(e) {
     if(typeof showToast==='function') showToast('Delete failed: ' + e.message, {type:'error'});
   });

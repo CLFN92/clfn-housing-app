@@ -183,7 +183,7 @@ function udpSaveUnitNote(){
       list.insertAdjacentHTML('afterbegin', _udpUnitNoteHtml(added));
     }
     if(inp) inp.value = '';
-    if(typeof showToast === 'function') showToast('Note added.');
+    if(typeof showToast === 'function') showToast('Note added.', {type:'info'});
   });
 }
 window.udpRenderUnitNotes = udpRenderUnitNotes;
@@ -222,7 +222,7 @@ function openUnitEditModal(unitId){
   var isFieldEmployee = (window.currentRole || '') === 'field_employee';
   var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
-  if(!u){ showToast('Unit not found: ' + unitId); return; }
+  if(!u){ showToast('Unit not found: ' + unitId, {type:'error'}); return; }
   window._editingUnitId    = unitId;
   window._currentDetailUnitId = unitId; // back-compat: udpNewSow(), renos.html, file-panel sync all key off this
   var set = function(id,val){ var el=document.getElementById(id); if(el) el.value=(val===null||val===undefined||val==='nan')?'':String(val); };
@@ -520,7 +520,7 @@ async function ueOpenMaintenanceQr(){
   if(!uid) return;
   var units = getAllUnits();
   var u = units.find(function(x){ return x.id === uid; });
-  if(!u){ showToast('Unit not found'); return; }
+  if(!u){ showToast('Unit not found', {type:'error'}); return; }
   // Get or create the per-unit secret token (persists into the unit data jsonb).
   if(!u.qrToken){
     u.qrToken = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
@@ -563,8 +563,8 @@ async function ueOpenMaintenanceQr(){
 }
 function ueCopyQrLink(){
   var url = (window._ueQrData && window._ueQrData.url) || '';
-  if(navigator.clipboard && url){ navigator.clipboard.writeText(url).then(function(){ showToast('Link copied'); }); }
-  else if(url){ showToast('Copy this link: ' + url); }
+  if(navigator.clipboard && url){ navigator.clipboard.writeText(url).then(function(){ showToast('Link copied', {type:'info'}); }); }
+  else if(url){ showToast('Copy this link: ' + url, {type:'info'}); }
 }
 function uePrintMaintenanceQr(){
   var d = window._ueQrData || {};
@@ -573,7 +573,7 @@ function uePrintMaintenanceQr(){
   var src = '';
   try { src = el ? (el.tagName === 'IMG' ? el.src : el.toDataURL('image/png')) : ''; } catch(e){}
   var w = window.open('', '_blank', 'width=480,height=680');
-  if(!w){ showToast('Allow pop-ups to print the QR'); return; }
+  if(!w){ showToast('Allow pop-ups to print the QR', {type:'error'}); return; }
   w.document.write('<html><head><title>Maintenance QR</title><style>body{font-family:-apple-system,Segoe UI,sans-serif;text-align:center;padding:44px 20px;}h2{margin:0 0 2px;font-size:20px;}p{color:#555;margin:0 0 22px;font-size:13px;letter-spacing:.5px;text-transform:uppercase;}img{width:300px;height:300px;}.cap{margin-top:18px;font-size:17px;font-weight:800;}.hint{font-size:13px;color:#555;margin-top:8px;}</style></head><body>'
     + '<h2>' + _qresc(d.nation||'Housing') + '</h2><p>Maintenance Request</p>'
     + (src ? '<img src="' + src + '"/>' : '')
@@ -676,13 +676,13 @@ function saveUnitEdit(){
   // Field Employees (maintenance crew) view inventory but never edit unit
   // records (funder, budget, identity). Backstop in case the edit UI is reached.
   if((window.currentRole || '') === 'field_employee'){
-    if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.');
+    if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.', {type:'error'});
     return;
   }
   var unitId=window._editingUnitId;
   var units=getAllUnits();
   var idx=units.findIndex(function(x){ return x.id===unitId; });
-  if(idx===-1){ showToast('Unit not found'); return; }
+  if(idx===-1){ showToast('Unit not found', {type:'error'}); return; }
   var get=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
   var chk=function(id){ var el=document.getElementById(id); return el?el.checked:false; };
   var u=units[idx];
@@ -766,7 +766,7 @@ function saveUnitEdit(){
         ? appAssignabilityStatus(linkedApp2)
         : { ok:false, reason:'Approval required before assigning' };
       if(!_as.ok) {
-        showToast('⚠ ' + _as.reason);
+        showToast('⚠ ' + _as.reason, {type:'info'});
         return;
       }
       // Record who actually gated the assignment — the saver's real role, not
@@ -811,7 +811,7 @@ function saveUnitEdit(){
   auditEntry('UNIT:'+u.id,'unit_edit','Unit saved'+(u.assignedTo?' — tenant: '+u.assignedName:''),window.currentRole||'staff');
   closeUnitEditModal(); renderInventoryView();
   if(typeof updateDashStats==='function') updateDashStats();
-  showToast('✓ Saved — '+u.num+' '+u.street);
+  showToast('✓ Saved — '+u.num+' '+u.street, {type:'info'});
 }
 
 
@@ -1067,7 +1067,7 @@ async function ueRemoveTenant() {
   }
 
   _ueRemoveTenantFields();
-  showToast('Tenant removed — remember to Save Changes');
+  showToast('Tenant removed — remember to Save Changes', {type:'info'});
 }
 
 
@@ -1285,14 +1285,14 @@ document.addEventListener('keydown', function(e) {
 
 // ── Save ED adjustment ──
 function saveEdAdjustment(){
-  if(!APPROVAL_AUTHORITY.can('applyScoreAdjustment', window.currentRole)){ showToast('Only the Executive Director can apply adjustments.'); return; }
+  if(!APPROVAL_AUTHORITY.can('applyScoreAdjustment', window.currentRole)){ showToast('Only the Executive Director can apply adjustments.', {type:'error'}); return; }
   var app = window._currentScorecardApp;
-  if(!app){ showToast('No application selected.'); return; }
+  if(!app){ showToast('No application selected.', {type:'error'}); return; }
   var pts = parseInt((document.getElementById('sc_ed_adj_pts')||{}).value||0)||0;
   var reason = ((document.getElementById('sc_ed_adj_reason')||{}).value||'').trim();
   var notes  = ((document.getElementById('sc_ed_adj_notes')||{}).value||'').trim();
   var idx = applications.findIndex(function(a){ return a.id===app.id; });
-  if(idx===-1){ showToast('Application not found'); return; }
+  if(idx===-1){ showToast('Application not found', {type:'error'}); return; }
   applications[idx].edAdjustment   = pts;
   applications[idx].edAdjustReason = reason;
   applications[idx].edNotes        = notes;
@@ -1323,7 +1323,7 @@ function saveEdAdjustment(){
   var msg=document.getElementById('sc_ed_save_msg');
   if(msg){msg.style.display='flex';setTimeout(function(){msg.style.display='none';},2000);}
   if(typeof _refreshAppViews==='function') _refreshAppViews();
-  showToast('ED adjustment saved'+(pts?' ('+( pts>0?'+':'')+pts+' pts)':''));
+  showToast('ED adjustment saved'+(pts?' ('+( pts>0?'+':'')+pts+' pts)':''), {type:'info'});
 }
 
 // ── User management (Settings > Users) ──
@@ -1780,7 +1780,7 @@ async function _udpLocSave() {
       if (u2) sbSaveUnit(u2).catch(function(){});
     }
     if (typeof auditEntry === 'function') auditEntry('UNIT:' + _udpLocUnitId, 'unit_location_set', 'GPS coordinates set via unit card');
-    if (typeof showToast === 'function') showToast('Location saved.');
+    if (typeof showToast === 'function') showToast('Location saved.', {type:'info'});
     _udpLocClose();
     // Re-render the map section if the detail panel is still showing this unit
     if (_currentDetailUnitId === _udpLocUnitId) {
@@ -1838,11 +1838,11 @@ function saveNewUnit(){
   var chk = function(id){ var el=document.getElementById(id); return el?el.checked:false; };
   var num    = get('au_num');
   var street = get('au_street');
-  if(!num || !street){ showToast('Unit number and street are required'); return; }
+  if(!num || !street){ showToast('Unit number and street are required', {type:'error'}); return; }
 
   var newId = (street.toUpperCase().replace(/\s+/g,'-') + '-' + num).replace(/[^A-Z0-9\-]/g,'');
   var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
-  if(units.find(function(u){ return u.id === newId; })){ showToast('A unit at that address already exists'); return; }
+  if(units.find(function(u){ return u.id === newId; })){ showToast('A unit at that address already exists', {type:'info'}); return; }
 
   var rentRaw = _canEditUnitRent() ? get('au_rent') : '';
   var auCcRaw = get('au_constructionCost');
@@ -1885,7 +1885,7 @@ function saveNewUnit(){
   if(_auStagedPhotos.length){ saveUnitPhotos(newId, _auStagedPhotos); _auStagedPhotos=[]; }
   closeAddUnitModal();
   renderInventoryView();
-  showToast(num + ' ' + street + ' added to inventory');
+  showToast(num + ' ' + street + ' added to inventory', {type:'info'});
 }
 
 function _canEditUnitRent(){
@@ -1948,10 +1948,10 @@ function closeAddLotModal(){
 function saveNewLot(){
   var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
   var lotNum = get('al_lotnum'), street = get('al_street');
-  if(!lotNum || !street){ showToast('Lot number and street are required'); return; }
+  if(!lotNum || !street){ showToast('Lot number and street are required', {type:'error'}); return; }
   var newId = ('LOT-' + street.toUpperCase().replace(/\s+/g,'-') + '-' + lotNum).replace(/[^A-Z0-9\-]/g,'');
   var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
-  if(units.find(function(u){ return u.id === newId; })){ showToast('A lot at that address already exists'); return; }
+  if(units.find(function(u){ return u.id === newId; })){ showToast('A lot at that address already exists', {type:'info'}); return; }
   var newLot = {
     id:newId, street:street, num:lotNum, lotNumber:lotNum,
     record_type:'lot', type:'Vacant Lot', status:'vacant_lot',
@@ -1963,7 +1963,7 @@ function saveNewLot(){
   if(typeof auditEntry==='function') auditEntry('UNIT:'+newId, 'lot_added', 'Vacant lot added: Lot '+lotNum+' '+street, window.currentRole||'');
   closeAddLotModal();
   renderInventoryView();
-  showToast('Lot '+lotNum+' '+street+' added');
+  showToast('Lot '+lotNum+' '+street+' added', {type:'info'});
 }
 function _lotArchive(lotId){
   var l = (typeof housingUnits!=='undefined'?housingUnits:[]).find(function(x){ return String(x.id)===String(lotId); });
@@ -1973,7 +1973,7 @@ function _lotArchive(lotId){
     saveUnitWithDraftFallback(l);
     if(typeof auditEntry==='function') auditEntry('UNIT:'+lotId, 'lot_archived', 'Vacant lot archived', window.currentRole||'');
     renderInventoryView();
-    showToast('Lot archived');
+    showToast('Lot archived', {type:'info'});
   };
   if(typeof showConfirm==='function'){
     showConfirm({ title:'Archive this lot?', message:'It will be removed from the Vacant Lots list.', confirmText:'Archive' }).then(function(ok){ if(ok) doIt(); });
@@ -2063,7 +2063,7 @@ function saveBudgetPools(){
   saveBudgetData(data);  // saveBudgetData already surfaces its own errors
   var hmLimitEl=document.getElementById('settings_hm_budget_limit');
   auditEntry('SETTINGS','settings_budget_save','Budget allocations saved for '+data.fiscalYear+(hmLimitEl?' — HM limit: $'+hmLimitEl.value:''),window.currentRole||'staff');
-  showToast('Budget allocations saved');
+  showToast('Budget allocations saved', {type:'info'});
   renderBudgetPools();
 }
 
@@ -2372,7 +2372,7 @@ function saveAddTenant(){
   var status=(document.getElementById('at_status')||{}).value||'occupied';
 
   var err=document.getElementById('at_error');
-  function showErr(msg){ if(err){err.textContent=msg;err.style.display='block';}else showToast(msg); }
+  function showErr(msg){ if(err){err.textContent=msg;err.style.display='block';}else showToast(msg, {type:'info'}); }
 
   // Validation
   if(!unitId){ showErr('Please select a unit.'); return; }
@@ -2426,7 +2426,7 @@ function saveAddTenant(){
   if(typeof renderMatchView==='function') renderMatchView();
   if(typeof renderDashTable==='function') renderDashTable();
   if(typeof renderWorklist==='function') renderWorklist();
-  showToast('✓ '+tenantName+' assigned to '+units[idx].num+' '+units[idx].street);
+  showToast('✓ '+tenantName+' assigned to '+units[idx].num+' '+units[idx].street, {type:'info'});
 }
 
 
@@ -2550,7 +2550,7 @@ window.openEditModal = function(appId) {
   var app = applications.find(function(a){ return a.id === appId; });
   if(!app) {
     console.warn('[openEditModal] app not found in applications[] — bailing. id:', appId);
-    showToast('Application not found');
+    showToast('Application not found', {type:'error'});
     return;
   }
 
@@ -2559,7 +2559,7 @@ window.openEditModal = function(appId) {
   // (last name, on-reserve, street/city/postal). Route them there.
   if (app.appType === 'commercial') {
     if (typeof window.openCommercialApp === 'function') { window.openCommercialApp(appId); return; }
-    showToast('Commercial application viewer is not available on this page.');
+    showToast('Commercial application viewer is not available on this page.', {type:'error'});
     return;
   }
 
@@ -2908,7 +2908,7 @@ window.openEditModal = function(appId) {
   var _editStatus = (app.status||'draft').replace(/_/g,' ');
   auditEntry(app.id, 'application_opened', _editType + ' opened for editing — current status: ' + _editStatus, window.currentRole||'staff');
 
-  showToast('Editing ' + _name);
+  showToast('Editing ' + _name, {type:'info'});
 }
 
 
@@ -2963,7 +2963,7 @@ function confirmApprovalAction() {
   var notes = notesEl ? notesEl.value.trim() : '';
 
   if(requireNotes && !notes) {
-    showToast('Please add notes explaining this decision.');
+    showToast('Please add notes explaining this decision.', {type:'error'});
     if(notesEl) notesEl.focus();
     return;
   }
@@ -2987,7 +2987,7 @@ function confirmApprovalAction() {
 
   // Find and update the application
   var idx = applications.findIndex(function(a){ return a.id === app.id; });
-  if(idx === -1) { showToast('Application not found'); closeApprovalModal(); return; }
+  if(idx === -1) { showToast('Application not found', {type:'error'}); closeApprovalModal(); return; }
 
   var oldStatus = applications[idx].status;
   applications[idx].status = action;
@@ -3104,7 +3104,7 @@ function confirmApprovalAction() {
     submitted:    'Returned to Review Queue'
   };
 
-  showToast((statusDesc[action] || action) + ' — ' + ((app.fn||'') + ' ' + (app.ln||'')).trim());
+  showToast((statusDesc[action] || action) + ' — ' + ((app.fn||'') + ' ' + (app.ln||'')).trim(), {type:'info'});
 
   // Hand-off: final approval of a scored applicant with no unit -> offer to jump
   // straight to Match so an approved applicant doesn't sit in limbo.

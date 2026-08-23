@@ -395,8 +395,8 @@ function _prjKpi(val, lbl) {
 // ── Detail modal ─────────────────────────────────────────────────────────────
 function openPrjModal(id) {
   var p = id ? (window._prjProjects || []).find(function(x){ return x.id === id; }) : null;
-  if (id && !p) { showToast('Project not found'); return; }
-  if (!id && !_prjCanManage()) { showToast('Only authorized staff can create projects'); return; }
+  if (id && !p) { showToast('Project not found', {type:'error'}); return; }
+  if (!id && !_prjCanManage()) { showToast('Only authorized staff can create projects', {type:'info'}); return; }
 
   window._prjEditId = id || null;
   _prjDocLib = null; _prjDocLibEntity = null;
@@ -729,7 +729,7 @@ function _prjAttachGrantDoc(i) {
     var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
     var path = 'projects/' + d.id + '/grants/' + g.id + '/' + safeName;
     try {
-      showToast('Uploading ' + safeName + '…');
+      showToast('Uploading ' + safeName + '…', {type:'info'});
       await sbUploadFile(path, file);
       if (typeof sbSaveFileMeta === 'function') {
         sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
@@ -741,7 +741,7 @@ function _prjAttachGrantDoc(i) {
         auditEntry('PRJ:' + d.id, 'project_grant_doc_attached', 'Funding agreement ' + file.name + ' attached to grant ' + (g.source || g.reference || '') + ' on ' + (d.project_number || d.name));
       }
       _prjRenderOverview();
-      showToast('Funding agreement attached');
+      showToast('Funding agreement attached', {type:'info'});
     } catch(e) {
       console.warn('[Projects] grant doc upload:', e);
       showToast('Upload failed — check your connection and try again', { type: 'error' });
@@ -1568,7 +1568,7 @@ async function _prjLinkExpenseDoc(i, kind, candIdx) {
       auditEntry('PRJ:' + d.id, 'project_expense_doc_linked', kind + ' document ' + cand.name + ' linked to a ' + _prjMoney(exp[i].amount, true) + ' expense on ' + (d.project_number || d.name));
     }
     _prjRenderCosts();
-    showToast('Document linked');
+    showToast('Document linked', {type:'info'});
   } catch(e) {
     console.warn('[Projects] link expense doc:', e);
     showToast('Could not save the link — try again', { type: 'error' });
@@ -1591,7 +1591,7 @@ function _prjPickAndUploadExpenseDoc(i, kind) {
     if (!file) return;
     if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
     try {
-      showToast('Uploading ' + file.name + '…');
+      showToast('Uploading ' + file.name + '…', {type:'info'});
       await _prjUploadExpenseDocFile(exp[i], kind, file);
       if (kind === 'invoice' && exp[i].doc) delete exp[i].doc;   // legacy slot superseded
       // Persist right away so the uploaded file can't be orphaned by an
@@ -1602,7 +1602,7 @@ function _prjPickAndUploadExpenseDoc(i, kind) {
         auditEntry('PRJ:' + d.id, 'project_expense_doc_attached', kind + ' document ' + file.name + ' attached to a ' + _prjMoney(exp[i].amount, true) + ' expense on ' + (d.project_number || d.name));
       }
       _prjRenderCosts();
-      showToast('Document attached');
+      showToast('Document attached', {type:'info'});
     } catch(e) {
       console.warn('[Projects] expense doc upload:', e);
       showToast('Upload failed — check your connection and try again', { type: 'error' });
@@ -1857,7 +1857,7 @@ async function _prjRunPaymentRequest() {
   _prjRenderCosts();
 
   await _prjExportRequestFiles(req);
-  showToast('Payment request ' + req.number + ' exported — cost lines marked claimed');
+  showToast('Payment request ' + req.number + ' exported — cost lines marked claimed', {type:'info'});
 }
 
 // Re-export (summary PDF + all attached documents) for an existing request.
@@ -2254,7 +2254,7 @@ function _prjAllocAmounts(total, n) {
 function _prjOpenAllocateModal() {
   var d = window._prjDraft;
   if (!d || !d.id) { showToast('Save the project first', { type: 'error' }); return; }
-  if (!_prjCanAllocate()) { showToast('Only authorized staff can allocate project costs'); return; }
+  if (!_prjCanAllocate()) { showToast('Only authorized staff can allocate project costs', {type:'info'}); return; }
   var units = _prjUnitsForProject(d.id);
   if (!units.length) { showToast('No units are linked to this project yet — create or link units on the Lots & Units tab first', { type: 'error' }); return; }
 
@@ -2370,7 +2370,7 @@ async function _prjRunAllocation() {
   showToast(failures
     ? 'Costs allocated, but ' + failures + ' unit save' + (failures === 1 ? '' : 's') + ' failed — retry allocation'
     : 'Costs allocated to ' + units.length + ' unit' + (units.length === 1 ? '' : 's'),
-    failures ? { type: 'error' } : undefined);
+    failures ? { type: 'error' } : { type: 'info' });
 }
 
 // ── Lots & Units tab ─────────────────────────────────────────────────────────
@@ -2519,7 +2519,7 @@ async function _prjSaveLotsBatch() {
     if (modal) modal.remove();
     _prjRenderLots();
     renderProjectsList();
-    showToast(count + ' lot' + (count === 1 ? '' : 's') + ' added');
+    showToast(count + ' lot' + (count === 1 ? '' : 's') + ' added', {type:'info'});
   } catch(e) {
     console.warn('[Projects] lots batch:', e);
     showToast('Could not add lots — check your connection and try again', { type: 'error' });
@@ -2567,7 +2567,7 @@ function _prjLinkUnitToLot(lotId) {
   var candidates = (window.housingUnits || [])
     .filter(function(u){ return u && !u.archived && !u.projectId; })
     .map(function(u){ return { id: u.id, label: (u.num || '') + ' ' + (u.street || '') }; });
-  if (!candidates.length) { showToast('No unlinked units available'); return; }
+  if (!candidates.length) { showToast('No unlinked units available', {type:'info'}); return; }
 
   var ov = document.createElement('div');
   ov.id = 'prjLinkModal';
@@ -2623,7 +2623,7 @@ async function _prjConfirmLinkUnit(lotId) {
     if (modal) modal.remove();
     _prjRenderLots();
     renderProjectsList();
-    showToast('Unit linked');
+    showToast('Unit linked', {type:'info'});
   } catch(e) {
     console.warn('[Projects] link unit:', e);
     showToast('Could not link the unit', { type: 'error' });
@@ -2644,7 +2644,7 @@ function _prjLinkExisting() {
       var isLot = (typeof _isLot === 'function' && _isLot(u));
       return { id: u.id, label: ((u.num || '') + ' ' + (u.street || '')).trim() + (isLot ? '  (Vacant Lot)' : '') };
     });
-  if (!candidates.length) { showToast('No unlinked units or lots available'); return; }
+  if (!candidates.length) { showToast('No unlinked units or lots available', {type:'info'}); return; }
 
   var ov = document.createElement('div');
   ov.id = 'prjLinkExModal';
@@ -2692,7 +2692,7 @@ async function _prjConfirmLinkExisting() {
   var m = document.getElementById('prjLinkExModal'); if (m) m.remove();
   _prjRenderLots();
   renderProjectsList();
-  showToast('Linked to project');
+  showToast('Linked to project', {type:'info'});
 }
 function _prjUnlinkExisting(unitId) {
   var d = window._prjDraft;
@@ -2704,7 +2704,7 @@ function _prjUnlinkExisting(unitId) {
   if (typeof auditEntry === 'function') auditEntry('PRJ:' + d.id, 'project_existing_unlinked', ((u.num || '') + ' ' + (u.street || '')).trim() + ' unlinked from ' + (d.project_number || d.name), window.currentRole || '');
   _prjRenderLots();
   renderProjectsList();
-  showToast('Unlinked from project');
+  showToast('Unlinked from project', {type:'info'});
 }
 window._prjLinkExisting = _prjLinkExisting;
 window._prjConfirmLinkExisting = _prjConfirmLinkExisting;
@@ -2745,7 +2745,7 @@ function _prjCreateUnitsFromLots() {
   var d = window._prjDraft;
   if (!d || !d.id || !_prjCanManage()) return;
   var lots = _prjLotsFor(d.id).filter(function(l){ return !l.unit_id; });
-  if (!lots.length) { showToast('Every lot on this project already has a unit — add more lots first'); return; }
+  if (!lots.length) { showToast('Every lot on this project already has a unit — add more lots first', {type:'info'}); return; }
 
   var lotRows = lots.map(function(l, i) {
     var numGuess = (String(l.lot_number || '').match(/\d+/) || [''])[0];
@@ -2864,7 +2864,7 @@ async function _prjConfirmCreateUnits() {
   showToast(failed.length
     ? created + ' created; failed: ' + failed.join(', ')
     : created + ' unit' + (created === 1 ? '' : 's') + ' created and linked to this project',
-    failed.length ? { type: 'error' } : undefined);
+    failed.length ? { type: 'error' } : { type: 'info' });
 }
 
 // ── Documents tab ────────────────────────────────────────────────────────────
@@ -2908,7 +2908,7 @@ function _prjMountDocs() {
 async function savePrjProject() {
   var d = window._prjDraft;
   if (!d) return;
-  if (!_prjCanManage()) { showToast('Only authorized staff can edit projects'); return; }
+  if (!_prjCanManage()) { showToast('Only authorized staff can edit projects', {type:'info'}); return; }
   if (!d.name || !d.name.trim()) { showToast('Project name is required', { type: 'error' }); _prjSwitchTab('overview'); return; }
 
   var isNew = !d.id;
@@ -2937,7 +2937,7 @@ async function savePrjProject() {
     _prjMountDocsIfOpen();
     renderProjectsList();
     _prjSetSavedIndicator('✓ Saved ' + new Date().toLocaleTimeString());
-    showToast(isNew ? 'Project ' + (d.project_number || '') + ' created' : 'Project saved');
+    showToast(isNew ? 'Project ' + (d.project_number || '') + ' created' : 'Project saved', {type:'info'});
   } catch(e) {
     console.warn('[Projects] save:', e);
     showToast('Could not save the project — check your connection and try again', { type: 'error' });
@@ -2976,7 +2976,7 @@ function _prjArchiveProject() {
       }
       closePrjModal();
       renderProjectsList();
-      showToast('Project archived');
+      showToast('Project archived', {type:'info'});
     } catch(e) {
       console.warn('[Projects] archive:', e);
       showToast('Could not archive the project', { type: 'error' });

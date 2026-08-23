@@ -184,7 +184,7 @@ function aaToggleApproval(key) {
   if (typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.isToggleable(key)) return;
   var role = window._realRole || window.currentRole;
   if (!APPROVAL_AUTHORITY.can('editApprovalAuthority', role)) {
-    if (typeof showToast === 'function') showToast('Only the Executive Director can change approvals.');
+    if (typeof showToast === 'function') showToast('Only the Executive Director can change approvals.', {type:'error'});
     return;
   }
   var label       = APPROVAL_AUTHORITY.labels[key] || key;
@@ -275,7 +275,7 @@ function aaResetAction(key) {
 function saveApprovalAuthoritySettings() {
   var effectiveRole = window._realRole || window.currentRole;
   if(typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('editApprovalAuthority', effectiveRole)) {
-    showToast('Only the Executive Director can save approval authority settings.');
+    showToast('Only the Executive Director can save approval authority settings.', {type:'error'});
     return;
   }
   // Save the full live config (role arrays + numeric thresholds) so any
@@ -287,10 +287,10 @@ function saveApprovalAuthoritySettings() {
   window._appSettings['approval_authority'] = data;
   saveSettingWithDraftFallback('approval_authority', data).then(function(ok) {
     if(ok) {
-      showToast('✓ Approval authority saved');
+      showToast('✓ Approval authority saved', {type:'info'});
       if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'approval_authority_save', 'Approval authority configuration updated', effectiveRole || 'ed');
     } else {
-      showToast('Save failed — open browser console (F12) for details');
+      showToast('Save failed — open browser console (F12) for details', {type:'error'});
     }
   });
 }
@@ -455,7 +455,7 @@ function prefillTransferFromTenant() {
     var bandEl = document.getElementById('band');
     if(bandEl) bandEl.checked = !!existingApp.band;
   }
-  showToast('Profile pre-filled from existing application');
+  showToast('Profile pre-filled from existing application', {type:'info'});
 }
 
 function onAppTypeChange() {
@@ -721,7 +721,7 @@ async function rescoreAndSave() {
   if(btn) { btn.disabled = true; btn.textContent = 'Rescoring...'; }
   try {
     await rescoreAllApplications();
-    showToast('✓ Rescored ' + applications.length + ' applications');
+    showToast('✓ Rescored ' + applications.length + ' applications', {type:'info'});
     // Reload data from Supabase to get fresh breakdowns, then refresh scorecard
     if(true) {
       sbLoadApplications().then(function(fresh) {
@@ -739,7 +739,7 @@ async function rescoreAndSave() {
     if(typeof renderDashTable==='function') renderDashTable();
     if(typeof renderMatchView==='function') renderMatchView();
   } catch(e) {
-    showToast('Rescore failed — check console');
+    showToast('Rescore failed — check console', {type:'error'});
     console.error('[SCORE] rescoreAndSave error:', e);
   } finally {
     if(btn) { btn.disabled = false; btn.textContent = '↺ Rescore All Applications'; }
@@ -1206,7 +1206,7 @@ function _stopAuditAutoRefresh() {
 function exportAudit(format) {
   var rows = Array.isArray(window._auditRows) ? window._auditRows : [];
   if (!rows.length) {
-    if (typeof showToast === 'function') showToast('No audit entries to export.');
+    if (typeof showToast === 'function') showToast('No audit entries to export.', {type:'info'});
     return;
   }
   var headers = ['Date / Time', 'ID / Ref', 'Event', 'Detail', 'Name', 'Role'];
@@ -1513,10 +1513,10 @@ function saveThemeSettings() {
   window._appSettings.theme = theme;
   saveSettingWithDraftFallback('theme', theme).then(function(ok){
     if(ok){
-      showToast('Theme saved and applied');
+      showToast('Theme saved and applied', {type:'info'});
       if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'theme_updated', 'Brand theme updated', window.currentRole||'staff');
     } else {
-      showToast('Theme save failed — applied locally only');
+      showToast('Theme save failed — applied locally only', {type:'error'});
     }
   });
 }
@@ -1537,7 +1537,7 @@ function resetThemeSettings() {
     window._themeDraftLogo = '';
     saveSettingWithDraftFallback('theme', empty).then(function(saved){
       if(saved){
-        showToast('Theme reset to defaults');
+        showToast('Theme reset to defaults', {type:'info'});
         if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'theme_reset', 'Brand theme reset to defaults', window.currentRole||'staff');
       }
       renderThemesPanel();
@@ -1673,10 +1673,10 @@ function saveRequiredFieldsSettings() {
   if(typeof applyRequiredFields === 'function') applyRequiredFields();
   saveSettingWithDraftFallback('required_fields', cfg).then(function(ok){
     if(ok){
-      showToast('Required fields saved');
+      showToast('Required fields saved', {type:'info'});
       if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'required_fields_updated', 'Application required-field config updated', window.currentRole||'staff');
     } else {
-      showToast('Save failed — applied locally only');
+      showToast('Save failed — applied locally only', {type:'error'});
     }
   });
 }
@@ -1695,7 +1695,7 @@ function resetRequiredFieldsSettings() {
     if(typeof applyRequiredFields === 'function') applyRequiredFields();
     saveSettingWithDraftFallback('required_fields', {}).then(function(saved){
       if(saved){
-        showToast('Required fields reset to defaults');
+        showToast('Required fields reset to defaults', {type:'info'});
         if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'required_fields_reset', 'Required fields reset to defaults', window.currentRole||'staff');
       }
       renderRequiredFieldsPanel();
@@ -1833,7 +1833,7 @@ window.renderMaintenanceQrPanel = renderMaintenanceQrPanel;
 // Open a print-ready label sheet (3-up grid) from the rendered QR tiles.
 function printAllMaintenanceQr(){
   var list = window._maintQrList || [];
-  if(!list.length){ if(typeof showToast==='function') showToast('Nothing to print yet'); return; }
+  if(!list.length){ if(typeof showToast==='function') showToast('Nothing to print yet', {type:'info'}); return; }
   var labels = [];
   for(var i=0;i<list.length;i++){
     var host = document.getElementById('maint_qr_host_' + i);
@@ -1843,7 +1843,7 @@ function printAllMaintenanceQr(){
     labels.push({ src: src, addr: list[i].addr, nation: list[i].nation });
   }
   var w = window.open('', '_blank', 'width=900,height=1000');
-  if(!w){ if(typeof showToast==='function') showToast('Allow pop-ups to print the labels'); return; }
+  if(!w){ if(typeof showToast==='function') showToast('Allow pop-ups to print the labels', {type:'error'}); return; }
   var cells = labels.map(function(L){
     return '<div class="label">'
       + (L.src ? '<img class="qr" src="' + L.src + '"/>' : '<div class="qr"></div>')

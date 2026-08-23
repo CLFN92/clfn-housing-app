@@ -338,7 +338,7 @@
 
     if(t.hasAttribute('data-iq-start')){
       _syncDetails();
-      if(!S.unitId){ if(typeof showToast==='function') showToast('Please select a unit.'); return; }
+      if(!S.unitId){ if(typeof showToast==='function') showToast('Please select a unit.', {type:'error'}); return; }
       S.step = 'section'; S.sectionIdx = 0; render(); return;
     }
 
@@ -418,7 +418,7 @@
       if (typeof _inspUpdateUnitDates === 'function') _inspUpdateUnitDates(record.unit_id, record.inspection_date, record.type);
       if(typeof _inspLoad === 'function') await _inspLoad();
       if(typeof renderInspectionsList === 'function') renderInspectionsList();
-      if(typeof showToast === 'function') showToast('✓ Inspection saved');
+      if(typeof showToast === 'function') showToast('✓ Inspection saved', {type:'info'});
       close();
       if (typeof _inspRepairItems === 'function' && typeof _inspPromptSOW === 'function') {
         var repairItems = _inspRepairItems(record.checklist);

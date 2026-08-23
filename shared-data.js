@@ -784,7 +784,7 @@ function syncSaveQueue(){
     });
   })).then(function(){
     if(synced > 0 && typeof showToast === 'function'){
-      showToast(synced + ' item' + (synced === 1 ? '' : 's') + ' synced from local backup.');
+      showToast(synced + ' item' + (synced === 1 ? '' : 's') + ' synced from local backup.', {type:'info'});
     }
     return { tried: mine.length, synced: synced, skipped: skipped };
   });
@@ -1166,7 +1166,7 @@ async function sbSaveTenantNote(fullName, body, opts) {
     if (typeof auditEntry === 'function') {
       auditEntry('TENANT:' + tid, 'tenant_note_add', 'Note added via ' + (opts.context || 'workflow'), window.currentRole || 'staff');
     }
-    if (typeof showToast === 'function') showToast('Note saved.');
+    if (typeof showToast === 'function') showToast('Note saved.', {type:'info'});
     return true;
   } catch (e) {
     console.warn('[note] save failed:', e);
@@ -1411,7 +1411,7 @@ async function sbSaveSetting(key, value) {
 function persistSetting(key, value, opts) {
   opts = opts || {};
   function _fail(msg) {
-    if (typeof showToast === 'function') showToast(opts.failMsg || msg);
+    if (typeof showToast === 'function') showToast(opts.failMsg || msg, {type:'error'});
     return false;
   }
   return fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
@@ -1425,7 +1425,7 @@ function persistSetting(key, value, opts) {
     if (opts.auditAction && typeof auditEntry === 'function') {
       auditEntry('SETTINGS', opts.auditAction, opts.auditDetail || (key + ' updated'), window.currentRole || 'ed');
     }
-    if (opts.okMsg && typeof showToast === 'function') showToast(opts.okMsg);
+    if (opts.okMsg && typeof showToast === 'function') showToast(opts.okMsg, {type:'info'});
     if (typeof opts.onSuccess === 'function') opts.onSuccess();
     return true;
   }).catch(function(e) {
@@ -1654,14 +1654,14 @@ function _bcrAddSubmit(){
     ['bcr_name','bcr_dob','bcr_date','bcr_reason'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
     var hb = document.getElementById('bcr_harbouring'); if (hb) hb.checked = false;
     _bcrRenderList();
-    if (typeof showToast === 'function') showToast('Added to BCR list.');
+    if (typeof showToast === 'function') showToast('Added to BCR list.', {type:'info'});
   }).catch(function(e){ if (typeof showToast === 'function') showToast('Add failed: ' + e.message, { type:'error' }); });
 }
 window._bcrAddSubmit = _bcrAddSubmit;
 
 function _bcrLift(id){
   if (!window.confirm('Lift the BCR for this person? They will become eligible for housing again.')) return;
-  sbLiftBcr(id).then(function(){ _bcrRenderList(); if (typeof showToast === 'function') showToast('BCR lifted.'); })
+  sbLiftBcr(id).then(function(){ _bcrRenderList(); if (typeof showToast === 'function') showToast('BCR lifted.', {type:'info'}); })
     .catch(function(e){ if (typeof showToast === 'function') showToast('Lift failed: ' + e.message, { type:'error' }); });
 }
 window._bcrLift = _bcrLift;
@@ -1760,7 +1760,7 @@ function _mergeDoGroup(gi){
   var dupIds = g.map(function(t){ return t.id; }).filter(function(id){ return id !== canonicalId; });
   if (!dupIds.length) return;
   sbMergeTenants(canonicalId, dupIds)
-    .then(function(){ _mergeReload(); if (typeof showToast === 'function') showToast('Records merged.'); })
+    .then(function(){ _mergeReload(); if (typeof showToast === 'function') showToast('Records merged.', {type:'info'}); })
     .catch(function(e){ if (typeof showToast === 'function') showToast('Merge failed: ' + e.message, { type:'error' }); });
 }
 window._mergeDoGroup = _mergeDoGroup;
@@ -2242,7 +2242,7 @@ function cicSaveNote(){
       list.insertAdjacentHTML('afterbegin', _cicNoteHtml(added));
     }
     if(inp) inp.value = '';
-    if(typeof showToast === 'function') showToast('Note added.');
+    if(typeof showToast === 'function') showToast('Note added.', {type:'info'});
   });
 }
 window.cicRenderNotes = cicRenderNotes;
@@ -2489,14 +2489,14 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a'); a.href=url; a.download=filename+'.csv'; a.click();
     URL.revokeObjectURL(url);
-    showToast('CSV exported — '+data.length+' rows');
+    showToast('CSV exported — '+data.length+' rows', {type:'info'});
 
   } else if(format==='excel') {
     var loadXLSX = function(cb){
       if(window.XLSX){ cb(); return; }
       var s=document.createElement('script');
       s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload=cb; s.onerror=function(){showToast('Could not load Excel library.');};
+      s.onload=cb; s.onerror=function(){showToast('Could not load Excel library.', {type:'error'});};
       document.head.appendChild(s);
     };
     loadXLSX(function(){
@@ -2505,7 +2505,7 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
       ws['!cols'] = (colWidths||headers.map(function(){return 16;})).map(function(w){return{wch:w};});
       XLSX.utils.book_append_sheet(wb, ws, 'Data');
       XLSX.writeFile(wb, filename+'.xlsx');
-      showToast('Excel exported — '+data.length+' rows');
+      showToast('Excel exported — '+data.length+' rows', {type:'info'});
     });
 
   } else if(format==='pdf') {
@@ -2536,7 +2536,7 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
         margin:{left:14,right:14}
       });
       doc.save(filename+'.pdf');
-      showToast('PDF exported — '+data.length+' records');
+      showToast('PDF exported — '+data.length+' records', {type:'info'});
     });
   }
 }
@@ -2687,7 +2687,7 @@ function applyApprovalDisabledSweep(gate){
     _sweepInspectionsViaRest(); // async, detached — self-toasts its own count
   }
 
-  if (swept && typeof showToast === 'function') showToast('✓ ' + swept + ' item(s) auto-approved');
+  if (swept && typeof showToast === 'function') showToast('✓ ' + swept + ' item(s) auto-approved', {type:'info'});
   // Refresh any open surfaces that show queues.
   if (typeof renderWorklist === 'function') renderWorklist();
   if (typeof renderDashTable === 'function') try { renderDashTable(); } catch(e){}
@@ -2725,7 +2725,7 @@ async function _sweepInspectionsViaRest(){
         ins.approved_by = _APPROVAL_SYSTEM_ACTOR; ins.approved_at = when;
       }
     });
-    if (n && typeof showToast === 'function') showToast('✓ ' + n + ' inspection report(s) auto-approved');
+    if (n && typeof showToast === 'function') showToast('✓ ' + n + ' inspection report(s) auto-approved', {type:'info'});
     if (typeof renderInspectionsList === 'function') try { renderInspectionsList(); } catch(e){}
     return n;
   } catch(e) { console.warn('[approval sweep] inspections:', e); return 0; }
@@ -2797,7 +2797,7 @@ window._tenantMrRenderPhotos = _tenantMrRenderPhotos;
 // Review modal for a single tenant-reported request.
 function openTenantMrReview(id){
   var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });
-  if(!s){ if(typeof showToast === 'function') showToast('Request not found'); return; }
+  if(!s){ if(typeof showToast === 'function') showToast('Request not found', {type:'error'}); return; }
   var e = function(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
   var photoPaths = _tenantMrPhotoPaths(s);
   var photosHtml = photoPaths.length
@@ -2848,7 +2848,7 @@ function _tenantMrApprove(id){
   var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
   var photoPaths = _tenantMrPhotoPaths(s);
   sbResolveTenantMr(id, 'approved', note).then(function(){
-    if(typeof showToast === 'function') showToast('✓ Approved — creating maintenance request');
+    if(typeof showToast === 'function') showToast('✓ Approved — creating maintenance request', {type:'info'});
     var x = document.getElementById('tenant_mr_modal'); if(x) x.remove();
     if(typeof auditEntry === 'function') auditEntry('UNIT:' + s.unit_id, 'tenant_mr_approved', 'Tenant maintenance request approved — ' + (s.category || '') + ': ' + String(s.description || '').slice(0, 140), actor);
     // Carry the tenant photos onto the unit's Documents tab (they already live
@@ -2902,7 +2902,7 @@ function _tenantMrReject(id){
   var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });
   var note = (document.getElementById('tenant_mr_note') || {}).value || '';
   sbResolveTenantMr(id, 'rejected', note).then(function(){
-    if(typeof showToast === 'function') showToast('Request rejected');
+    if(typeof showToast === 'function') showToast('Request rejected', {type:'info'});
     var x = document.getElementById('tenant_mr_modal'); if(x) x.remove();
     if(s && typeof auditEntry === 'function') auditEntry('UNIT:' + s.unit_id, 'tenant_mr_rejected', 'Tenant maintenance request rejected' + (note ? ' — ' + note : ''), (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '');
     if(typeof renderWorklist === 'function') renderWorklist();
@@ -2976,7 +2976,7 @@ var _APPSUB_TYPE_LABEL = { new:'New application', update:'Application update', t
 
 function openApplicationSubmissionReview(id){
   var s = (window._appSubmissions || []).find(function(x){ return x.id === id; });
-  if(!s){ if(typeof showToast === 'function') showToast('Submission not found'); return; }
+  if(!s){ if(typeof showToast === 'function') showToast('Submission not found', {type:'error'}); return; }
   var e = function(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
   var p = s.payload || {};
   var when = s.submitted_at ? new Date(s.submitted_at).toLocaleString() : (s.created_at ? new Date(s.created_at).toLocaleString() : '');
@@ -3099,7 +3099,7 @@ function _appSubApprove(id){
   var p = s.payload || {};
   var staffEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
   var staffName  = (window.HOUSING_SESSION && HOUSING_SESSION.name) || '';
-  if(typeof showToast === 'function') showToast('Creating application…');
+  if(typeof showToast === 'function') showToast('Creating application…', {type:'info'});
   _appSubNextAppId().then(function(appId){
     var app = Object.assign({}, p, {
       id: appId, status: 'submitted', appType: p.appType || 'new_housing',
@@ -3114,7 +3114,7 @@ function _appSubApprove(id){
         if(typeof auditEntry === 'function') auditEntry(appId, 'application_created_from_portal', 'Created from applicant portal submission ' + s.id + ' — ' + ([p.fn, p.ln].filter(Boolean).join(' ')), staffEmail);
         if(typeof applications !== 'undefined' && Array.isArray(applications)) applications.push(app);
         _appSubClose();
-        if(typeof showToast === 'function') showToast('✓ Application ' + appId + ' created — open it to add scoring & approve');
+        if(typeof showToast === 'function') showToast('✓ Application ' + appId + ' created — open it to add scoring & approve', {type:'info'});
         if(typeof renderWorklist === 'function') renderWorklist();
         if(typeof renderDashboard === 'function') try { renderDashboard(); } catch(_e){}
       });
@@ -3174,7 +3174,7 @@ function _appSubMerge(id, targetAppId){
   ['habitants','incomes','references','pets'].forEach(function(k){ if(Array.isArray(p[k]) && p[k].length) merged[k] = p[k]; });
   if(s.submission_type === 'transfer'){ merged.appType = 'transfer_request'; merged.transferPending = true; }
   merged.last_portal_merge = { submission_id: s.id, type: s.submission_type, at: new Date().toISOString(), by: staffEmail };
-  if(typeof showToast === 'function') showToast('Merging into ' + targetAppId + '…');
+  if(typeof showToast === 'function') showToast('Merging into ' + targetAppId + '…', {type:'info'});
   sbSaveApplication(merged).then(function(){
     Object.assign(target, merged);   // save confirmed — adopt onto the live app
     return _appSubResolve(id, 'approved', note, targetAppId).then(function(){
@@ -3182,7 +3182,7 @@ function _appSubMerge(id, targetAppId){
       _appSubCarryDocs(targetAppId, p._docs);
       if(typeof auditEntry === 'function') auditEntry(targetAppId, 'application_updated_from_portal', 'Merged portal ' + s.submission_type + ' submission ' + s.id + ' into ' + targetAppId + (note ? ' — ' + note : ''), staffEmail);
       _appSubClose();
-      if(typeof showToast === 'function') showToast('✓ Merged into ' + targetAppId);
+      if(typeof showToast === 'function') showToast('✓ Merged into ' + targetAppId, {type:'info'});
       if(typeof renderWorklist === 'function') renderWorklist();
       if(typeof renderDashboard === 'function') try { renderDashboard(); } catch(_e){}
     });
@@ -3195,7 +3195,7 @@ function _appSubRequestChanges(id){
   if(!note){ if(typeof showToast === 'function') showToast('Add a note so the applicant knows what to change', {type:'error'}); return; }
   _appSubResolve(id, 'changes_requested', note).then(function(){
     _appSubClose();
-    if(typeof showToast === 'function') showToast('Sent back to the applicant for changes');
+    if(typeof showToast === 'function') showToast('Sent back to the applicant for changes', {type:'info'});
     if(typeof auditEntry === 'function') auditEntry('APPSUB:' + id, 'application_submission_changes_requested', note, (window.HOUSING_SESSION && HOUSING_SESSION.email) || '');
     if(typeof renderWorklist === 'function') renderWorklist();
   }).catch(function(err){ console.warn('[app-sub] request changes failed:', err); if(typeof showToast === 'function') showToast('Failed — please retry', {type:'error'}); });
@@ -3206,7 +3206,7 @@ function _appSubReject(id){
   var note = (document.getElementById('app_sub_note') || {}).value || '';
   _appSubResolve(id, 'rejected', note).then(function(){
     _appSubClose();
-    if(typeof showToast === 'function') showToast('Submission rejected');
+    if(typeof showToast === 'function') showToast('Submission rejected', {type:'info'});
     if(typeof auditEntry === 'function') auditEntry('APPSUB:' + id, 'application_submission_rejected', note, (window.HOUSING_SESSION && HOUSING_SESSION.email) || '');
     if(typeof renderWorklist === 'function') renderWorklist();
   }).catch(function(err){ console.warn('[app-sub] reject failed:', err); if(typeof showToast === 'function') showToast('Failed — please retry', {type:'error'}); });
@@ -3232,7 +3232,7 @@ function inviteApplicantToPortal(email, name, appId){
   var send = function(addr){
     _appSubSendInvite(addr, appId).then(function(res){
       if(res.ok && res.data && res.data.ok){
-        if(typeof showToast === 'function') showToast('✓ Portal invite sent to ' + addr);
+        if(typeof showToast === 'function') showToast('✓ Portal invite sent to ' + addr, {type:'info'});
         if(appId && typeof auditEntry === 'function') auditEntry(appId, 'portal_invite_sent', 'Portal invite emailed to ' + addr, (window.HOUSING_SESSION && HOUSING_SESSION.email) || '');
       } else {
         if(typeof showToast === 'function') showToast((res.data && res.data.error) || 'Could not send the invite', { type:'error' });
@@ -3734,7 +3734,7 @@ function confirmCtAction() {
   var notes = (notesEl && notesEl.value) ? notesEl.value.trim() : '';
 
   if(needsNotes && !notes) {
-    showToast('Please add a note explaining this decision.');
+    showToast('Please add a note explaining this decision.', {type:'error'});
     if(notesEl) notesEl.focus();
     return;
   }
@@ -3773,7 +3773,7 @@ function confirmCtAction() {
   }
 
   var toastLabels = {hm_recommended:'Recommended to ED',approved:'Contractor approved',declined:'Application declined',returned:'Returned for more info'};
-  showToast(toastLabels[action]||action);
+  showToast(toastLabels[action]||action, {type:'info'});
   cancelCtAction();
   // Refresh whichever surface the action came from. CIC = inline approval
   // sections inside the edit modal (stays open — the user is editing the
@@ -3888,14 +3888,14 @@ async function deactivateStaff(id, btn){
       body:JSON.stringify({is_active:false})
     });
     if(r.ok){
-      showToast('Staff member deactivated');
+      showToast('Staff member deactivated', {type:'info'});
       renderHousingUserTable();
     } else {
-      showToast('Could not deactivate — check permissions');
+      showToast('Could not deactivate — check permissions', {type:'error'});
       if(btn){btn.disabled=false;btn.textContent='Deactivate';}
     }
   } catch(e){
-    showToast('Error: '+e.message);
+    showToast('Error: '+e.message, {type:'error'});
     if(btn){btn.disabled=false;btn.textContent='Deactivate';}
   }
 }
@@ -3936,7 +3936,7 @@ async function reactivateStaff(id, btn){
       body:JSON.stringify({is_active:true})
     });
     if(r.ok){
-      showToast(newLogin ? ('Reactivated + login recreated — temporary password: '+pw) : 'Staff member reactivated');
+      showToast(newLogin ? ('Reactivated + login recreated — temporary password: '+pw) : 'Staff member reactivated', {type:'info'});
       auditEntry('SETTINGS','settings_user_reactivate','Staff reactivated (id='+id+')'+(newLogin?' + login recreated':''),window.currentRole||'ed');
       if(newLogin && email && typeof sendNotification==='function'){
         try {
@@ -3951,11 +3951,11 @@ async function reactivateStaff(id, btn){
       }
       renderHousingUserTable();
     } else {
-      showToast('Could not reactivate — check permissions');
+      showToast('Could not reactivate — check permissions', {type:'error'});
       if(btn){btn.disabled=false;btn.textContent='Reactivate';}
     }
   } catch(e){
-    showToast('Error: '+e.message);
+    showToast('Error: '+e.message, {type:'error'});
     if(btn){btn.disabled=false;btn.textContent='Reactivate';}
   }
 }
@@ -3965,7 +3965,7 @@ async function reactivateStaff(id, btn){
 // We don't surface response details (anti-enumeration) and we don't gate
 // resends — Supabase rate-limits the endpoint server-side per email + IP.
 async function sendStaffPasswordReset(email, btn){
-  if(!email){ showToast('No email on file'); return; }
+  if(!email){ showToast('No email on file', {type:'error'}); return; }
   if(btn){btn.disabled=true; btn.textContent='Sending…';}
   try {
     var redirectTo = window.location.origin + '/index.html';
@@ -3975,15 +3975,15 @@ async function sendStaffPasswordReset(email, btn){
       body:    JSON.stringify({ email: email, redirect_to: redirectTo })
     });
     if(r.status === 429){
-      showToast('Too many reset attempts — try again in a few minutes');
+      showToast('Too many reset attempts — try again in a few minutes', {type:'error'});
     } else if(!r.ok){
-      showToast('Could not send reset — try again');
+      showToast('Could not send reset — try again', {type:'error'});
     } else {
-      showToast('Reset link sent to '+email);
+      showToast('Reset link sent to '+email, {type:'info'});
       auditEntry('SETTINGS','settings_user_send_reset','Password reset sent to '+email,window.currentRole||'ed');
     }
   } catch(e){
-    showToast('Error: '+e.message);
+    showToast('Error: '+e.message, {type:'error'});
   } finally {
     if(btn){btn.disabled=false; btn.textContent='Send Reset';}
   }
@@ -4153,7 +4153,7 @@ async function _sbEditStaffModal(id) {
   var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id+'&select=*', { headers: HOUSING_HEADERS });
   var data = await r.json();
   var u = data[0];
-  if(!u) { showToast('Staff member not found'); return; }
+  if(!u) { showToast('Staff member not found', {type:'error'}); return; }
 
   // Determine current housing role
   var currentHrole = sbMapRole(u);
@@ -4225,7 +4225,7 @@ function emailContractorAgreement() {
   // Two buttons in contractors.html still bind to this onclick, so
   // keeping it callable (with a clear "not wired yet" toast) avoids
   // ReferenceErrors on click.
-  showToast('Email agreement is being re-wired — coming soon.');
+  showToast('Email agreement is being re-wired — coming soon.', {type:'info'});
 }
 function exportContractors(format) {
   var contractors = window._contractors || [];
@@ -4375,7 +4375,7 @@ function headerExport(format) {
   else if(view==='renos')  exportRenos(format);
   else if(view==='contractors') exportContractors(format);
   else if(view==='tenants') exportTenants(format);
-  else showToast('Nothing to export on this page.');
+  else showToast('Nothing to export on this page.', {type:'info'});
 }
 function initCtAction(action, needsNotes, prefix) {
   prefix = prefix || 'ctap';
@@ -4698,7 +4698,7 @@ function printContractorAgreement() {
   var ct = window._ctLastSaved || _readContractorFormData();
   var html = _buildContractorAgreementHTML(ct);
   var w = window.open('','_blank','width=900,height=750,toolbar=0,menubar=0');
-  if(!w){ showToast('Please allow popups to print'); return; }
+  if(!w){ showToast('Please allow popups to print', {type:'error'}); return; }
   w.document.open(); w.document.write(html); w.document.close();
   w.onload = function(){ w.focus(); w.print(); };
 }
@@ -5162,10 +5162,10 @@ function _ctFmtCurrency(n) { return formatCurrency(n); }
 function ctPrintFromRow(idx) {
   var contractors = window._contractors || [];
   var ct = contractors[idx];
-  if (!ct) { showToast('Contractor not found'); return; }
+  if (!ct) { showToast('Contractor not found', {type:'error'}); return; }
   window._ctLastSaved = ct;
   if (typeof printContractorAgreement === 'function') printContractorAgreement();
-  else showToast('Print is not available on this page');
+  else showToast('Print is not available on this page', {type:'error'});
 }
 
 // ⋮ menu for a contractor row — HM/ED only. Items intentionally lean:
@@ -5239,7 +5239,7 @@ function _ctHandleRowAction(action, idx) {
       if (typeof saveContractorWithDraftFallback === 'function') saveContractorWithDraftFallback(ct);
       else if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('archive failed:', e); });
       auditEntry('CT:'+ct.id, 'ct_archived', 'Contractor archived: ' + (ct.name||''), role);
-      showToast('📦 Contractor archived');
+      showToast('📦 Contractor archived', {type:'info'});
       renderContractorsView();
     });
   } else if (action === 'unarchive') {
@@ -5248,7 +5248,7 @@ function _ctHandleRowAction(action, idx) {
     if (typeof saveContractorWithDraftFallback === 'function') saveContractorWithDraftFallback(ct);
     else if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('unarchive failed:', e); });
     auditEntry('CT:'+ct.id, 'ct_unarchived', 'Contractor restored from archive: ' + (ct.name||''), role);
-    showToast('📤 Contractor unarchived');
+    showToast('📤 Contractor unarchived', {type:'info'});
     renderContractorsView();
   } else if (action === 'decline') {
     showPrompt({
@@ -5268,7 +5268,7 @@ function _ctHandleRowAction(action, idx) {
       if (typeof saveContractorWithDraftFallback === 'function') saveContractorWithDraftFallback(ct);
       else if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('decline failed:', e); });
       auditEntry('CT:'+ct.id, 'declined', 'Contractor declined' + (reason ? ' — ' + reason : ''), role);
-      showToast('Contractor declined');
+      showToast('Contractor declined', {type:'info'});
       renderContractorsView();
     });
   }
@@ -7054,7 +7054,7 @@ function resetRenoScoreModel() {
     if (!ok) return;
     if(window._appSettings) delete window._appSettings['reno_score_model'];
     renderRenoScoreTable();
-    showToast('Renovation scoring reset');
+    showToast('Renovation scoring reset', {type:'info'});
   });
 }
 function resetSow(){
@@ -7378,9 +7378,9 @@ function saveRenoScoreModel() {
   if(!window._appSettings) window._appSettings={};
   window._appSettings['reno_score_model']=model;
   saveSettingWithDraftFallback('reno_score_model', model).then(function(ok){
-    if(!ok){ showToast('Renovation scoring did NOT save to server — please retry.'); return; }
+    if(!ok){ showToast('Renovation scoring did NOT save to server — please retry.', {type:'error'}); return; }
     auditEntry('SETTINGS','settings_reno_score_save','Renovation priority scoring model saved',window.currentRole||'staff');
-    showToast('Renovation scoring saved');
+    showToast('Renovation scoring saved', {type:'info'});
     renderRenoScoreTable();
   });
 }
@@ -7393,9 +7393,9 @@ function saveUnitScoreModel(){
   if(!window._appSettings) window._appSettings={};
   window._appSettings['unit_score_model']=model;
   saveSettingWithDraftFallback('unit_score_model', model).then(function(ok){
-    if(!ok){ showToast('Unit match scoring did NOT save to server — please retry.'); return; }
+    if(!ok){ showToast('Unit match scoring did NOT save to server — please retry.', {type:'error'}); return; }
     auditEntry('SETTINGS','settings_unit_score_save','Unit matching scoring model saved',window.currentRole||'staff');
-    showToast('Unit match scoring saved');
+    showToast('Unit match scoring saved', {type:'info'});
     renderUnitScoreTable();
   });
 }
@@ -7443,11 +7443,11 @@ async function scSaveAssignedDocs(app) {
   }
 
   if (errors.length) {
-    showToast('⚠ ' + matched + ' matched, ' + errors.length + ' failed — see console');
+    showToast('⚠ ' + matched + ' matched, ' + errors.length + ' failed — see console', {type:'error'});
   } else if (matched > 0) {
-    showToast('✓ ' + matched + ' file' + (matched === 1 ? '' : 's') + ' added to document library');
+    showToast('✓ ' + matched + ' file' + (matched === 1 ? '' : 's') + ' added to document library', {type:'info'});
   } else {
-    showToast('No files selected');
+    showToast('No files selected', {type:'error'});
     return;
   }
   if (matched > 0) {
@@ -7558,14 +7558,14 @@ async function scDeleteAssignedDoc(doc) {
     if (doc.file_path && doc.file_path.indexOf('applications/APP-/') === -1) {
       await sbDeleteFile(doc.file_path);
     }
-    showToast('File deleted');
+    showToast('File deleted', {type:'info'});
     // Re-open modal for the same app
     var modal = document.getElementById('assignDocsModal');
     var app   = modal && modal._scApp;
     if (app) scShowAssignDocs(app);
   } catch (e) {
     console.warn('[assignDocs] delete failed:', e);
-    showToast('Delete failed — see console');
+    showToast('Delete failed — see console', {type:'error'});
   }
 }
 
@@ -7626,7 +7626,7 @@ async function scReassignDoc(doc) {
 async function _scDoReassign(doc, targetAppId, targetName) {
   document.getElementById('reassignPickerModal') && document.getElementById('reassignPickerModal').remove();
   var fname = doc.file_name || doc.file_path.split('/').pop();
-  showToast('Reassigning ' + fname + '…');
+  showToast('Reassigning ' + fname + '…', {type:'info'});
   try {
     var destPath = 'applications/' + targetAppId + '/' + Date.now() + '_' + fname;
     // Copy to target applicant's folder
@@ -7652,14 +7652,14 @@ async function _scDoReassign(doc, targetAppId, targetName) {
     if (doc.file_path && doc.file_path.indexOf('applications/APP-/') === -1) {
       await sbDeleteFile(doc.file_path);
     }
-    showToast('✓ ' + fname + ' reassigned to ' + targetName);
+    showToast('✓ ' + fname + ' reassigned to ' + targetName, {type:'info'});
     // Refresh the assign modal
     var modal = document.getElementById('assignDocsModal');
     var app   = modal && modal._scApp;
     if (app) scShowAssignDocs(app);
   } catch (e) {
     console.warn('[assignDocs] reassign failed:', e);
-    showToast('Reassign failed — see console');
+    showToast('Reassign failed — see console', {type:'error'});
   }
 }
 
@@ -7699,7 +7699,7 @@ async function runDocPoolMigration() {
     }
   }
   console.log('[migration] Done. ' + ok + ' migrated, ' + fail + ' failed.');
-  if (typeof showToast === 'function') showToast('Migration: ' + ok + ' moved, ' + fail + ' failed');
+  if (typeof showToast === 'function') showToast('Migration: ' + ok + ' moved, ' + fail + ' failed', {type:'error'});
 }
 window.runDocPoolMigration = runDocPoolMigration;
 function setExportView(viewName) {
@@ -8518,7 +8518,7 @@ function saveBudgetData(data){
       // Roll back in-memory so UI reflects reality
       if(prev === undefined) delete window._appSettings['budget_pools'];
       else window._appSettings['budget_pools'] = prev;
-      showToast('Could not save budget — changes NOT persisted. Please retry.');
+      showToast('Could not save budget — changes NOT persisted. Please retry.', {type:'error'});
     }
   });
 }
@@ -8600,15 +8600,15 @@ async function saveStaffEdit(id, original, modal) {
         else auditEntry('SETTINGS', 'settings_user_magic_link', 'Magic-link sign-in for '+name+': '+(magicVal?'enabled':'disabled'), window.currentRole||'ed');
       } catch(e){ console.warn('[magic-link] save error', e); }
       modal.remove();
-      showToast('✓ Staff member updated');
+      showToast('✓ Staff member updated', {type:'info'});
       auditEntry('SETTINGS', 'settings_user_edit', 'Staff updated: '+name+' — role set to '+hrole, window.currentRole||'ed');
       renderHousingUserTable();
     } else {
-      showToast('Could not save — check permissions');
+      showToast('Could not save — check permissions', {type:'error'});
       if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Save Changes'; }
     }
   } catch(e) {
-    showToast('Error: '+e.message);
+    showToast('Error: '+e.message, {type:'error'});
     if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Save Changes'; }
   }
 }
@@ -8833,7 +8833,7 @@ function showPrintPanel(docHtml, title) {
 
 function showMatch(){
   if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('match')){
-    showToast('Match module is not enabled for this nation.');
+    showToast('Match module is not enabled for this nation.', {type:'error'});
     return;
   }
   // Match lives in match.html. Element-based check (see showInventory).
@@ -8884,7 +8884,7 @@ function rpContractorSearch(q) {
 
 function showContractors(){
   if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('contractors')){
-    showToast('Contractors module is not enabled for this nation.');
+    showToast('Contractors module is not enabled for this nation.', {type:'error'});
     return;
   }
   // contractorsView markup lives in contractors.html
@@ -8893,7 +8893,7 @@ function showContractors(){
 
 function showRenos(){
   if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('renovations')){
-    showToast('Renovations module is not enabled for this nation.');
+    showToast('Renovations module is not enabled for this nation.', {type:'error'});
     return;
   }
   // The renoApprovalsView/renosView markup lives in renos.html —
@@ -8921,7 +8921,7 @@ function showScorecard(app){
   // have their own review modal — never show them the residential scorecard.
   if(app.appType === 'commercial'){
     if(typeof window.openCommercialApp === 'function'){ window.openCommercialApp(app.id); return; }
-    if(typeof showToast === 'function') showToast('Commercial application viewer is not available on this page.');
+    if(typeof showToast === 'function') showToast('Commercial application viewer is not available on this page.', {type:'error'});
     return;
   }
   window._currentScorecardApp=app;
@@ -9412,7 +9412,7 @@ async function sendRfqToRecipients(rfq, contractorList) {
     }
   }
   if (_attachSkipped > 0 && typeof showToast === 'function') {
-    showToast(_attachSkipped + ' selected attachment' + (_attachSkipped > 1 ? 's' : '') + ' could not be loaded and will be omitted from the email');
+    showToast(_attachSkipped + ' selected attachment' + (_attachSkipped > 1 ? 's' : '') + ' could not be loaded and will be omitted from the email', {type:'error'});
   }
 
   var ok = 0, fail = 0, failNames = [];
@@ -9448,8 +9448,8 @@ async function sendRfqToRecipients(rfq, contractorList) {
     }
   }
   if (typeof showToast === 'function') {
-    if (fail) showToast('Sent to ' + ok + ' of ' + (ok+fail) + ' -- failed: ' + failNames.join(', '));
-    else      showToast('RFQ sent to ' + ok + ' contractor' + (ok === 1 ? '' : 's'));
+    if (fail) showToast('Sent to ' + ok + ' of ' + (ok+fail) + ' -- failed: ' + failNames.join(', '), {type:'error'});
+    else      showToast('RFQ sent to ' + ok + ' contractor' + (ok === 1 ? '' : 's'), {type:'info'});
   }
   return { ok: ok, fail: fail, failNames: failNames };
 }
@@ -9516,7 +9516,7 @@ function _rfqApproveLinkedSow(unitId, projectNumber, role, contractor) {
 async function awardRfq(rfqId, contractorId, amount, notes, opts) {
   opts = opts || {};
   var rfq = (window._rfqCache || {})[rfqId];
-  if (!rfq) { if (typeof showToast === 'function') showToast('RFQ not found'); return false; }
+  if (!rfq) { if (typeof showToast === 'function') showToast('RFQ not found', {type:'error'}); return false; }
   var role = window.currentRole || 'staff';
   var updates = { status: 'awarded', awarded_contractor_id: contractorId,
                   award_amount: parseFloat(amount) || 0, award_notes: notes || null,
@@ -9587,8 +9587,8 @@ async function awardRfq(rfqId, contractorId, amount, notes, opts) {
         })();
       }
     }
-    if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded' + (opts.skipNotify ? ' (no notifications) — Maintenance Request approved' : ' — Maintenance Request approved'));
+    if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded' + (opts.skipNotify ? ' (no notifications) — Maintenance Request approved' : ' — Maintenance Request approved'), {type:'info'});
     return true;
-  } catch(e) { console.warn('[rfq] award failed:', e); if (typeof showToast === 'function') showToast('Award failed -- see console'); return false; }
+  } catch(e) { console.warn('[rfq] award failed:', e); if (typeof showToast === 'function') showToast('Award failed -- see console', {type:'error'}); return false; }
 }
 window.awardRfq = awardRfq;

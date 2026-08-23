@@ -10,7 +10,11 @@
  * ============================================================ */
 
 function toast(msg, duration) {
-  if (typeof showToast === 'function') { showToast(msg, {duration: duration || 2500}); return; }
+  // Classify by content so legacy finance callers (which never pass a type)
+  // surface failures as errors and confirmations as info instead of being
+  // silently suppressed by the type-less-toast rule.
+  var _isErr = /fail|error|cannot|could not|invalid|missing|denied|required|not permitted|unable|please|no longer|try again/i.test(String(msg || ''));
+  if (typeof showToast === 'function') { showToast(msg, {duration: duration || 2500, type: _isErr ? 'error' : 'info'}); return; }
   console.log(msg);
 }
 

@@ -128,7 +128,7 @@ function saveV2Tiers() {
       showToast('Tier thresholds saved locally but did not reach the server — please retry.', { type: 'error' });
       return;
     }
-    showToast('Tier thresholds saved — rescore all to apply');
+    showToast('Tier thresholds saved — rescore all to apply', {type:'info'});
   });
 }
 
@@ -312,7 +312,7 @@ function updateV2ScoreOption(el) {
   liveV2ScoreModel[cat][key] = val;
   saveV2ScoringModel();
   auditEntry('SETTINGS', 'scoring_v2_change', 'V2 Scoring: ' + cat + '.' + key + ' set to ' + val + ' pts', window.currentRole || 'ed');
-  showToast('Score updated — rescore all to apply');
+  showToast('Score updated — rescore all to apply', {type:'info'});
 }
 
 function updateV2Tier(el) {
@@ -367,7 +367,7 @@ function resetV2TiersED() {
     liveV2Tiers = Object.assign({}, DEFAULT_V2_TIERS);
     saveV2Tiers();
     renderV2ScoringEditor();
-    showToast('Tier thresholds reset to defaults');
+    showToast('Tier thresholds reset to defaults', {type:'info'});
     auditEntry('SETTINGS', 'scoring_v2_tiers_reset', 'Priority tier thresholds reset to defaults', 'ed');
   });
 }
@@ -377,7 +377,7 @@ function resetV2ScoringModelED() {
     liveV2ScoreModel = JSON.parse(JSON.stringify(DEFAULT_V2_SCORE_MODEL));
     saveV2ScoringModel();
     renderV2ScoringEditor();
-    showToast('Scoring model reset to defaults');
+    showToast('Scoring model reset to defaults', {type:'info'});
     auditEntry('SETTINGS', 'scoring_v2_reset', 'V2 scoring model reset to defaults', 'ed');
   });
 }
@@ -440,7 +440,7 @@ function saveMatchPriorityModelED() {
   _matchPriorityGuard('Match Priority weighting updated', function() {
     saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
       if(!ok){ showToast('Match priority weights saved locally but did not reach the server — it may revert on next sign-in.', { type: 'error' }); return; }
-      showToast('Match priority weights saved');
+      showToast('Match priority weights saved', {type:'info'});
     });
     auditEntry('SETTINGS', 'match_priority_model', 'Match priority weights updated: Has-Match=' + liveMatchPriorityModel.hasMatchBonus + ' Temporary=' + liveMatchPriorityModel.temporaryBonus + ' On-Reserve=' + liveMatchPriorityModel.onReserveBonus + ' No-House=' + liveMatchPriorityModel.noHouseBonus, window.currentRole);
   });
@@ -452,7 +452,7 @@ function resetMatchPriorityModelED() {
     renderMatchPriorityEditor();
     saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
       if(!ok){ showToast('Match priority weights reset locally but did not reach the server — it may revert on next sign-in.', { type: 'error' }); return; }
-      showToast('Match priority weights reset to defaults');
+      showToast('Match priority weights reset to defaults', {type:'info'});
     });
     auditEntry('SETTINGS', 'match_priority_model_reset', 'Match priority weights reset to defaults', window.currentRole);
   });
@@ -900,7 +900,7 @@ function _onModuleToggle(modName, nowOn) {
     }
   }
 
-  if(typeof showToast === 'function') showToast(modName + (nowOn ? ' enabled' : ' disabled') + '.');
+  if(typeof showToast === 'function') showToast(modName + (nowOn ? ' enabled' : ' disabled') + '.', {type:'info'});
 }
 
 // ── Nation editor render helpers ────────────────────────────────────────────
@@ -943,11 +943,11 @@ function saveNationSettings() {
   var short = v('nation_input_short');
   if (!disp)  { showToast('Display name is required', { type: 'error' }); var de=document.getElementById('nation_input_display'); if(de) de.focus(); return; }
   if (!short) { showToast('Short name is required', { type: 'error' });   var se=document.getElementById('nation_input_short');   if(se) se.focus(); return; }
-  if (short.length > 16) { showToast('Short name must be 16 characters or fewer'); return; }
+  if (short.length > 16) { showToast('Short name must be 16 characters or fewer', {type:'info'}); return; }
 
   var emailVal = v('nation_input_email');
   if (emailVal && !/.+@.+\..+/.test(emailVal)) {
-    showToast('Email address looks malformed'); var ee=document.getElementById('nation_input_email'); if(ee) ee.focus(); return;
+    showToast('Email address looks malformed', {type:'info'}); var ee=document.getElementById('nation_input_email'); if(ee) ee.focus(); return;
   }
 
   // Build the socials sub-object from whichever fields are populated.
@@ -986,7 +986,7 @@ function saveNationSettings() {
     // Apply locally regardless of server result so the UI reflects intent.
     if (typeof applyNationOverrides === 'function') applyNationOverrides();
     if (allOk) {
-      showToast('Nation settings saved');
+      showToast('Nation settings saved', {type:'info'});
       if (typeof auditEntry === 'function') {
         var summary = 'Nation settings updated: ' + disp + ' (' + short + ')';
         var extras = [];
@@ -1203,7 +1203,7 @@ function saveNosTable() {
 
   saveSettingWithDraftFallback('nos_table', nos).then(function(ok) {
     if(ok) {
-      showToast('\u2713 NOS table saved');
+      showToast('\u2713 NOS table saved', {type:'info'});
       auditEntry('SETTINGS', 'nos_table_save', 'NOS table updated by ED', CLFN_PERMS.roleLabel(ROLE.ED));
     } else {
       showToast('Save failed — check connection', { type: 'error' });
@@ -1895,7 +1895,7 @@ var auditLog=[];
 // Archive an APPLICATION — bundles any linked unit documents before archiving
 function archiveApplication(appId) {
   var idx = applications.findIndex(function(a){ return a.id === appId; });
-  if(idx === -1) { showToast('Application not found'); return; }
+  if(idx === -1) { showToast('Application not found', {type:'error'}); return; }
   var role = window.currentRole || 'staff';
   var app  = applications[idx];
   var linkedUnitId = app.assignedUnit || app.assignedUnitId || null;
@@ -1910,7 +1910,7 @@ function archiveApplication(appId) {
     'Application archived',
     role);
   _refreshAppViews();
-  showToast('Application and supporting documents archived');
+  showToast('Application and supporting documents archived', {type:'info'});
 }
 
 // Archive a UNIT (demolition) — bundles all docs, marks archived, auto-archives linked apps
@@ -1957,7 +1957,7 @@ function _unitRestoreLot(u, role){
 function archiveUnit(unitId) {
   var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
-  if(!u) { showToast('Unit not found'); return; }
+  if(!u) { showToast('Unit not found', {type:'error'}); return; }
   var role = window.currentRole || 'staff';
   var addr = u.num + ' ' + u.street;
   showConfirm({
@@ -2010,7 +2010,7 @@ function archiveUnit(unitId) {
     if(_wlSec && !_wlSec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
       renderWorklist();
     }
-    showToast('Unit archived — all documents preserved');
+    showToast('Unit archived — all documents preserved', {type:'info'});
   });
 }
 
@@ -2018,7 +2018,7 @@ function archiveUnit(unitId) {
 function unarchiveUnit(unitId) {
   var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
-  if(!u) { showToast('Unit not found'); return; }
+  if(!u) { showToast('Unit not found', {type:'error'}); return; }
   var role = window.currentRole || 'staff';
   var addr = u.num + ' ' + u.street;
   showConfirm({
@@ -2047,7 +2047,7 @@ function unarchiveUnit(unitId) {
     if(_wlSec && !_wlSec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
       renderWorklist();
     }
-    showToast(addr + ' restored to active inventory');
+    showToast(addr + ' restored to active inventory', {type:'info'});
   });
 }
 
@@ -2380,7 +2380,7 @@ function _renderNationPositionsBlock(){
 function saveNationPositionLabels(){
   if (typeof APPROVAL_AUTHORITY === 'undefined'
       || !APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
-    showToast('Only the Executive Director can rename positions');
+    showToast('Only the Executive Director can rename positions', {type:'error'});
     return;
   }
   var host = document.getElementById('nation_panel_positions');
@@ -2423,6 +2423,6 @@ function resetNationPositionLabels(){
   host.querySelectorAll('input[data-pos-key]').forEach(function(inp){
     inp.value = '';
   });
-  showToast('Reverted to defaults. Click Save to persist.');
+  showToast('Reverted to defaults. Click Save to persist.', {type:'info'});
 }
 

@@ -300,8 +300,10 @@
       // The control-plane project ref, one click to copy — it's needed for the
       // platform SQL editor, workflow inputs, and function deploys, and was
       // otherwise only findable by dissecting the Supabase URL.
+      // Explicit light styling: the ghost-button classes assume a light card,
+      // so on this dark hero the button rendered black-on-black (invisible).
       +   '<div class="nic-sub" style="margin-top:4px;">Platform project ref: <code id="plat-ref">' + esc(_refFromUrl(window.PLATFORM_SUPABASE_URL || '') || '') + '</code> '
-      +     '<button class="btn sm ghost" type="button" data-act="copy-text" data-copy="' + esc(_refFromUrl(window.PLATFORM_SUPABASE_URL || '') || '') + '" style="padding:2px 10px;font-size:11px;">Copy</button></div>'
+      +     '<button class="btn sm" type="button" data-act="copy-text" data-copy="' + esc(_refFromUrl(window.PLATFORM_SUPABASE_URL || '') || '') + '" style="padding:2px 10px;font-size:11px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:7px;cursor:pointer;">Copy</button></div>'
       + '</div>'
       + '<div class="nic-strip">'
       +   tile('Nations', String(nations.length))

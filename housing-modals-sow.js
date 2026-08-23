@@ -84,7 +84,7 @@ async function handleSowFileUpload(input) {
   var files = Array.from(input.files || []);
   if (!files.length) return;
   if (!_sowUnitId) {
-    showToast('Save the request first or open it on a unit before attaching files.');
+    showToast('Save the request first or open it on a unit before attaching files.', {type:'error'});
     input.value = '';
     return;
   }
@@ -94,7 +94,7 @@ async function handleSowFileUpload(input) {
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     if (queued + f.size > available) {
-      showToast('Skipped "' + f.name + '" — would exceed 50 MB limit.');
+      showToast('Skipped "' + f.name + '" — would exceed 50 MB limit.', {type:'info'});
       continue;
     }
     queued += f.size;
@@ -109,10 +109,10 @@ async function handleSowFileUpload(input) {
       window._sowFiles.push(rec);
     }
     renderSowFiles();
-    showToast('✓ ' + accepted.length + ' file' + (accepted.length > 1 ? 's' : '') + ' attached');
+    showToast('✓ ' + accepted.length + ' file' + (accepted.length > 1 ? 's' : '') + ' attached', {type:'info'});
   } catch (e) {
     console.warn('[SOW FILE] upload failed:', e);
-    showToast('Upload failed: ' + (e.message || 'unknown error'));
+    showToast('Upload failed: ' + (e.message || 'unknown error'), {type:'error'});
   }
   if (zone) zone.classList.remove('is-drag');
   input.value = '';
@@ -136,10 +136,10 @@ async function _sowViewFile(path) {
       ? await sbGetSignedUrl(path)
       : null;
     if (url) { window.open(url, '_blank', 'noopener'); }
-    else { showToast('Could not generate a link for that file.'); }
+    else { showToast('Could not generate a link for that file.', {type:'error'}); }
   } catch(e) {
     console.warn('[SOW FILE] view failed:', e);
-    showToast('Could not open file: ' + (e.message || 'unknown error'));
+    showToast('Could not open file: ' + (e.message || 'unknown error'), {type:'error'});
   }
 }
 // Back-compat alias in case any cached markup still calls the old name.
@@ -1405,7 +1405,7 @@ async function _sowPromptWorkOrderEmail(){
     } else if(sow.contractorId){
       if(typeof notifyWorkOrderToContractor !== 'function' || typeof _resolveContractorForEmail !== 'function') return;
       var ct = await _resolveContractorForEmail(sow.contractorId);
-      if(!ct){ if(typeof showToast === 'function') showToast('Contractor record not found.'); return; }
+      if(!ct){ if(typeof showToast === 'function') showToast('Contractor record not found.', {type:'error'}); return; }
       // Build the recipient list: the company email (default on) plus each Key
       // Contact that has an email on file (default off — the user opts each in).
       var _validEmail = function(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e||'').trim()); };
@@ -1424,7 +1424,7 @@ async function _sowPromptWorkOrderEmail(){
       (ct.people || []).forEach(function(p, i){
         _pushRecip('kc_'+i, p && p.email, (p && p.name) ? (p.name + ' (key contact)') : 'Key contact', false);
       });
-      if(!recips.length){ if(typeof showToast === 'function') showToast('No contractor or key-contact email on file.'); return; }
+      if(!recips.length){ if(typeof showToast === 'function') showToast('No contractor or key-contact email on file.', {type:'error'}); return; }
       var r2 = await showConfirm({
         title:'Email Work Order?',
         message:'Select who should receive this work order (PDF attached):',
@@ -1434,10 +1434,10 @@ async function _sowPromptWorkOrderEmail(){
       if(!r2 || !r2.ok) return;
       var picked = (r2.items) || {};
       var chosen = recips.filter(function(x){ return picked[x.id]; }).map(function(x){ return x.email; });
-      if(!chosen.length){ if(typeof showToast === 'function') showToast('No recipients selected — nothing sent.'); return; }
+      if(!chosen.length){ if(typeof showToast === 'function') showToast('No recipients selected — nothing sent.', {type:'info'}); return; }
       notifyWorkOrderToContractor(sow, unit, ct, chosen);
     } else {
-      if(typeof showToast === 'function') showToast('Assign this request to a contractor or employee to email the work order.');
+      if(typeof showToast === 'function') showToast('Assign this request to a contractor or employee to email the work order.', {type:'info'});
     }
   }catch(e){ console.warn('[sow] work-order email prompt threw:', e); }
 }
@@ -1462,7 +1462,7 @@ async function _sowPromptTenantEmail(){
     if(!unit) return;
     var email = '';
     if(typeof _resolveTenantEmailForUnit === 'function'){ try { email = await _resolveTenantEmailForUnit(unit); } catch(e){ email = ''; } }
-    if(!email){ if(typeof showToast === 'function') showToast('No tenant email on file for this unit.'); return; }
+    if(!email){ if(typeof showToast === 'function') showToast('No tenant email on file for this unit.', {type:'info'}); return; }
     var _esc = escapeHtml; // shared-ui.js (same five-char escape)
     var tenantName = unit.assignedName || 'the tenant';
     var r = await showConfirm({
@@ -1539,7 +1539,7 @@ window._sowSafePreprintSave = _sowSafePreprintSave;
 
 function sowOpenRfq(){
   if(!(_sowUnitId && window._sowEditingProjectNumber)){
-    if(typeof showToast === 'function') showToast('Save the request first');
+    if(typeof showToast === 'function') showToast('Save the request first', {type:'error'});
     return;
   }
   var _existing = (typeof getSowByProjectNumber === 'function')
@@ -1787,7 +1787,7 @@ function sowApproveInline() {
   var role   = window._realRole || window.currentRole || '';
   var canHm  = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role);
   var canEd  = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowOverThreshold', role);
-  if (!canHm && !canEd) { if (typeof showToast === 'function') showToast('You do not have approval authority for this request.'); return; }
+  if (!canHm && !canEd) { if (typeof showToast === 'function') showToast('You do not have approval authority for this request.', {type:'info'}); return; }
 
   var approver = canEd ? 'ed' : 'hm';
   var today    = new Date().toISOString().split('T')[0];
@@ -1947,7 +1947,7 @@ function _wlApproveSow(uid, pn){
         _sowUnitId = _prevUnitId;
       }
     } catch(e){ console.warn('[wlApprove] email fire threw:', e); }
-    if(typeof showToast === 'function') showToast('✓ ' + pn + ' approved');
+    if(typeof showToast === 'function') showToast('✓ ' + pn + ' approved', {type:'info'});
     if(typeof renderWorklist === 'function') renderWorklist();
     if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(uid);
     // Now approved — prompt the next step (issue work order / start RFQ). Only
@@ -1964,11 +1964,11 @@ window._wlApproveSow = _wlApproveSow;
 
 function markSowComplete(){
   if(!_sowUnitId || !window._sowEditingProjectNumber){
-    showToast('Save the request before marking complete.');
+    showToast('Save the request before marking complete.', {type:'error'});
     return;
   }
   if(!canMarkSowComplete()){
-    showToast('Only Housing Manager or Executive Director can mark a request complete.');
+    showToast('Only Housing Manager or Executive Director can mark a request complete.', {type:'info'});
     return;
   }
   var pn = window._sowEditingProjectNumber;
@@ -1979,7 +1979,7 @@ function markSowComplete(){
   }).then(function(ok){
     if (!ok) return;
     var sow = getSowByProjectNumber(_sowUnitId, pn);
-    if(!sow){ showToast('Request not found'); return; }
+    if(!sow){ showToast('Request not found', {type:'error'}); return; }
     sow.approval_status = 'completed';
     sow.completed_at = new Date().toISOString();
     sow.completed_by = window.currentUserName || _realRoleForPermissions();
@@ -1996,7 +1996,7 @@ function markSowComplete(){
         auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+(_u.status||'updated')+' (SOW '+pn+' completed, no active SOWs remain)', _realRoleForPermissions());
       }
     } catch(e){ console.warn('[SOW] complete-revert threw:', e); }
-    showToast('✓ Request marked Completed');
+    showToast('✓ Request marked Completed', {type:'info'});
     _applySowModalLock(sow);
     // Optional completion note on the tenant file (outcome / follow-up).
     try {
@@ -2018,7 +2018,7 @@ function markSowComplete(){
 function reopenSow(){
   if(!_sowUnitId || !window._sowEditingProjectNumber) return;
   if(!canReopenSow()){
-    showToast('Only the Executive Director can reopen a completed or cancelled request.');
+    showToast('Only the Executive Director can reopen a completed or cancelled request.', {type:'error'});
     return;
   }
   var pn = window._sowEditingProjectNumber;
@@ -2032,7 +2032,7 @@ function reopenSow(){
   }).then(function(ok){
     if (!ok) return;
     var sow = getSowByProjectNumber(_sowUnitId, pn);
-    if(!sow){ showToast('Request not found'); return; }
+    if(!sow){ showToast('Request not found', {type:'error'}); return; }
     // Clear a cancelled state on reopen (un-cancel).
     if(sow.cancelled){ sow.cancelled = false; sow.cancelled_at = null; sow.cancelled_by = null; }
     if(sow.edName && sow.edDate) sow.approval_status = 'ed_approved';
@@ -2046,7 +2046,7 @@ function reopenSow(){
     auditEntry('SOW:'+_sowUnitId, 'sow_reopened', 'SOW '+pn+(_wasCancelled?' un-cancelled and reopened':' reopened for editing'), _realRoleForPermissions());
     if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
     if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(_sowUnitId);
-    showToast(_wasCancelled ? 'Request reopened (un-cancelled)' : 'Request reopened');
+    showToast(_wasCancelled ? 'Request reopened (un-cancelled)' : 'Request reopened', {type:'info'});
     _applySowModalLock(sow);
   });
 }
@@ -2134,7 +2134,7 @@ function cancelSow(){
       }).catch(function(e){ console.warn('[SOW] cancel notify failed:', e); });
     }
 
-    showToast('✖ Request ' + pn + ' cancelled' + (doNotify ? ' — contractor notified' : ''));
+    showToast('✖ Request ' + pn + ' cancelled' + (doNotify ? ' — contractor notified' : ''), {type:'info'});
     _applySowModalLock(sow);
     if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
     if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(_sowUnitId);
@@ -2303,9 +2303,9 @@ window.udpArchiveSow = function(unitId, projectNumber){
   }).then(function(ok){
     if(!ok) return;
     var role = window.currentRole || 'staff';
-    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.'); return; }
+    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.', {type:'error'}); return; }
     var sow = archiveSow(unitId, projectNumber, role);
-    if(!sow){ showToast('Request not found'); return; }
+    if(!sow){ showToast('Request not found', {type:'error'}); return; }
     auditEntry('SOW:'+unitId, 'sow_archived', 'SOW '+projectNumber+' archived', role);
     // If archiving emptied the active-SOW set on this unit, revert the
     // unit's status back to its prior state.
@@ -2319,17 +2319,17 @@ window.udpArchiveSow = function(unitId, projectNumber){
       }
     } catch(e){ console.warn('[SOW archive] revert threw:', e); }
     udpRenderSowTable(unitId);
-    showToast('✓ Request '+projectNumber+' archived');
+    showToast('✓ Request '+projectNumber+' archived', {type:'info'});
   });
 };
 window.udpUnarchiveSow = function(unitId, projectNumber){
   if(!unitId || !projectNumber) return;
-  if(typeof unarchiveSow !== 'function'){ showToast('Unarchive helper missing.'); return; }
+  if(typeof unarchiveSow !== 'function'){ showToast('Unarchive helper missing.', {type:'error'}); return; }
   var sow = unarchiveSow(unitId, projectNumber);
-  if(!sow){ showToast('Request not found'); return; }
+  if(!sow){ showToast('Request not found', {type:'error'}); return; }
   auditEntry('SOW:'+unitId, 'sow_unarchived', 'SOW '+projectNumber+' restored', window.currentRole || 'staff');
   udpRenderSowTable(unitId);
-  showToast('✓ Request '+projectNumber+' restored');
+  showToast('✓ Request '+projectNumber+' restored', {type:'info'});
 };
 
 // archiveCurrentSow — invoked by the 🗄 Archive button in the SOW modal
@@ -2340,7 +2340,7 @@ window.udpUnarchiveSow = function(unitId, projectNumber){
 window.archiveCurrentSow = function(){
   var unitId = _sowUnitId;
   var projectNumber = window._sowEditingProjectNumber;
-  if(!unitId || !projectNumber){ showToast('No request to archive.'); return; }
+  if(!unitId || !projectNumber){ showToast('No request to archive.', {type:'info'}); return; }
   // Permission: anyone with the SOW modal open can archive an initiated SOW.
   // The audit-log entry below records who archived it for accountability.
   var role = window.currentRole || 'staff';
@@ -2350,9 +2350,9 @@ window.archiveCurrentSow = function(){
     confirmText: 'Archive'
   }).then(function(ok){
     if(!ok) return;
-    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.'); return; }
+    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.', {type:'error'}); return; }
     var sow = archiveSow(unitId, projectNumber, role);
-    if(!sow){ showToast('Request not found'); return; }
+    if(!sow){ showToast('Request not found', {type:'error'}); return; }
     auditEntry('SOW:'+unitId, 'sow_archived', 'SOW '+projectNumber+' archived from SOW modal', role);
     // If this was the last active SOW, revert the unit's status.
     try {
@@ -2365,7 +2365,7 @@ window.archiveCurrentSow = function(){
       }
     } catch(e){ console.warn('[SOW archive modal] revert threw:', e); }
     closeSowModal();
-    showToast('✓ Request '+projectNumber+' archived');
+    showToast('✓ Request '+projectNumber+' archived', {type:'info'});
     // Refresh whichever upstream view is in the DOM.
     if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
     if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(unitId);
@@ -2391,7 +2391,7 @@ function udpOpenSowDocument(unitId, projectNumber){
   // Opens the full SOW as a print-ready document (same as "Full SOW" button inside the modal).
   // Loads the SOW into the modal first so printSOW() has the right data, then triggers print.
   var sow = getSowByProjectNumber(unitId, projectNumber);
-  if(!sow){ showToast('Request not found'); return; }
+  if(!sow){ showToast('Request not found', {type:'error'}); return; }
   closeUnitEditModal({handoff:true});
   openSowModal(unitId, projectNumber);
   // Give the modal a tick to populate before printing.
@@ -2402,7 +2402,7 @@ function udpPrintWorkOrder(unitId, projectNumber){
   // Prints a work order for the specific SOW. Loads the SOW into the modal briefly so
   // the existing printWorkOrder() (which reads from modal state) produces the right output.
   var sow = getSowByProjectNumber(unitId, projectNumber);
-  if(!sow){ showToast('Request not found'); return; }
+  if(!sow){ showToast('Request not found', {type:'error'}); return; }
   closeUnitEditModal({handoff:true});
   openSowModal(unitId, projectNumber);
   setTimeout(function(){ if(true) printWorkOrder(); }, 250);
@@ -3468,7 +3468,7 @@ function _sowPayUseMrTotal(){
 }
 function _sowPaySetupSchedule(){
   var st = window._sowPayState; if(!st) return;
-  if(st.draws && st.draws.length){ if(typeof showToast==='function') showToast('A schedule already exists.'); return; }
+  if(st.draws && st.draws.length){ if(typeof showToast==='function') showToast('A schedule already exists.', {type:'info'}); return; }
   if(!st.po || _sowPayNum(st.po.amount) <= 0){ if(typeof showToast==='function') showToast('Enter the PO total first.', {type:'error'}); return; }
   st.draws = _sowPayStandardSchedule();
   _sowRenderPayments();
@@ -3525,7 +3525,7 @@ async function _sowUploadDrawInvoice(id, input){
   var file = input && input.files && input.files[0];
   if(!file) return;
   if(!(window._sowWasPreviouslySaved && _sowUnitId && window._sowEditingProjectNumber)){
-    if(typeof showToast==='function') showToast('Save the request first, then attach invoices.');
+    if(typeof showToast==='function') showToast('Save the request first, then attach invoices.', {type:'error'});
     input.value = '';
     return;
   }
@@ -3534,7 +3534,7 @@ async function _sowUploadDrawInvoice(id, input){
   if(!d){ input.value=''; return; }
   var safe = file.name.replace(/[^A-Za-z0-9._-]/g,'_');
   var path = 'sow/' + _sowUnitId + '/' + window._sowEditingProjectNumber + '/payments/' + id + '_' + safe;
-  if(typeof showToast==='function') showToast('Uploading invoice…');
+  if(typeof showToast==='function') showToast('Uploading invoice…', {type:'info'});
   try{
     await sbUploadFile(path, file);
     if(typeof sbSaveFileMeta === 'function'){
@@ -3542,7 +3542,7 @@ async function _sowUploadDrawInvoice(id, input){
     }
     d.invoice = { path:path, name:file.name };
     _sowPersistPayments();     // persist immediately so the file can't be orphaned
-    if(typeof showToast==='function') showToast('✓ Invoice attached');
+    if(typeof showToast==='function') showToast('✓ Invoice attached', {type:'info'});
     _sowRenderPayments();
   }catch(e){
     console.warn('[SOW pay] invoice upload failed:', e);

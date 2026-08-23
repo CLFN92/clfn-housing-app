@@ -33,7 +33,9 @@
         || window.HLH_LOGO_DATA_URL || window.CLFN_LOGO_DATA_URL || '';
   }
   function isAdmin() { var r = window.currentRole || ''; return r === 'ed' || r === 'super_user'; }
-  function toast(m, o) { if (typeof showToast === 'function') showToast(m, o); }
+  // Default untyped calls to 'info' so confirmations are visible; callers
+  // passing {type:'error'} keep their type.
+  function toast(m, o) { if (typeof showToast === 'function') showToast(m, (o && o.type) ? o : Object.assign({type:'info'}, o || {})); }
 
   // QR payload for a unit: <qr_base or portal base, scheme-stripped>/u/<slug|id>.
   function qrBase() {

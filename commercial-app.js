@@ -247,7 +247,7 @@ function _caPersist(app, okMsg, auditAction){
     if (typeof auditEntry === 'function') {
       auditEntry(app.id, auditAction, (app.classification || 'Commercial') + ' — ' + (app.orgName||'') + ' (' + _caStatusLabel(app.status) + ')', window.currentRole || 'staff');
     }
-    if (typeof showToast === 'function') showToast('✓ ' + okMsg);
+    if (typeof showToast === 'function') showToast('✓ ' + okMsg, {type:'info'});
     closeCommercialApp();
     if (typeof renderApplications === 'function') renderApplications();
     if (typeof renderWorklist === 'function') renderWorklist();

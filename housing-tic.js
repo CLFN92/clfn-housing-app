@@ -1002,16 +1002,16 @@
     if (!name) return;
     if (typeof bcrLookup === 'function' && bcrLookup(name)) return; // already on the list
     if (typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageBcr', window.currentRole)) {
-      if (typeof showToast === 'function') showToast(name + ' is marked Banished — ask a Housing Manager or ED to add them to the BCR list so eligibility checks pick it up.');
+      if (typeof showToast === 'function') showToast(name + ' is marked Banished — ask a Housing Manager or ED to add them to the BCR list so eligibility checks pick it up.', {type:'error'});
       return;
     }
-    if (typeof showToast === 'function') showToast('Add ' + name + ' to the BCR (banishment) list to keep eligibility checks in sync.');
+    if (typeof showToast === 'function') showToast('Add ' + name + ' to the BCR (banishment) list to keep eligibility checks in sync.', {type:'info'});
     if (typeof openBcrManager === 'function') openBcrManager(name);
   }
 
   function _ticToggleHomeCare(){
     if(_ticReadOnlyRole()){
-      if(typeof showToast === 'function') showToast('Read-only access — editing tenant details is disabled for your role.');
+      if(typeof showToast === 'function') showToast('Read-only access — editing tenant details is disabled for your role.', {type:'error'});
       return;
     }
     var t  = _ticState.tenant;
@@ -1023,7 +1023,7 @@
         _ticState.tenant = (rows && rows[0]) || Object.assign({}, t, { home_care: newVal });
         _ticRenderStrip();
         _ticAudit('tic_overview_change', (newVal ? 'Flagged' : 'Removed') + ' Home & Community Care');
-        if (typeof showToast === 'function') showToast(newVal ? 'Flagged as Home & Community Care.' : 'H&CC flag removed.');
+        if (typeof showToast === 'function') showToast(newVal ? 'Flagged as Home & Community Care.' : 'H&CC flag removed.', {type:'info'});
       })
       .catch(function(err){
         if (typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
@@ -1035,7 +1035,7 @@
     var inp = ev.target;
     if(!inp || !inp.getAttribute) return;
     if(_ticReadOnlyRole()){
-      if(typeof showToast === 'function') showToast('Read-only access — editing tenant details is disabled for your role.');
+      if(typeof showToast === 'function') showToast('Read-only access — editing tenant details is disabled for your role.', {type:'error'});
       return;
     }
     // Income Type change → toggle Employer field visibility (no save fires).
@@ -1148,7 +1148,7 @@
       .then(function(){
         _ticRenderOverview();
         _ticAudit(auditAction, auditDetail);
-        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Income record updated.' : 'Income record added.');
+        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Income record updated.' : 'Income record added.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
@@ -1166,7 +1166,7 @@
       .then(function(){
         _ticRenderOverview();
         _ticAudit('tic_income_delete', detail);
-        if(typeof showToast === 'function') showToast('Income record removed.');
+        if(typeof showToast === 'function') showToast('Income record removed.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Delete failed: ' + err.message, { type:'error' });
@@ -1394,7 +1394,7 @@
       .then(function(){
         _ticRenderOccupants();
         _ticAudit(auditAction, auditDetail);
-        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Household member updated.' : 'Household member added.');
+        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Household member updated.' : 'Household member added.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
@@ -1412,7 +1412,7 @@
       .then(function(){
         _ticRenderOccupants();
         _ticAudit('tic_habitant_delete', detail);
-        if(typeof showToast === 'function') showToast('Household member removed.');
+        if(typeof showToast === 'function') showToast('Household member removed.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Delete failed: ' + err.message, { type:'error' });
@@ -1595,7 +1595,7 @@
       .then(function(){
         _ticRenderReferences();
         _ticAudit(auditAction, auditDetail);
-        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Emergency contact updated.' : 'Emergency contact added.');
+        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Emergency contact updated.' : 'Emergency contact added.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
@@ -1613,7 +1613,7 @@
       .then(function(){
         _ticRenderReferences();
         _ticAudit('tic_reference_delete', detail);
-        if(typeof showToast === 'function') showToast('Emergency contact removed.');
+        if(typeof showToast === 'function') showToast('Emergency contact removed.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Delete failed: ' + err.message, { type:'error' });
@@ -1700,7 +1700,7 @@
       .then(function(){
         _ticRenderPets();
         _ticAudit('tic_pet_delete', detail);
-        if(typeof showToast === 'function') showToast('Pet removed.');
+        if(typeof showToast === 'function') showToast('Pet removed.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Delete failed: ' + err.message, { type:'error' });
@@ -1849,7 +1849,7 @@
         // Prevent deletion of application-sourced docs from within the TIC
         customDelete: async function(file) {
           if (file && file.source === 'application') {
-            if (typeof showToast === 'function') showToast('This document belongs to the application — manage it from the application form');
+            if (typeof showToast === 'function') showToast('This document belongs to the application — manage it from the application form', {type:'info'});
             return;
           }
           // Standard delete for tenant-owned docs
@@ -2010,7 +2010,7 @@
       .then(function(){
         _ticRenderPets();
         _ticAudit(auditAction, auditDetail);
-        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Pet updated.' : 'Pet added.');
+        if(typeof showToast === 'function') showToast(mode === 'edit' ? 'Pet updated.' : 'Pet added.', {type:'info'});
       })
       .catch(function(err){
         if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
@@ -2073,7 +2073,7 @@
         if(inp) inp.value = '';
         if(typeof _ticRenderHero === 'function') _ticRenderHero();  // refresh last-note badge
         _ticAudit('tic_note_add', 'Added note (' + body.length + ' chars)');
-        if(typeof showToast === 'function') showToast('Note added.');
+        if(typeof showToast === 'function') showToast('Note added.', {type:'info'});
       });
     })
     .catch(function(err){
@@ -2246,7 +2246,7 @@
     if(t.id === 'tic_act_view_app'){
       _ticFindApplicationForTenant().then(function(appId){
         if(!appId){
-          if(typeof showToast === 'function') showToast('No application found for this tenant.');
+          if(typeof showToast === 'function') showToast('No application found for this tenant.', {type:'error'});
           return;
         }
         _ticGoToApplication(appId);
@@ -2256,7 +2256,7 @@
     if(t.id === 'tic_act_view_unit'){
       var vuUnitId = _ticAssignedUnitId();
       if(!vuUnitId){
-        if(typeof showToast === 'function') showToast('No unit assigned to this tenant.');
+        if(typeof showToast === 'function') showToast('No unit assigned to this tenant.', {type:'error'});
         return;
       }
       _ticClose();
@@ -2266,7 +2266,7 @@
     if(t.id === 'tic_act_new_wo'){
       var unitId = (_ticState.tenant && _ticState.tenant.unit_id) || (_ticState.unit && _ticState.unit.id);
       if(!unitId){
-        if(typeof showToast === 'function') showToast('No unit linked to this tenant.');
+        if(typeof showToast === 'function') showToast('No unit linked to this tenant.', {type:'error'});
         return;
       }
       _ticClose();
@@ -2274,7 +2274,7 @@
         window._sowForceNew = true;   // "New Work Order" always starts a fresh request
         openSowModal(unitId);
       } else {
-        if(typeof showToast === 'function') showToast('Work order module not loaded on this page.');
+        if(typeof showToast === 'function') showToast('Work order module not loaded on this page.', {type:'info'});
       }
       return;
     }
@@ -2283,7 +2283,7 @@
       if(ticTid){
         window.location.href = 'finance.html?fic=' + encodeURIComponent(ticTid);
       } else {
-        if(typeof showToast === 'function') showToast('No tenant linked.');
+        if(typeof showToast === 'function') showToast('No tenant linked.', {type:'info'});
       }
       return;
     }
@@ -2292,12 +2292,12 @@
       if(finTid){
         window.location.href = 'finance.html?fic=' + encodeURIComponent(finTid);
       } else {
-        if(typeof showToast === 'function') showToast('No tenant linked.');
+        if(typeof showToast === 'function') showToast('No tenant linked.', {type:'info'});
       }
       return;
     }
     if(t.id === 'tic_act_letter'){
-      if(typeof showToast === 'function') showToast('Generate letter — coming soon.');
+      if(typeof showToast === 'function') showToast('Generate letter — coming soon.', {type:'info'});
       return;
     }
     if(t.id === 'tic_act_invite'){
@@ -2307,11 +2307,11 @@
       var iName  = (iApp && ((iApp.fn||'') + ' ' + (iApp.ln||'')).trim()) || iTn.full_name || iTn.name || 'this applicant';
       var iAppId = (iApp && iApp.id) || '';
       if(typeof inviteApplicantToPortal === 'function') inviteApplicantToPortal(iEmail, iName, iAppId);
-      else if(typeof showToast === 'function') showToast('Invite is not available on this page.');
+      else if(typeof showToast === 'function') showToast('Invite is not available on this page.', {type:'error'});
       return;
     }
     if(t.id === 'tic_act_flag'){
-      if(typeof showToast === 'function') showToast('Flag for review — coming soon.');
+      if(typeof showToast === 'function') showToast('Flag for review — coming soon.', {type:'info'});
       return;
     }
   }
@@ -3306,7 +3306,7 @@
       if (!_go) return;
     }
 
-    if (typeof showToast === 'function') showToast('Saving changes and generating PDF...');
+    if (typeof showToast === 'function') showToast('Saving changes and generating PDF...', {type:'info'});
 
     try { await _ticLeaseSaveChanges(); } catch(e) { console.warn('[lease] save-back failed:', e); }
 
@@ -3497,18 +3497,18 @@
         if (mo) mo.remove();
         if (typeof showToast === 'function') showToast(_leaseQueued
           ? 'Agreement saved on this device — it will upload to the document library when you are back online.'
-          : 'Occupancy Agreement saved to document library');
+          : 'Occupancy Agreement saved to document library', {type:'info'});
         return;
       } catch(e) {
         console.error('[lease] jsPDF generation failed:', e);
-        if (typeof showToast === 'function') showToast('PDF generation failed — see console');
+        if (typeof showToast === 'function') showToast('PDF generation failed — see console', {type:'error'});
         return;
       }
     }
 
     // ── AcroForm fallback — used when no contract body has been saved ──────
     try { await _loadPdfLib(); } catch(e) {
-      if (typeof showToast==='function') showToast('PDF library unavailable'); return;
+      if (typeof showToast==='function') showToast('PDF library unavailable', {type:'error'}); return;
     }
 
     var fieldValues = {
@@ -3682,11 +3682,11 @@
 
       var mo = document.getElementById('tic_lease_modal');
       if (mo) mo.remove();
-      if (typeof showToast === 'function') showToast('Occupancy Agreement saved to document library');
+      if (typeof showToast === 'function') showToast('Occupancy Agreement saved to document library', {type:'info'});
 
     } catch(e) {
       console.error('[lease] PDF generation failed:', e);
-      if (typeof showToast === 'function') showToast('PDF generation failed — see console');
+      if (typeof showToast === 'function') showToast('PDF generation failed — see console', {type:'error'});
     }
   }
   // ── Hydro One Consent for Disclosure — pre-generation modal ───────────────
@@ -3813,7 +3813,7 @@
   //   • Part C: clean two-column blocks — no stray "Hydro"/"One" inline text
   async function _ticGenerateHydroOneConsentPdf() {
     if (typeof _loadJsPdf === 'function') await _loadJsPdf();
-    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable', {type:'error'}); return; }
 
     var fv = function(id) { var e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
     var fc = function(id) { var e = document.getElementById(id); return e ? e.checked : false; };
@@ -3836,7 +3836,7 @@
     ['ho_acct', 'ho_meter'].forEach(clearRequired);
     if (missing.length) {
       missing.forEach(markRequired);
-      if (typeof showToast === 'function') showToast('Bill Account # and Meter # are required');
+      if (typeof showToast === 'function') showToast('Bill Account # and Meter # are required', {type:'error'});
       return;
     }
 
@@ -4123,17 +4123,17 @@
         // Close the modal now that the PDF is done
         var mo = document.getElementById('tic_hydroone_modal');
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('✓ PDF saved to document library');
+        if (typeof showToast === 'function') showToast('✓ PDF saved to document library', {type:'info'});
       } catch (e) {
         console.warn('[tic] PDF upload to doc library failed:', e);
         var mo2 = document.getElementById('tic_hydroone_modal');
         if (mo2) mo2.remove();
-        if (typeof showToast === 'function') showToast('✓ PDF downloaded (document library save failed — see console)');
+        if (typeof showToast === 'function') showToast('✓ PDF downloaded (document library save failed — see console)', {type:'error'});
       }
     } else {
       var mo3 = document.getElementById('tic_hydroone_modal');
       if (mo3) mo3.remove();
-      if (typeof showToast === 'function') showToast('✓ PDF generated');
+      if (typeof showToast === 'function') showToast('✓ PDF generated', {type:'info'});
     }
   }
 
@@ -4251,7 +4251,7 @@
 
   async function _ticGenerateInspectionNoticePdf() {
     if (typeof _loadJsPdf === 'function') await _loadJsPdf();
-    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable', {type:'error'}); return; }
 
     var fv = function(id) { var e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
     function markRequired(id, on) { var e = document.getElementById(id); if (e) e.style.borderColor = on ? 'var(--danger)' : ''; }
@@ -4279,7 +4279,7 @@
     if (missing.length) {
       missing.forEach(function(id){ markRequired(id, true); });
       var f = document.getElementById(missing[0]); if (f) f.focus();
-      if (typeof showToast === 'function') showToast('Date served, purpose, and Housing Manager are required');
+      if (typeof showToast === 'function') showToast('Date served, purpose, and Housing Manager are required', {type:'error'});
       return;
     }
 
@@ -4289,7 +4289,7 @@
     var letterLong  = _inspFmtDateLong(letterYmd) || _inspFmtDateLong(new Date().toISOString().split('T')[0]);
 
     var logo = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
-    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable'); return; }
+    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable', {type:'error'}); return; }
     var ctx = _makePdfDoc({
       headerTitle:    'Notice of Inspection',
       headerSubtitle: "48 Hours' Notice",
@@ -4430,15 +4430,15 @@
         }
         _ticDocLibKey = null; _ticDocLib = null; // force doc-lib remount so it appears
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('✓ Notice saved to document library');
+        if (typeof showToast === 'function') showToast('✓ Notice saved to document library', {type:'info'});
       } catch (e) {
         console.warn('[tic] inspection notice upload failed:', e);
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('✓ Notice downloaded (document library save failed — see console)');
+        if (typeof showToast === 'function') showToast('✓ Notice downloaded (document library save failed — see console)', {type:'error'});
       }
     } else {
       if (mo) mo.remove();
-      if (typeof showToast === 'function') showToast('✓ Notice generated');
+      if (typeof showToast === 'function') showToast('✓ Notice generated', {type:'info'});
     }
   }
 
@@ -4518,7 +4518,7 @@
   }
 
   function _ticOpenEvictionNoticeModal(kind) {
-    if (!_ticCanEvict()) { if (typeof showToast === 'function') showToast('Eviction notices are restricted to the Housing Manager or Executive Director'); return; }
+    if (!_ticCanEvict()) { if (typeof showToast === 'function') showToast('Eviction notices are restricted to the Housing Manager or Executive Director', {type:'info'}); return; }
     var immediate = (kind === 'immediate');
     var k = immediate ? 'immediate' : 'standard';
 
@@ -4637,10 +4637,10 @@
   }
 
   async function _ticGenerateEvictionNoticePdf(kind) {
-    if (!_ticCanEvict()) { if (typeof showToast === 'function') showToast('Eviction notices are restricted to the Housing Manager or Executive Director'); return; }
+    if (!_ticCanEvict()) { if (typeof showToast === 'function') showToast('Eviction notices are restricted to the Housing Manager or Executive Director', {type:'info'}); return; }
     var immediate = (kind === 'immediate');
     if (typeof _loadJsPdf === 'function') await _loadJsPdf();
-    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable', {type:'error'}); return; }
 
     var fv = function(id) { var e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
     function markRequired(id, on) { var e = document.getElementById(id); if (e) e.style.borderColor = on ? 'var(--danger)' : ''; }
@@ -4680,7 +4680,7 @@
       if (typeof showToast === 'function') {
         showToast(immediate
           ? 'Tenant, Housing Manager, ED name, ED approval date, and vacate date/time are required'
-          : 'Tenant, Housing Manager, and response deadline are required');
+          : 'Tenant, Housing Manager, and response deadline are required', {type:'error'});
       }
       return;
     }
@@ -4695,7 +4695,7 @@
     var vacateLong = immediate ? vacate : _inspFmtDateLong(vacate); // immediate vacate is free-text date+time
 
     var logo = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
-    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable'); return; }
+    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable', {type:'error'}); return; }
     var ctx = _makePdfDoc({
       headerTitle:    immediate ? 'Notice of Immediate Eviction' : 'Notice of Eviction',
       headerSubtitle: immediate ? 'Housing Policy s. 26.3' : 'Housing Policy s. 26.2',
@@ -4808,15 +4808,15 @@
         }
         _ticDocLibKey = null; _ticDocLib = null; // force doc-lib remount so it appears
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('✓ Eviction notice saved to document library');
+        if (typeof showToast === 'function') showToast('✓ Eviction notice saved to document library', {type:'info'});
       } catch (e) {
         console.warn('[tic] eviction notice upload failed:', e);
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('✓ Notice downloaded (document library save failed — see console)');
+        if (typeof showToast === 'function') showToast('✓ Notice downloaded (document library save failed — see console)', {type:'error'});
       }
     } else {
       if (mo) mo.remove();
-      if (typeof showToast === 'function') showToast('✓ Eviction notice generated');
+      if (typeof showToast === 'function') showToast('✓ Eviction notice generated', {type:'info'});
     }
   }
 
@@ -4943,8 +4943,8 @@
 
   async function _ticGenerateReplacementLeasePdf() {
     if (typeof _loadJsPdf === 'function') await _loadJsPdf();
-    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
-    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable'); return; }
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable', {type:'error'}); return; }
+    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable', {type:'error'}); return; }
 
     var fv = function(id){ var e = document.getElementById(id); return e ? (e.value||'').trim() : ''; };
     var sigVal = function(id){ return (typeof getSigDataURL === 'function') ? getSigDataURL(id) : ''; };
@@ -5252,15 +5252,15 @@
         }
         _ticDocLibKey = null; _ticDocLib = null;
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('✓ Replacement lease saved to document library');
+        if (typeof showToast === 'function') showToast('✓ Replacement lease saved to document library', {type:'info'});
       } catch (e) {
         console.warn('[tic] replacement lease upload failed:', e);
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('✓ Lease downloaded (document library save failed — see console)');
+        if (typeof showToast === 'function') showToast('✓ Lease downloaded (document library save failed — see console)', {type:'error'});
       }
     } else {
       if (mo) mo.remove();
-      if (typeof showToast === 'function') showToast('✓ Replacement lease generated');
+      if (typeof showToast === 'function') showToast('✓ Replacement lease generated', {type:'info'});
     }
   }
   window._ticGenerateReplacementLeasePdf = _ticGenerateReplacementLeasePdf;
@@ -5597,7 +5597,7 @@
       if(typeof _ticAudit === 'function')
         _ticAudit('unit_location_set', 'Set GPS coordinates' + (photoPath ? ' and house photo' : '') + ' for unit');
 
-      if(typeof showToast === 'function') showToast('Location saved.');
+      if(typeof showToast === 'function') showToast('Location saved.', {type:'info'});
       _slpClose();
       _ticRenderOverview();
 

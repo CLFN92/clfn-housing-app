@@ -438,6 +438,6 @@
     var ns = (typeof nationShort==='function')? nationShort() : 'Housing';
     var fname = ns+'_Project_Schedule_'+_psFmt(_psToday());
     if(typeof _doExport === 'function'){ _doExport(format, headers, data, fname, [16,26,22,14,12,12,10,10], true); }
-    else if(typeof showToast==='function'){ showToast('Export unavailable on this page.'); }
+    else if(typeof showToast==='function'){ showToast('Export unavailable on this page.', {type:'error'}); }
   };
 })();

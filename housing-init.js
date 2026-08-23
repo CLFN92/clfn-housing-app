@@ -287,7 +287,7 @@ function handleAddUnitPhotoUpload(input) {
 // and append the returned path to the unit's photo list (which persists across sessions).
 async function handleEditUnitPhotoUpload(input) {
   var unitId = window._editingUnitId;
-  if (!unitId) { showToast('No unit being edited'); return; }
+  if (!unitId) { showToast('No unit being edited', {type:'error'}); return; }
   var files = Array.from(input.files || []).filter(function(f){ return f.type && f.type.startsWith('image/'); });
   if (!files.length) { input.value = ''; return; }
   var zone = document.getElementById('ue_drop_zone');
@@ -300,10 +300,10 @@ async function handleEditUnitPhotoUpload(input) {
     }
     saveUnitPhotos(unitId, existing);
     renderEditUnitPhotoPreview(unitId);
-    showToast('✓ ' + files.length + ' photo' + (files.length > 1 ? 's' : '') + ' uploaded');
+    showToast('✓ ' + files.length + ' photo' + (files.length > 1 ? 's' : '') + ' uploaded', {type:'info'});
   } catch (e) {
     console.warn('[EDIT UNIT PHOTO] upload failed:', e);
-    showToast('Photo upload failed: ' + (e.message || 'unknown error'));
+    showToast('Photo upload failed: ' + (e.message || 'unknown error'), {type:'error'});
   }
   if (zone) zone.style.borderColor = 'var(--border)';
   input.value = '';
@@ -704,7 +704,7 @@ function openAssignModal(appId, suggestedUnitId) {
   var allApps  = (typeof applications !== 'undefined' ? applications : []);
   var allUnits = getAllUnits().slice();
   var app = allApps.find(function(a){ return a.id===appId; });
-  if(!app){ showToast('Application not found'); return; }
+  if(!app){ showToast('Application not found', {type:'error'}); return; }
   var role = window.currentRole || 'housing_employee_l1';
 
   // Primary pool: vacant units that are NOT secondary-eligible (band/ISC/CMHC housing)
@@ -1016,8 +1016,8 @@ function closeAssignModal() {
 function confirmAssignment() {
   var unitId = _amSelectedUnitId;
   var moveIn = (document.getElementById('am_movein_date')||{}).value||'';
-  if(!unitId){ showToast('Please select a unit'); return; }
-  if(!_amAppId){ showToast('No application selected'); return; }
+  if(!unitId){ showToast('Please select a unit', {type:'error'}); return; }
+  if(!_amAppId){ showToast('No application selected', {type:'error'}); return; }
 
   var role = window.currentRole||'staff';
   var isTopRec = _amAllScored.length>0 && _amAllScored[0].unit.id===unitId;
@@ -1054,7 +1054,7 @@ function confirmAssignment() {
   var overrideNotes = ((document.getElementById('am_override_notes')||{}).value||'').trim();
   var needsNotes = !isSecondary2 && ((canAssignTie2 && !canOverride2 && isTied2) || isEdOverride2);
   if(needsNotes && !overrideNotes){
-    showToast((canAssignTie2 && !canOverride2) ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection');
+    showToast((canAssignTie2 && !canOverride2) ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection', {type:'error'});
     var notesEl = document.getElementById('am_override_notes');
     if(notesEl) notesEl.focus();
     return;
@@ -1065,8 +1065,8 @@ function confirmAssignment() {
 
   var appIdx=allApps.findIndex(function(a){return a.id===_amAppId;});
   var unitIdx=allUnits.findIndex(function(u){return u.id===unitId;});
-  if(appIdx<0){showToast('Application not found');return;}
-  if(unitIdx<0){showToast('Unit not found');return;}
+  if(appIdx<0){showToast('Application not found', {type:'error'});return;}
+  if(unitIdx<0){showToast('Unit not found', {type:'error'});return;}
 
   var app=allApps[appIdx]; var u=allUnits[unitIdx];
   var name=((app.fn||'')+' '+(app.ln||'')).trim();
@@ -1082,7 +1082,7 @@ function confirmAssignment() {
   if (!_isSecondaryEligibleUnit(u)) {
     var _caNeedsBeds = Math.max(1, 1 + (app.coApp?1:0) + ((app.habitants||[]).length));
     if (_isOversizedUnit(u, _caNeedsBeds) && !canOverride2) {
-      showToast('This unit is 2+ bedrooms larger than the applicant needs — Executive Director approval required');
+      showToast('This unit is 2+ bedrooms larger than the applicant needs — Executive Director approval required', {type:'error'});
       return;
     }
   }
@@ -1095,7 +1095,7 @@ function confirmAssignment() {
                  app.status === APP_STATUS.HM_APPROVED  ||
                  app.status === 'assigned';
     if (!_secOk) {
-      showToast('Application must be approved or assigned before adding a secondary unit');
+      showToast('Application must be approved or assigned before adding a secondary unit', {type:'error'});
       return;
     }
     // Write unit — do NOT change the unit's status
@@ -1125,7 +1125,7 @@ function confirmAssignment() {
     if(typeof renderDashTable === 'function') renderDashTable();
     if(typeof updateDashStats === 'function') updateDashStats();
     if(typeof renderWorklist  === 'function') renderWorklist();
-    showToast('✓ '+name+' — secondary unit '+addr+' assigned');
+    showToast('✓ '+name+' — secondary unit '+addr+' assigned', {type:'info'});
     return;
   }
 
@@ -1138,7 +1138,7 @@ function confirmAssignment() {
   var _as = (typeof appAssignabilityStatus === 'function')
     ? appAssignabilityStatus(app)
     : { ok: (app.status === APP_STATUS.ED_APPROVED || app.status === APP_STATUS.MGR_APPROVED || app.status === APP_STATUS.HM_APPROVED), reason:'Approval required before assigning' };
-  if(!_as.ok){ showToast(_as.reason); return; }
+  if(!_as.ok){ showToast(_as.reason, {type:'info'}); return; }
 
   // Write unit
   var isTransferReq = (app.appType === 'transfer_request');
@@ -1183,7 +1183,7 @@ function confirmAssignment() {
   // no longer surfaces in the assignment queue. Without this call the row
   // lingered until the next manual page reload.
   if(typeof renderWorklist === 'function') renderWorklist();
-  showToast('✓ '+name+' assigned to '+addr+(isEdOverride2?' (override)':''));
+  showToast('✓ '+name+' assigned to '+addr+(isEdOverride2?' (override)':''), {type:'info'});
 
   // Hand-off: the tenant is now housed -> offer to generate the occupancy
   // agreement right away. Opening their TIC with the _ticAutoLease flag set
@@ -1388,16 +1388,16 @@ async function submitAddHousingStaff() {
   var btn   = document.getElementById('hs-submit-btn');
   var res   = document.getElementById('hs-result');
 
-  if(!name)  { showToast("Please enter the employee's full name"); return; }
-  if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
+  if(!name)  { showToast("Please enter the employee's full name", {type:'error'}); return; }
+  if(!email||!email.includes('@')) { showToast('Please enter a valid email address', {type:'error'}); return; }
   var isExternal = !!(document.getElementById('hs-external') && document.getElementById('hs-external').checked);
   var _staffDom = nationEmailDomain();               // '' -> this nation has no domain gate
   var _staffDomain = '@' + _staffDom;
   if(isExternal){
     // External consultants are ED-only and passwordless (magic-link).
-    if(!APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole)){ showToast('Only the ED can add an external consultant'); return; }
+    if(!APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole)){ showToast('Only the ED can add an external consultant', {type:'error'}); return; }
   } else if(_staffDom && !email.endsWith(_staffDomain)) {
-    showToast('Only ' + _staffDomain + ' email addresses can be registered (tick "External consultant" for an outside email)');
+    showToast('Only ' + _staffDomain + ' email addresses can be registered (tick "External consultant" for an outside email)', {type:'info'});
     return;
   }
 
@@ -1406,7 +1406,7 @@ async function submitAddHousingStaff() {
   if(!APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole)){
     var allowedForLimited = ['housing_employee_l1','housing_employee_l2'];
     if(allowedForLimited.indexOf(role) === -1){
-      showToast('Housing managers can only add Housing Employees. Only the ED can add other roles.');
+      showToast('Housing managers can only add Housing Employees. Only the ED can add other roles.', {type:'error'});
       return;
     }
   }
@@ -1431,7 +1431,7 @@ async function submitAddHousingStaff() {
           res.innerHTML = '<strong>Already exists.</strong><br><span style="font-size:11px;">'+escapeHtml(email)+' is <b>already in the staff directory</b> &mdash; they\'re in the Users table, no need to add again.</span>';
           res.style.display='block';
         }
-        showToast('Already in the staff directory');
+        showToast('Already in the staff directory', {type:'info'});
         if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
         return;
       }
@@ -1586,7 +1586,7 @@ async function submitAddHousingStaff() {
         res.innerHTML = head + pwLine + tailLine;
       }
       res.style.display='block';
-      showToast('\u2713 '+name+' added successfully');
+      showToast('\u2713 '+name+' added successfully', {type:'info'});
     }
 
     // Branded welcome email via the nation's OWN provider (Graph/Resend) --
@@ -1625,7 +1625,7 @@ async function submitAddHousingStaff() {
       res.innerHTML = '<strong>Could not add the staff member.</strong><br><span style="font-size:11px;">'+escapeHtml(emsg)+'</span>';
       res.style.display='block';
     }
-    showToast(timedOut ? 'Add staff timed out — try again' : ('Error: '+(e&&e.message||e)));
+    showToast(timedOut ? 'Add staff timed out — try again' : ('Error: '+(e&&e.message||e)), {type:'error'});
     if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
   }
 }
@@ -2358,7 +2358,7 @@ function _runQuickAction(action){
   } else if(action === 'run-match'){
     if(typeof showMatch === 'function') showMatch();
   } else if(action === 'rent-payment'){
-    showToast('Coming soon — Finance module.');
+    showToast('Coming soon — Finance module.', {type:'info'});
   }
 }
 

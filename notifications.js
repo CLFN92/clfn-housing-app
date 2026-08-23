@@ -3148,7 +3148,7 @@ function _ntfSanitizeNode(node) {
 // ED-only: same gate as the rest of the editable settings surfaces.
 function saveNotificationTemplate() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit notification templates'); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can edit notification templates', {type:'error'}); return; }
   var ed = _ntfReadEditorState();
   if (!ed) return;
   var all  = (window._appSettings && window._appSettings.email_templates) || {};
@@ -3201,7 +3201,7 @@ function resetNotificationTemplate() {
       cb.checked = !!defaultCc[cb.getAttribute('data-ntf-cc-role')];
     });
   }
-  showToast('Reverted to default. Click Save to persist.');
+  showToast('Reverted to default. Click Save to persist.', {type:'info'});
 }
 
 // Send the current (unsaved) template to the logged-in user's email,
@@ -3212,13 +3212,13 @@ function sendNotificationTest() {
   if (!ed) return;
   var session = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION : null;
   var to      = session && session.email;
-  if (!to) { showToast('No signed-in email to send to'); return; }
+  if (!to) { showToast('No signed-in email to send to', {type:'info'}); return; }
 
   var tokens   = _ntfMockTokensForEvent(ed.eventKey);
   var subject  = _substitutePlaceholders(ed.subject,  tokens);
   var bodyHtml = _substitutePlaceholders(ed.bodyHtml, tokens);
 
-  showToast('Sending test to ' + to + '...');
+  showToast('Sending test to ' + to + '...', {type:'info'});
   window.sendNotification({
     to:          to,
     to_name:     (session && session.name) || '',
@@ -3228,10 +3228,10 @@ function sendNotificationTest() {
     entity_type: 'notification_test',
     entity_id:   ed.eventKey
   }).then(function(){
-    showToast('✓ Test email sent to ' + to);
+    showToast('✓ Test email sent to ' + to, {type:'info'});
   }).catch(function(err){
     console.warn('[ntf] test send failed:', err);
-    showToast('Test send failed - see console');
+    showToast('Test send failed - see console', {type:'error'});
   });
 }
 
@@ -3322,15 +3322,15 @@ function _ntfMockTokensForEvent(eventKey) {
 // Read + sanitize the current editor state. Returns null on missing
 // inputs so callers can early-return cleanly.
 function _ntfReadEditorState() {
-  if (!_ntfSelectedEvent) { showToast('Pick a notification event first'); return null; }
+  if (!_ntfSelectedEvent) { showToast('Pick a notification event first', {type:'info'}); return null; }
   var subjEl = document.getElementById('ntf_subject');
   var bodyEl = document.getElementById('ntf_body');
-  if (!subjEl || !bodyEl) { showToast('Editor not ready'); return null; }
+  if (!subjEl || !bodyEl) { showToast('Editor not ready', {type:'info'}); return null; }
   var subject  = (subjEl.value || '').trim();
   var bodyHtml = _ntfSanitizeBodyHtml(bodyEl.innerHTML || '');
-  if (!subject)  { showToast('Subject is required'); subjEl.focus(); return null; }
+  if (!subject)  { showToast('Subject is required', {type:'error'}); subjEl.focus(); return null; }
   if (!bodyHtml || bodyHtml === '<br>' || bodyHtml.replace(/<[^>]+>/g,'').trim() === '') {
-    showToast('Body is required'); bodyEl.focus(); return null;
+    showToast('Body is required', {type:'error'}); bodyEl.focus(); return null;
   }
   // Read both checkbox grids. Primary (#ntf_roles) is required for
   // non-applicant events; applicant-type events have no primary grid
@@ -3353,7 +3353,7 @@ function _ntfReadEditorState() {
   }
   var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor' || cfg.recipientType === 'rfq_contractor' || cfg.recipientType === 'field_employee');
   if (!isImplicitRecipient && !roles.length) {
-    showToast('Pick at least one recipient role');
+    showToast('Pick at least one recipient role', {type:'info'});
     return null;
   }
   return {
@@ -3533,13 +3533,13 @@ function _cfgCopyValue(btn) {
     var val = txt ? (txt.textContent || '') : '';
     if (!val) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(val).then(function(){ showToast('Copied'); });
+      navigator.clipboard.writeText(val).then(function(){ showToast('Copied', {type:'info'}); });
     } else {
       // Fallback for older browsers
       var ta = document.createElement('textarea');
       ta.value = val; document.body.appendChild(ta);
       ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-      showToast('Copied');
+      showToast('Copied', {type:'info'});
     }
   } catch (e) {
     console.warn('[cfg] copy failed:', e);
@@ -3549,11 +3549,11 @@ function _cfgCopyValue(btn) {
 // Save the RFQ trigger threshold to housing_settings.
 function saveRfqThreshold() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change the RFQ threshold'); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can change the RFQ threshold', {type:'error'}); return; }
   var inp = document.getElementById('cfg_rfq_threshold');
   if (!inp) return;
   var val = parseFloat(inp.value);
-  if (isNaN(val) || val < 0) { showToast('Enter a valid dollar amount'); inp.focus(); return; }
+  if (isNaN(val) || val < 0) { showToast('Enter a valid dollar amount', {type:'error'}); inp.focus(); return; }
   persistSetting('rfq_threshold', val, {
     auditAction: 'rfq_threshold_save',
     auditDetail: 'RFQ threshold set to $' + val.toLocaleString(),
@@ -3563,11 +3563,11 @@ function saveRfqThreshold() {
 
 function saveEldersAgeMin() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change this setting'); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
   var inp = document.getElementById('cfg_elders_age_min');
   if (!inp) return;
   var val = parseInt(inp.value, 10);
-  if (isNaN(val) || val < 18 || val > 99) { showToast('Enter a valid age between 18 and 99'); inp.focus(); return; }
+  if (isNaN(val) || val < 18 || val > 99) { showToast('Enter a valid age between 18 and 99', {type:'error'}); inp.focus(); return; }
   persistSetting('eldersAgeMin', val, {
     auditAction: 'elders_age_min_save',
     auditDetail: 'Elders minimum age set to ' + val,
@@ -3579,7 +3579,7 @@ function saveEldersAgeMin() {
 // nation (OCAP consent switch; read server-side by the support-login function).
 function saveSupportLoginEnabled() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change platform support access'); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can change platform support access', {type:'error'}); return; }
   var inp = document.getElementById('cfg_support_login');
   if (!inp) return;
   var enabled = !!inp.checked;
@@ -3683,7 +3683,7 @@ function runDuplicateAppsAudit() {
 }
 
 function exportDuplicateAppsCSV() {
-  if (!_dupAuditRows.length) { showToast('Run the audit first'); return; }
+  if (!_dupAuditRows.length) { showToast('Run the audit first', {type:'info'}); return; }
   var lines = [['Type','Name','App ID','Email','DOB','Status'].map(function(h){ return '"'+h+'"'; }).join(',')];
   _dupAuditRows.forEach(function(r) {
     var a = r.app;
@@ -3709,12 +3709,12 @@ function _dupArchiveApp(appId) {
     if (!ok) return;
     var allApps = (typeof applications !== 'undefined') ? applications : [];
     var app = allApps.find(function(a){ return a && a.id === appId; });
-    if (!app) { showToast('Application not found'); return; }
+    if (!app) { showToast('Application not found', {type:'error'}); return; }
     app.archived     = true;
     app.declineReason = (app.declineReason ? app.declineReason + '; ' : '') + 'Archived as duplicate';
     if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
     if (typeof auditEntry === 'function') auditEntry(appId, 'archived_duplicate', 'Application archived as duplicate from audit tool', window.currentRole||'staff');
-    showToast('Application archived');
+    showToast('Application archived', {type:'info'});
     runDuplicateAppsAudit();
   });
 }
@@ -4003,15 +4003,15 @@ function _termsWireEditor() {
 
 function saveTermsDoc() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit terms & conditions'); return; }
-  if (!_termsSelectedDoc) { showToast('Select a document first'); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can edit terms & conditions', {type:'error'}); return; }
+  if (!_termsSelectedDoc) { showToast('Select a document first', {type:'error'}); return; }
 
   var bodyEl = document.getElementById('terms_body');
-  if (!bodyEl) { showToast('Editor not ready'); return; }
+  if (!bodyEl) { showToast('Editor not ready', {type:'info'}); return; }
 
   var bodyHtml = _ntfSanitizeBodyHtml(bodyEl.innerHTML || '');
   if (!bodyHtml || bodyHtml === '<br>' || bodyHtml.replace(/<[^>]+>/g, '').trim() === '') {
-    showToast('Body cannot be empty'); bodyEl.focus(); return;
+    showToast('Body cannot be empty', {type:'error'}); bodyEl.focus(); return;
   }
 
   var all  = (window._appSettings && window._appSettings.terms_and_conditions) || {};
@@ -4030,7 +4030,7 @@ function resetTermsDoc() {
   var cfg    = _termsDocConfig(_termsSelectedDoc);
   var bodyEl = document.getElementById('terms_body');
   if (cfg && bodyEl) bodyEl.innerHTML = _termsApplyNationTokens(cfg.defaultBody);
-  showToast('Reverted to default. Click Save to persist.');
+  showToast('Reverted to default. Click Save to persist.', {type:'info'});
 }
 
 // Parse saved T&C HTML into parts for both renderers.
@@ -4859,19 +4859,19 @@ function _contractsReadClauses() {
 
 function saveContractsDoc() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts'); return; }
-  if (!_contractsSelectedDoc) { showToast('Select a document first'); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts', {type:'error'}); return; }
+  if (!_contractsSelectedDoc) { showToast('Select a document first', {type:'error'}); return; }
 
   var bodyEl = document.getElementById('contracts_body');
-  if (!bodyEl) { showToast('Editor not ready'); return; }
+  if (!bodyEl) { showToast('Editor not ready', {type:'info'}); return; }
 
   var bodyHtml = _ntfSanitizeBodyHtml(bodyEl.innerHTML || '');
   if (!bodyHtml || bodyHtml === '<br>' || bodyHtml.replace(/<[^>]+>/g, '').trim() === '') {
-    showToast('Document body cannot be empty'); bodyEl.focus(); return;
+    showToast('Document body cannot be empty', {type:'error'}); bodyEl.focus(); return;
   }
 
   var clauses = _contractsReadClauses();
-  if (!clauses.length) { showToast('Add at least one initials clause'); return; }
+  if (!clauses.length) { showToast('Add at least one initials clause', {type:'error'}); return; }
 
   var all  = (window._appSettings && window._appSettings.contracts_agreements) || {};
   var next = Object.assign({}, all);
@@ -4948,7 +4948,7 @@ function _rfqDocEditorHtml() {
 }
 function saveRfqDocumentStrings() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts'); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts', {type:'error'}); return; }
   var g = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ''; };
   var obj = {};
   _RFQDOC_EDIT_KEYS.forEach(function(grp){
@@ -4983,7 +4983,7 @@ window.resetRfqDocumentStrings = resetRfqDocumentStrings;
 
 function toggleHideSignatures(el) {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change this'); if (el) el.checked = _docSigsHidden(); return; }
+  if (role !== 'ed') { showToast('Only the Executive Director can change this', {type:'error'}); if (el) el.checked = _docSigsHidden(); return; }
   var on = !!(el && el.checked);
   persistSetting('hide_signatures', on, {
     auditAction: 'contracts_hide_signatures',
@@ -5006,7 +5006,7 @@ function resetContractsDoc() {
       return _contractsClauseCardHtml(cl, i);
     }).join('');
   }
-  showToast('Reverted to default. Click Save to persist.');
+  showToast('Reverted to default. Click Save to persist.', {type:'info'});
 }
 
 // Removes a stale or corrupted saved body from _appSettings so the next
