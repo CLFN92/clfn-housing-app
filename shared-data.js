@@ -590,7 +590,11 @@ var _SAVE_RETRY = {
   // App notes are append-only POSTs with a fresh server-generated UUID. The
   // queue entity carries the original args; the retry re-fires the insert.
   app_note:   function(entity){ return _withSaveTimeout(sbAddAppNote(entity.app_id, entity.body)); },
-  setting:    function(entity){ return _withSaveTimeout(_rejectIfFalse(sbSaveSetting(entity.key, entity.value), 'sbSaveSetting')); }
+  setting:    function(entity){ return _withSaveTimeout(_rejectIfFalse(sbSaveSetting(entity.key, entity.value), 'sbSaveSetting')); },
+  // Maintenance Requests: one merge-duplicates upsert per unit (housing_sow.data
+  // holds the unit's whole SOW list), so retries are idempotent and the queue's
+  // per-(type,id) last-write-wins matches the server's semantics exactly.
+  sow:        function(entity){ return _withSaveTimeout(_rejectIfFalse(sbSaveSowRow(entity), 'sbSaveSowRow')); }
 };
 
 // ── Degraded-mode (slow cell) guard ─────────────────────────────────────────
@@ -8540,16 +8544,35 @@ function saveBudgetData(data){
   });
 }
 
+// Network writer for one unit's SOW row. Resolves true/false (same contract as
+// sbSaveUnit) so the save-queue's _rejectIfFalse adapter can normalize HTTP
+// errors into retryable failures. updated_at is stamped at SEND time (not
+// enqueue time) so a queued retry carries a fresh timestamp.
+function sbSaveSowRow(entity){
+  return fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
+    method: 'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
+    body: JSON.stringify({ unit_id: entity.unit_id, data: entity.data, updated_at: new Date().toISOString() })
+  }).then(function(r){
+    if(!r.ok) console.warn('SOW save failed: HTTP '+r.status);
+    return r.ok;
+  });
+}
+
 function saveSowData(unitId, data){
   // Update in-memory cache (writes the RAW wrapper — callers should pass {sows:[...]}).
   if(!window._sowCache) window._sowCache = {};
   window._sowCache[unitId] = data;
-  // Save to Supabase
-  fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ unit_id: unitId, data: data, updated_at: new Date().toISOString() })
-  }).catch(function(e){ console.warn('SOW save failed:',e); });
+  // Persist through the offline save-queue (Phase O: a Maintenance Request
+  // written up in the field on a dead/slow connection must not vanish). The
+  // row is a merge-duplicates upsert keyed by unit_id, so queued retries are
+  // idempotent and last-write-wins — same semantics as the direct POST this
+  // replaced. Falls back to the raw writer if the queue layer isn't loaded.
+  if(typeof saveWithDraftFallback === 'function'){
+    return saveWithDraftFallback('sow', unitId, { unit_id: unitId, data: data });
+  }
+  return sbSaveSowRow({ unit_id: unitId, data: data })
+    .catch(function(e){ console.warn('SOW save failed:', e); return false; });
 }
 
 function saveSowList(unitId, sowList){
