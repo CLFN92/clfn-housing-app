@@ -115,6 +115,7 @@ window._mapNationRow = function(r){
   var sub = String(r.subdomain).toLowerCase();
   return {
     id:            sub,
+    _fromRegistry: true,   // marks registry-sourced entries; hardcoded nations (CLFN) never carry this
     display_name:  r.display_name || sub,
     short:         r.short || sub.toUpperCase(),
     supabase_url:  r.supabase_url || '',
@@ -187,10 +188,15 @@ window.CLFN_CONFIG_LOADED = true;
     var url  = String(window.PLATFORM_REGISTRY_URL || '');
     var anon = String(window.PLATFORM_REGISTRY_ANON || '');
     if (!url || !anon || /REPLACE_WITH/.test(anon) || typeof fetch !== 'function') return;
-    // Throttle: skip if we refreshed within the last hour (cache still warm).
+    // Throttle: skip only if we refreshed within the last 2 minutes. This was
+    // 1 HOUR, which meant a control-plane branding edit (colour/logo/email
+    // identity) could take up to an hour + a reload to reach the nation app —
+    // the localStorage cache survives tab-closes, so no user ritual clears it.
+    // A single tiny GET against nations_public every couple of minutes is
+    // negligible; freshness matters more.
     try {
       var c = JSON.parse(localStorage.getItem(window._REG_CACHE_KEY) || 'null');
-      if (c && c.at && (Date.now() - c.at) < 3600000) return;
+      if (c && c.at && (Date.now() - c.at) < 120000) return;
     } catch (e) {}
     var host = (typeof location !== 'undefined' && location.hostname || '').toLowerCase();
     var sub  = host.split('.')[0];
@@ -203,6 +209,46 @@ window.CLFN_CONFIG_LOADED = true;
       if (!Array.isArray(rows)) return;
       try { localStorage.setItem(window._REG_CACHE_KEY, JSON.stringify({ at: Date.now(), rows: rows })); } catch (e) {}
       var added = window._mergeNationRegistry(rows);
+      // Hot-apply BRANDING changes for the CURRENT nation (registry-sourced
+      // only — hardcoded CLFN is immune): colour, logo, names, housing email,
+      // and email delivery config update in the live NATION_CONFIG so emails
+      // sent later this session carry the new identity. Connection fields
+      // (supabase_url/anon) are deliberately NOT touched mid-session — they
+      // apply from the refreshed cache on the next load.
+      try {
+        if (window._NATION && window._NATION._fromRegistry) {
+          var mySub = String(window._NATION.id || '').toLowerCase();
+          for (var ri = 0; ri < rows.length; ri++) {
+            if (String(rows[ri].subdomain || '').toLowerCase() !== mySub) continue;
+            var fresh = window._mapNationRow(rows[ri]);
+            if (!fresh) break;
+            ['display_name', 'short', 'primary_color', 'logo', 'email_domain', 'housing_email', 'email'].forEach(function(k){
+              window._NATION[k] = fresh[k];
+            });
+            var NC = window.NATION_CONFIG;
+            if (NC) {
+              var disp = fresh.display_name || NC.display_name;
+              NC.display_name = disp; NC.name = disp;
+              NC.short         = fresh.short         || NC.short;
+              NC.primary_color = fresh.primary_color || null;
+              NC.logo          = fresh.logo          || '';
+              NC.email_domain  = fresh.email_domain  || '';
+              NC.housing_email = fresh.housing_email || '';
+              var em = (fresh.email && typeof fresh.email === 'object') ? fresh.email : {};
+              NC.email_config = {
+                provider:  em.provider  || 'graph',
+                from:      em.from       || fresh.housing_email || '',
+                from_name: em.from_name  || disp,
+                reply_to:  em.reply_to   || em.from || fresh.housing_email || '',
+                app_name:  em.app_name   || '',
+                tenant_id: em.tenant_id  || '',
+                client_id: em.client_id  || ''
+              };
+            }
+            break;
+          }
+        }
+      } catch (e) { /* branding refresh is best-effort */ }
       var knownNow = !!(window.NATIONS_DIRECTORY[host] || window.NATIONS_DIRECTORY[sub]);
       // Only a brand-new, previously-unresolvable nation triggers a one-time reload.
       if (!knownBefore && added && knownNow && !sessionStorage.getItem('_fnhub_reg_reloaded')) {
