@@ -214,14 +214,16 @@
   function _contactsCard() {
     var rows = S.contacts.map(function (c, i) {
       return '<div style="display:grid;grid-template-columns:1fr 1fr 34px;gap:8px;margin-bottom:8px;align-items:center;">'
-        + '<input value="' + esc(c.label || '') + '" placeholder="Label (e.g. Emergency)" oninput="_lblContactEdit(' + i + ',\'label\',this.value)" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;"/>'
-        + '<input value="' + esc(c.phone || '') + '" placeholder="Phone" oninput="_lblContactEdit(' + i + ',\'phone\',this.value)" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;"/>'
+        // maxlength keeps label + number inside what a 2" label can print —
+        // longer text was silently ellipsized on the band ("1-866-763-5…").
+        + '<input value="' + esc(c.label || '') + '" maxlength="18" placeholder="Label (e.g. Emergency)" oninput="_lblContactEdit(' + i + ',\'label\',this.value)" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;"/>'
+        + '<input value="' + esc(c.phone || '') + '" maxlength="14" placeholder="Phone" oninput="_lblContactEdit(' + i + ',\'phone\',this.value)" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;"/>'
         + '<button type="button" class="btn btn-ghost btn-sm" onclick="_lblRemoveContact(' + i + ')"' + (S.contacts.length <= 2 ? ' disabled title="A nation needs at least 2 contacts"' : '') + ' style="padding:6px 0;">&times;</button>'
         + '</div>';
     }).join('');
     return '<div class="std-table-card" style="padding:16px;margin-bottom:16px;">'
       + '<div class="lbl-yellow" style="margin-bottom:4px;">Emergency contacts</div>'
-      + '<div class="txt-sm-meta" style="margin-bottom:10px;">2 to 3 contacts. These print in the accent colour on every label\'s bottom band.</div>'
+      + '<div class="txt-sm-meta" style="margin-bottom:10px;">2 to 3 contacts. These print in the accent colour on every label\'s bottom band. Keep the label short (18 characters max) so the full phone number fits on the printed label — check the preview.</div>'
       + rows
       + '<div style="display:flex;gap:8px;margin-top:6px;">'
       +   '<button type="button" class="btn btn-ghost btn-sm" onclick="_lblAddContact()"' + (S.contacts.length >= 3 ? ' disabled title="Maximum 3 contacts"' : '') + '>+ Add contact</button>'
@@ -333,6 +335,12 @@
     }).join('');
     var housing = [((S.cfg && S.cfg.department_label) || ''), ((S.cfg && S.cfg.housing_email) || ''), ((S.cfg && S.cfg.housing_phone) || '')].filter(Boolean).join('  |  ');
     var logo = nationLogo();
+    // White-knockout the band logo ONLY when the theme marks it transparent —
+    // the filter turns every opaque pixel white, so a logo with a solid
+    // background became a blank white square on the black band.
+    var logoTransparent = !!(window._appSettings && _appSettings.theme && _appSettings.theme.logoTransparent);
+    var logoStyle = 'height:' + (bandPx * 0.62) + 'px;width:auto;flex:0 0 auto;'
+      + (logoTransparent ? 'filter:brightness(0) invert(1);' : 'border-radius:3px;');
     return '<div style="width:' + pxW + 'px;height:' + (g.H * scale) + 'px;position:relative;overflow:hidden;font-family:Arial,Helvetica,sans-serif;background:#fff;">'
       + '<div style="display:flex;gap:' + padPx + 'px;padding:' + padPx + 'px;height:' + (g.topH * scale) + 'px;box-sizing:border-box;">'
       +   '<div class="lbl-qr-host" style="width:' + qrPx + 'px;height:' + qrPx + 'px;flex:0 0 auto;"></div>'
@@ -343,7 +351,7 @@
       +   '</div>'
       + '</div>'
       + '<div style="position:absolute;bottom:0;left:0;right:0;height:' + bandPx + 'px;background:#000;color:#fff;display:flex;align-items:center;gap:' + padPx + 'px;padding:0 ' + padPx + 'px;box-sizing:border-box;">'
-      +   (logo ? '<img src="' + esc(logo) + '" style="height:' + (bandPx * 0.62) + 'px;width:auto;flex:0 0 auto;filter:brightness(0) invert(1);"/>' : '')
+      +   (logo ? '<img src="' + esc(logo) + '" style="' + logoStyle + '"/>' : '')
       +   '<div style="flex:1;min-width:0;font-size:' + (0.072 * scale) + 'px;line-height:1.12;">' + bandLines
       +     '<div style="color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(housing) + '</div>'
       +   '</div>'
@@ -560,12 +568,17 @@
     if (!jsPDF) { toast('PDF engine unavailable', { type: 'error' }); return; }
     var g = geom();
     var bleed = 0.125, pageW = g.W + 2 * bleed, pageH = g.H + 2 * bleed;
-    var doc = new jsPDF({ unit: 'in', format: [pageW, pageH] });
+    // Orientation must match the label's aspect: jsPDF normalises a custom
+    // format so the SMALLER dimension is the width in portrait, so a 2x1 label
+    // under the default portrait came out as a 1.25x2.25 PORTRAIT page with
+    // the content drawn 2.25in wide - off the right edge, bottom half empty.
+    var orient = pageW >= pageH ? 'landscape' : 'portrait';
+    var doc = new jsPDF({ orientation: orient, unit: 'in', format: [pageW, pageH] });
     var whiteLogo = await _whiteSilhouette(nationLogo());
     var accentContacts = S.contacts.filter(function (c) { return (c.label || c.phone); });
 
     for (var i = 0; i < units.length; i++) {
-      if (i > 0) doc.addPage([pageW, pageH], 'portrait');
+      if (i > 0) doc.addPage([pageW, pageH], orient);
       var u = units[i];
       var ox = bleed, oy = bleed;                       // trim origin inside the bleed
       // Everything is 100% K. White (255) reads as "no ink" = bare metal (knockout).
