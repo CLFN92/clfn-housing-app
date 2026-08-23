@@ -3490,6 +3490,27 @@ function _rsm(model, id) {
 //
 // Per-event composition + recipient resolution lives in notifications.js.
 // ════════════════════════════════════════════════════════════════════════
+// Resolve the nation's email brand colour as a server-acceptable hex string.
+// Pass a candidate to normalise it (trim, auto-prefix a missing '#'); with no
+// argument it resolves: registry primary_color -> the LIVE theme accent.
+// Returns '' when nothing valid is available. Shared by sendNotification and
+// the magic-link email (which builds its brand object separately and used to
+// send the raw registry value - un-normalised and with no theme fallback - so
+// its header stayed the Edge Function's slate default).
+function _resolveBrandColorHex(candidate) {
+  var norm = function(v){
+    var s = String(v == null ? '' : v).trim();
+    if(/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s)) s = '#' + s;
+    return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s) ? s : '';
+  };
+  if (candidate != null) return norm(candidate);
+  var _nc = window.NATION_CONFIG || {};
+  var bc = norm(_nc.primary_color);
+  if (!bc && typeof window._themeAccentHex === 'function') bc = norm(window._themeAccentHex());
+  return bc;
+}
+window._resolveBrandColorHex = _resolveBrandColorHex;
+
 window.sendNotification = async function(opts) {
   if(!opts || !opts.to || !opts.subject || (!opts.message && !opts.html && !opts.bodyHtml)) {
     throw new Error('sendNotification: requires to + subject + (message|html|bodyHtml)');
@@ -3513,15 +3534,9 @@ window.sendNotification = async function(opts) {
     // theme accent). Without this, nations whose branding lives only in the
     // saved theme - or whose registry colour was entered as 'f8e41a' - got
     // the slate-blue default header on every email.
-    var _normHex = function(v){
-      var s = String(v == null ? '' : v).trim();
-      if(/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s)) s = '#' + s;
-      return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s) ? s : '';
-    };
-    if(opts.brand_color != null) opts.brand_color = _normHex(opts.brand_color) || opts.brand_color;
+    if(opts.brand_color != null) opts.brand_color = _resolveBrandColorHex(opts.brand_color) || opts.brand_color;
     if(opts.brand_color == null){
-      var _bc = _normHex(_nc.primary_color);
-      if(!_bc && typeof window._themeAccentHex === 'function') _bc = _normHex(window._themeAccentHex());
+      var _bc = _resolveBrandColorHex();
       if(_bc) opts.brand_color = _bc;
     }
     if(opts.contact_line == null){
@@ -4125,7 +4140,9 @@ async function _staffMagicEmail(email){
         redirect_to: window.location.origin + '/index.html',
         brand: {
           nation_name:  _nc.display_name || _nc.short || '',
-          brand_color:  _nc.primary_color || '',
+          // Normalised registry colour -> live theme accent fallback (shared
+          // resolver) - the raw registry value alone left this email slate.
+          brand_color:  (typeof _resolveBrandColorHex === 'function' ? _resolveBrandColorHex() : (_nc.primary_color || '')),
           contact_line: _contact.join('  |  ')
         }
       })

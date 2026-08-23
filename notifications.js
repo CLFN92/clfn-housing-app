@@ -3457,6 +3457,22 @@ async function renderConfigPanel() {
     + '</div>'
 
     + '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">Notifications display</div>'
+    +   '<div class="cfg-section-sub">How long messages stay in the corner notifications box before clearing themselves.</div>'
+    +   '<div class="cfg-grid">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Auto-clear after (seconds)</div>'
+    +       '<div class="cfg-value" style="display:flex;align-items:center;gap:8px;">'
+    +         '<input type="number" id="cfg_toast_timeout" value="' + _ntfEsc(String((window._appSettings && window._appSettings.toast_timeout_seconds != null) ? window._appSettings.toast_timeout_seconds : 10)) + '" min="0" max="600" step="1"'
+    +         ' style="width:80px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"/>'
+    +         '<button type="button" class="btn btn-primary btn-sm" onclick="saveToastTimeout()">Save</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">Each message clears itself this many seconds after it appears (default 10). Set <b>0</b> to keep messages until they are dismissed by hand. Applies on every page for all staff.</div>'
+    + '</div>'
+
+    + '<div class="cfg-section">'
     +   '<div class="cfg-section-title">Email pipeline (' + _ntfEsc(gcProviderLabel) + ')</div>'
     +   '<div class="cfg-section-sub">Reference only for this nation. Update the actual secrets via the Supabase Dashboard.</div>'
 
@@ -3549,7 +3565,7 @@ function _cfgCopyValue(btn) {
 // Save the RFQ trigger threshold to housing_settings.
 function saveRfqThreshold() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change the RFQ threshold', {type:'error'}); return; }
+  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change the RFQ threshold', {type:'error'}); return; }
   var inp = document.getElementById('cfg_rfq_threshold');
   if (!inp) return;
   var val = parseFloat(inp.value);
@@ -3561,9 +3577,24 @@ function saveRfqThreshold() {
   });
 }
 
+function saveToastTimeout() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  var inp = document.getElementById('cfg_toast_timeout');
+  if (!inp) return;
+  var val = parseInt(inp.value, 10);
+  if (isNaN(val) || val < 0 || val > 600) { showToast('Enter a number of seconds from 0 (never clear) to 600', {type:'error'}); inp.focus(); return; }
+  persistSetting('toast_timeout_seconds', val, {
+    auditAction: 'toast_timeout_save',
+    auditDetail: 'Notification auto-clear set to ' + (val === 0 ? 'never (manual dismiss)' : val + 's'),
+    okMsg:       val === 0 ? 'Notifications will stay until dismissed' : 'Notifications will clear after ' + val + ' seconds'
+  });
+}
+window.saveToastTimeout = saveToastTimeout;
+
 function saveEldersAgeMin() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
   var inp = document.getElementById('cfg_elders_age_min');
   if (!inp) return;
   var val = parseInt(inp.value, 10);

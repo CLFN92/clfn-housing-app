@@ -104,7 +104,7 @@ serve(async (req) => {
     // --- Compose the branded inner body (send-notification wraps it in the
     //     nation-branded shell: header bar + footer contact line) ---
     const nationName = esc(brand.nation_name || 'Housing')
-    const btnColor = /^#[0-9a-fA-F]{6}$/.test(String(brand.brand_color || '')) ? String(brand.brand_color) : '#eab308'
+    const btnColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(brand.brand_color || '').trim()) ? String(brand.brand_color).trim() : '#eab308'
     const expiryStr = fmtDate(t.access_expires_at)
     const inner =
       '<p style="font-size:14px;line-height:1.65;color:#374151;margin:0 0 20px;">Click below to sign in to the ' + nationName +

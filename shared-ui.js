@@ -43,9 +43,10 @@ function escapeHtml(v) {
 // ── showToast → message box ───────────────────────────────────────────────────
 // Messages no longer pop as transient stacked toasts (multiple firing at once
 // is confusing and easy to miss). Instead they collect in ONE dismissible
-// message box in the corner. Nothing auto-times-out — the user closes each
-// message, or clears them all. Same call signature as before so every existing
-// showToast(...) call keeps working.
+// message box in the corner. Rows auto-clear after a configurable window
+// (Settings -> Config -> Notifications display; default 10s, 0 = stay until
+// dismissed) — see _toastTimeoutMs/_msgboxScheduleClear. Same call signature
+// as before so every existing showToast(...) call keeps working.
 //   opts.type — 'error' | 'info' | 'default'   (styles the row)
 //   opts.duration / opts.position — accepted but ignored (kept for compat)
 //
@@ -101,6 +102,26 @@ function _msgboxEnsure() {
   return box;
 }
 
+// Auto-clear window for message rows, in ms. Configurable per nation via
+// Settings -> Config -> "Notifications display" (housing_settings key
+// toast_timeout_seconds, hydrated into _appSettings). Default 10s; 0 = rows
+// stay until dismissed by hand (the original behaviour).
+function _toastTimeoutMs() {
+  var v = window._appSettings ? window._appSettings.toast_timeout_seconds : undefined;
+  v = (v === undefined || v === null || v === '') ? 10 : Number(v);
+  if (isNaN(v) || v <= 0) return 0;
+  return Math.min(v, 600) * 1000;
+}
+function _msgboxScheduleClear(row, body, box) {
+  if (row._clfnTimer) { clearTimeout(row._clfnTimer); row._clfnTimer = null; }
+  var ms = _toastTimeoutMs();
+  if (!ms) return;
+  row._clfnTimer = setTimeout(function(){
+    row.remove();
+    if (!body.children.length) box.style.display = 'none';
+  }, ms);
+}
+
 // Append a message row (newest on top). Identical repeated messages collapse to
 // a single row with a count badge instead of piling up duplicates.
 function _msgboxAdd(text, type) {
@@ -122,6 +143,7 @@ function _msgboxAdd(text, type) {
       badge.textContent = String((parseInt(badge.textContent, 10) || 1) + 1);
       body.insertBefore(rows[i], body.firstChild);
       box.style.display = '';
+      _msgboxScheduleClear(rows[i], body, box);   // repeat resets the clock
       return;
     }
   }
@@ -140,6 +162,7 @@ function _msgboxAdd(text, type) {
   x.setAttribute('aria-label', 'Dismiss');
   x.innerHTML = '&times;';
   x.addEventListener('click', function(){
+    if (row._clfnTimer) clearTimeout(row._clfnTimer);
     row.remove();
     if (!body.children.length) box.style.display = 'none';
   });
@@ -148,6 +171,7 @@ function _msgboxAdd(text, type) {
   row.appendChild(x);
   body.insertBefore(row, body.firstChild);
   box.style.display = '';
+  _msgboxScheduleClear(row, body, box);
 
   // Backstop against a runaway loop flooding the DOM — keep the newest 40.
   while (body.children.length > 40) body.removeChild(body.lastChild);
