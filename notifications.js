@@ -3473,6 +3473,29 @@ async function renderConfigPanel() {
     + '</div>'
 
     + '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">Applicant portal (external applications)</div>'
+    +   '<div class="cfg-section-sub">Community members submitting their own applications online at <b>apply.html</b>. Turning the portal off closes it completely: no sign-in links are sent and nothing can be started or submitted until it is turned back on.</div>'
+    +   '<div class="cfg-grid">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">External applications</div>'
+    +       '<div class="cfg-value" style="display:flex;align-items:center;gap:10px;">'
+    +         '<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;font-size:13px;"><input type="checkbox" id="cfg_external_apps" style="width:auto;"' + (((window._appSettings && window._appSettings.external_applications_enabled) !== false) ? ' checked' : '') + '/> <span>' + (((window._appSettings && window._appSettings.external_applications_enabled) !== false) ? 'Enabled' : 'Disabled') + '</span></label>'
+    +         '<button type="button" class="btn btn-primary btn-sm" onclick="saveExternalAppsEnabled()">Save</button>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Nation number (band membership #)</div>'
+    +       '<div class="cfg-value" style="display:flex;align-items:center;gap:8px;">'
+    +         '<input type="text" id="cfg_nation_band" inputmode="numeric" maxlength="3" placeholder="e.g. 192" value="' + _ntfEsc(String((window._appSettings && window._appSettings.nation_band_number) || '')) + '"'
+    +         ' style="width:80px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"/>'
+    +         '<button type="button" class="btn btn-primary btn-sm" onclick="saveNationBandNumber()">Save</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">The nation’s 3-digit band membership number. When set, self-serve applicants must enter a 10-digit band (registry) number that <b>starts with these 3 digits</b> before they can submit — the first three digits of a registry number are always the band membership number. Leave blank to skip that verification.</div>'
+    + '</div>'
+
+    + '<div class="cfg-section">'
     +   '<div class="cfg-section-title">Email pipeline (' + _ntfEsc(gcProviderLabel) + ')</div>'
     +   '<div class="cfg-section-sub">Reference only for this nation. Update the actual secrets via the Supabase Dashboard.</div>'
 
@@ -3591,6 +3614,41 @@ function saveToastTimeout() {
   });
 }
 window.saveToastTimeout = saveToastTimeout;
+
+// Applicant portal master switch (external self-serve applications).
+function saveExternalAppsEnabled() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  var cb = document.getElementById('cfg_external_apps');
+  if (!cb) return;
+  var on = !!cb.checked;
+  persistSetting('external_applications_enabled', on, {
+    auditAction: 'external_apps_toggle',
+    auditDetail: 'External (self-serve) applications turned ' + (on ? 'ON' : 'OFF'),
+    okMsg:       on ? 'Applicant portal is ON — community members can apply online'
+                    : 'Applicant portal is OFF — online applications are closed'
+  });
+  if (typeof renderConfigPanel === 'function') setTimeout(renderConfigPanel, 300);
+}
+window.saveExternalAppsEnabled = saveExternalAppsEnabled;
+
+// Nation band membership number (3 digits) — enables the applicant portal's
+// band-number verification: registry numbers must be 10 digits starting with
+// this prefix. Blank clears the setting and disables the check.
+function saveNationBandNumber() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  var inp = document.getElementById('cfg_nation_band');
+  if (!inp) return;
+  var val = (inp.value || '').trim();
+  if (val !== '' && !/^\d{3}$/.test(val)) { showToast('Enter the 3-digit band membership number (e.g. 192), or leave blank to disable the check', {type:'error'}); inp.focus(); return; }
+  persistSetting('nation_band_number', val, {
+    auditAction: 'nation_band_number_save',
+    auditDetail: val ? ('Nation band number set to ' + val + ' — applicant registry numbers must be 10 digits starting with it') : 'Nation band number cleared — applicant band-number verification off',
+    okMsg:       val ? ('Saved — self-serve applicants must enter a 10-digit registry number starting with ' + val) : 'Cleared — band-number verification is off'
+  });
+}
+window.saveNationBandNumber = saveNationBandNumber;
 
 function saveEldersAgeMin() {
   var role = window.currentRole || window._realRole;

@@ -125,6 +125,12 @@
   };
   var TYPE_LABEL = { new: 'New application', update: 'Application update', transfer: 'Transfer request' };
 
+  // Whether this nation requires a 10-digit band (registry) number. The
+  // 3-digit nation prefix is deliberately NEVER sent to the portal (no hint,
+  // no prefix in errors) so the expected format can't be learned and spoofed;
+  // the prefix match itself happens server-side at submit.
+  var _bandRequired = false;
+
   async function showDashboard() {
     app.innerHTML = '<div class="center"><p class="sub">Loading your applications…</p></div>';
     var res = await api('ping');
@@ -136,12 +142,19 @@
           + '</p><button class="btn" type="button" onclick="applyLogout()">Back to sign in</button></div>';
         return;
       }
+      if (res.data && res.data.portal_disabled) {
+        app.innerHTML = '<div class="center"><h1>Applications are closed</h1><p class="sub">'
+          + esc(res.data.error || 'Online applications are currently closed. Please contact the Housing office.')
+          + '</p><button class="btn ghost" type="button" onclick="applyLogout()">Sign out</button></div>';
+        return;
+      }
       app.innerHTML = '<div class="center"><h1>Something went wrong</h1><p class="sub">'
         + esc((res.data && res.data.error) || 'Please try again shortly.')
         + '</p><button class="btn ghost" type="button" onclick="location.reload()">Retry</button></div>';
       return;
     }
     document.getElementById('btn_out').style.display = '';
+    _bandRequired = !!(res.data && res.data.band_required);
     var email = (res.data && res.data.email) || '';
     var subs  = (res.data && res.data.submissions) || [];
     var prof  = (res.data && res.data.profile) || {};
@@ -262,7 +275,11 @@
     { title: 'Applicant', render: function (p) {
         return '<div class="grid2">' + wf('First name', 'w_fn', p.fn) + wf('Last name', 'w_ln', p.ln) + '</div>'
           + wf('Date of birth', 'w_dob', p.dob, 'date')
-          + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band) + wf('Marital status', 'w_marital', p.marital, 'select', ['Single', 'Married', 'Common-law', 'Separated', 'Divorced', 'Widowed']) + '</div>'
+          + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band)
+          +   wf('Marital status', 'w_marital', p.marital, 'select', ['Single', 'Married', 'Common-law', 'Separated', 'Divorced', 'Widowed']) + '</div>'
+          + (_bandRequired
+              ? '<p class="sub" style="margin:-4px 0 10px;">Your 10-digit registry number, as shown on your status card.</p>'
+              : '')
           + wf('Reserve status', 'w_reserve', p.reserve, 'select', ['On Reserve', 'Off Reserve'])
           + '<div class="grid2">' + wf('Phone', 'w_phone', p.phone, 'tel') + wf('Email', 'w_email', p.email, 'email') + '</div>'
           + '<h4 style="margin:16px 0 2px;">Current address</h4>'
@@ -450,8 +467,22 @@
   }
 
   function _evtBtn() { return (typeof event !== 'undefined' && event && event.target) ? event.target : null; }
+  // Band-number FORMAT check only (10 digits). The nation-prefix match is
+  // enforced server-side at submit — the portal never knows the prefix, so a
+  // wrong-nation number is rejected there with a generic message.
+  function _bandError(p) {
+    if (!_bandRequired) return '';
+    var band = String(p.band || '').replace(/[\s-]/g, '');
+    if (!/^\d{10}$/.test(band)) return 'Please enter your 10-digit band (registry) number, as shown on your status card.';
+    p.band = band;
+    return '';
+  }
   window.wizNav = async function (dir) {
     wizCollect();
+    if (dir > 0 && _wiz.step === 0) {
+      var bErr = _bandError(_wiz.payload);
+      if (bErr) { var bm = document.getElementById('wmsg'); if (bm) { bm.className = 'msg err'; bm.textContent = bErr; } return; }
+    }
     if (dir > 0) { var btn = _evtBtn(); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; } await wizPersist(); }
     _wiz.step = Math.max(0, Math.min(WIZ_STEPS.length - 1, _wiz.step + dir));
     wizRender();
@@ -462,6 +493,8 @@
     wizCollect();
     var p = _wiz.payload;
     if (!p.fn || !p.ln) { var m = document.getElementById('wmsg'); if (m) { m.className = 'msg err'; m.textContent = 'Please enter your first and last name (Applicant step).'; } return; }
+    var bandErr = _bandError(p);
+    if (bandErr) { var mb = document.getElementById('wmsg'); if (mb) { mb.className = 'msg err'; mb.textContent = bandErr + ' (Applicant step)'; } return; }
     if (!p.consentShareCLFN) { var m2 = document.getElementById('wmsg'); if (m2) { m2.className = 'msg err'; m2.textContent = 'Please check the consent box to submit.'; } return; }
     var btn = _evtBtn(); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
     if (!await wizPersist()) { if (btn) { btn.disabled = false; btn.textContent = 'Submit application'; } return; }

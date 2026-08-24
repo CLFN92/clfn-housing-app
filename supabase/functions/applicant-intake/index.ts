@@ -99,6 +99,34 @@ async function notifySubmission(admin: any, row: any, applicantEmail: string, ap
   }
 }
 
+// Nation band-number verification (opt-in via Settings -> Config in the staff
+// app). housing_settings key 'nation_band_number' holds the nation's 3-digit
+// band membership number. When set, a self-serve applicant's band (registry)
+// number must be exactly 10 digits and START with those 3 digits -- the first
+// three digits of a registry number are always the band membership number.
+// When the setting is absent/blank the check is skipped entirely, so nations
+// that have not configured it are unaffected.
+async function readNationSetting(admin: any, key: string): Promise<unknown> {
+  try {
+    const { data } = await admin.from('housing_settings').select('value').eq('key', key).limit(1)
+    let v = data && data[0] ? data[0].value : null
+    if (v && typeof v === 'object' && 'value' in v) v = (v as any).value
+    return v
+  } catch (_e) { return null }
+}
+async function nationBandPrefix(admin: any): Promise<string> {
+  const s = String((await readNationSetting(admin, 'nation_band_number')) ?? '').trim()
+  return /^\d{3}$/.test(s) ? s : ''
+}
+// External (self-serve) applications master switch. Settings -> Config in the
+// staff app. Absent = ON (backwards compatible); only an explicit false turns
+// the portal off.
+async function portalEnabled(admin: any): Promise<boolean> {
+  const v = await readNationSetting(admin, 'external_applications_enabled')
+  return !(v === false || v === 'false')
+}
+const PORTAL_CLOSED_MSG = 'Online applications are currently closed. Please contact the Housing office.'
+
 // Only allow magic-link redirects back to our own hosts (defense in depth;
 // Supabase also validates against its Redirect URL allow-list).
 function isSafeRedirect(u: string): boolean {
@@ -192,6 +220,7 @@ serve(async (req) => {
       const redirectTo  = isSafeRedirect(rawRedirect) ? rawRedirect : undefined
       const ip = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim()
       const admin0 = createClient(SUPABASE_URL, SERVICE_KEY)
+      if (!(await portalEnabled(admin0))) return json({ error: PORTAL_CLOSED_MSG, portal_disabled: true }, 503)
       // Rate-limit; respond with generic success either way so we never reveal
       // whether an address exists or signal that a bomb attempt was throttled.
       if (await magicLinkRateLimited(admin0, linkEmail, ip)) return json({ ok: true })
@@ -212,6 +241,14 @@ serve(async (req) => {
     const uid   = user.id
     const email = (user.email || '').toLowerCase()
     const admin = createClient(SUPABASE_URL, SERVICE_KEY)
+
+    // External-applications master switch: when OFF, every portal action is
+    // refused -- including staff invites, so a disabled portal cannot be
+    // half-used. Staff get a message pointing at the setting.
+    if (!(await portalEnabled(admin))) {
+      if (action === 'invite') return json({ error: 'External applications are turned OFF in Settings -> Config. Turn them on to invite applicants.' }, 503)
+      return json({ error: PORTAL_CLOSED_MSG, portal_disabled: true }, 503)
+    }
 
     // --- invite: STAFF-only. Email an applicant a branded portal sign-in link,
     // and (optionally) pre-link their existing application to their email so
@@ -291,7 +328,12 @@ serve(async (req) => {
       const { data: subs } = await admin.from('application_submissions')
         .select('id, submission_type, status, linked_app_id, created_app_id, review_notes, submitted_at, updated_at')
         .eq('applicant_uid', uid).order('updated_at', { ascending: false })
-      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [] })
+      // band_required tells the portal to demand a 10-digit registry number.
+      // The 3-digit prefix itself is NEVER sent to the client -- disclosing it
+      // would hand a spoofer the exact format to fabricate; the prefix match
+      // is enforced only server-side at submit, with a generic error.
+      const bandPrefix = await nationBandPrefix(admin)
+      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [], band_required: !!bandPrefix })
     }
 
     // --- save_draft: create or update the applicant's OWN draft ---
@@ -345,9 +387,23 @@ serve(async (req) => {
       if (!String(p.fn || '').trim() || !String(p.ln || '').trim()) {
         return json({ error: 'Please enter the applicant first and last name before submitting.' }, 400)
       }
+      // Band-number verification (server-side gate; the portal mirrors this
+      // client-side for early feedback but this is the enforcement point).
+      // Anti-spoofing: neither error message reveals the expected prefix.
+      const reqPrefix = await nationBandPrefix(admin)
+      if (reqPrefix) {
+        const band = String(p.band || '').replace(/[\s-]/g, '')
+        if (!/^\d{10}$/.test(band)) {
+          return json({ error: 'Please enter your 10-digit band (registry) number on the Applicant step.' }, 400)
+        }
+        if (band.slice(0, 3) !== reqPrefix) {
+          return json({ error: 'Your band number could not be verified for this nation. Please check the number on your status card, or contact the Housing office.' }, 400)
+        }
+        p.band = band   // persist the normalized (digits-only) form
+      }
       const now = new Date().toISOString()
       const { data: upd } = await admin.from('application_submissions')
-        .update({ status: 'submitted', submitted_at: now, updated_at: now })
+        .update({ status: 'submitted', submitted_at: now, updated_at: now, payload: p })
         .eq('id', subId).select('*').limit(1)
       const saved = (upd && upd[0]) || row
       const applicantName = [p.fn, p.ln].filter(Boolean).join(' ').trim()
