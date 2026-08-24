@@ -9,13 +9,18 @@ name: Deploy Supabase Edge Functions
 # registry is read with the publishable anon key (same one the app ships to
 # every browser); suspended nations are excluded by the view itself.
 #
-# One-time setup — repository secrets
+# One-time setup — one repository secret
 # (Settings -> Secrets and variables -> Actions -> New repository secret):
 #   SUPABASE_ACCESS_TOKEN  - Supabase -> Account -> Access Tokens -> generate
 #                            (an account token works for every project you own)
-#   SUPABASE_PROJECT_ID    - fallback single project ref, used only if the
-#                            registry can't be reached
 # Until the token exists the job runs green and simply skips.
+#
+# NOTE: the old SUPABASE_PROJECT_ID secret is deliberately NOT referenced
+# here any more (and can be deleted). Its value is CLFN's project ref, and
+# GitHub blocks any job output containing a referenced secret's value -- which
+# silently emptied the deploy matrix (the ref itself is publishable; it ships
+# in shared-config.js to every browser). The lead nation's ref is instead the
+# hard-coded fallback below for when the registry is unreachable.
 #
 # Manual runs ("Run workflow") can still target ONE nation via project_ref —
 # useful right after provisioning, before the next push-triggered fleet deploy.
@@ -50,7 +55,8 @@ jobs:
         id: list
         env:
           INPUT_REF:  ${{ github.event.inputs.project_ref }}
-          FALLBACK:   ${{ secrets.SUPABASE_PROJECT_ID }}
+          # Publishable lead-nation ref (same value as in shared-config.js).
+          FALLBACK:   fkhzrbalumzeripzolph
           HAS_TOKEN:  ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
         run: |
           set -e
@@ -80,13 +86,8 @@ jobs:
                      | select(.ref | test("^[a-z0-9]{15,}$"))]' 2>/dev/null || echo '[]')
           COUNT=$(echo "$MATRIX" | jq 'length')
           if [ "$COUNT" -eq 0 ]; then
-            if [ -n "$FALLBACK" ]; then
-              echo "::warning::Registry unreachable or empty - falling back to SUPABASE_PROJECT_ID."
-              MATRIX=$(printf '[{"subdomain":"fallback","ref":"%s"}]' "$FALLBACK")
-            else
-              echo "::error::Registry unreachable and no SUPABASE_PROJECT_ID fallback set."
-              exit 1
-            fi
+            echo "::warning::Registry unreachable or empty - falling back to the lead nation only."
+            MATRIX=$(printf '[{"subdomain":"fallback","ref":"%s"}]' "$FALLBACK")
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
