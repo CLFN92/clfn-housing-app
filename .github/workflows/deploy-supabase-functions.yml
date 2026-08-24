@@ -1,14 +1,24 @@
 name: Deploy Supabase Edge Functions
 
-# Deploys the Edge Functions in supabase/functions/* to the Supabase project so
-# you never have to paste code into the dashboard editor again. Runs on any push
-# to main that touches a function (or manually via "Run workflow").
+# Deploys the NATION Edge Functions in supabase/functions/* to EVERY active
+# nation project — automatically, on any push to main that touches a function.
 #
-# One-time setup — add two repository secrets
+# The nation list comes from the platform registry (nations_public view on the
+# fnhub-platform project) at run time, so onboarding a nation in the admin
+# panel enrolls it in all future deploys with zero workflow changes. The
+# registry is read with the publishable anon key (same one the app ships to
+# every browser); suspended nations are excluded by the view itself.
+#
+# One-time setup — repository secrets
 # (Settings -> Secrets and variables -> Actions -> New repository secret):
 #   SUPABASE_ACCESS_TOKEN  - Supabase -> Account -> Access Tokens -> generate
-#   SUPABASE_PROJECT_ID    - your project ref (e.g. fkhzrbalumzeripzolph)
-# Until both exist the job runs green and simply skips (no red failures).
+#                            (an account token works for every project you own)
+#   SUPABASE_PROJECT_ID    - fallback single project ref, used only if the
+#                            registry can't be reached
+# Until the token exists the job runs green and simply skips.
+#
+# Manual runs ("Run workflow") can still target ONE nation via project_ref —
+# useful right after provisioning, before the next push-triggered fleet deploy.
 
 on:
   push:
@@ -19,52 +29,101 @@ on:
   workflow_dispatch:
     inputs:
       project_ref:
-        description: 'Nation project ref to deploy the nation functions to (e.g. a new nation like the demo). Leave blank to use the SUPABASE_PROJECT_ID secret.'
+        description: 'Deploy to ONE nation project ref only (e.g. right after provisioning). Leave blank to deploy to every active nation from the registry.'
         required: false
         default: ''
 
+env:
+  PLATFORM_REGISTRY_URL: https://dnaxulsdetlnpupegoiq.supabase.co
+  # Publishable anon key (same value the app ships to every browser).
+  PLATFORM_REGISTRY_ANON: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuYXh1bHNkZXRsbnB1cGVnb2lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NDQ5OTksImV4cCI6MjEwMTAyMDk5OX0.HYKgIe_inzHFk518ilfmhQUqtlldkTSoiwnmcwuaw_A
+
 jobs:
-  deploy:
+  # ── Resolve the fleet: every active nation's project ref ────────────────────
+  refs:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+      ready:  ${{ steps.list.outputs.ready }}
+    steps:
+      - name: Build nation list
+        id: list
+        env:
+          INPUT_REF:  ${{ github.event.inputs.project_ref }}
+          FALLBACK:   ${{ secrets.SUPABASE_PROJECT_ID }}
+          HAS_TOKEN:  ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
+        run: |
+          set -e
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "matrix=[]"   >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy - add the SUPABASE_ACCESS_TOKEN repo secret to enable auto-deploy."
+            exit 0
+          fi
+          # Manual single-nation run.
+          if [ -n "$INPUT_REF" ]; then
+            MATRIX=$(printf '[{"subdomain":"manual","ref":"%s"}]' "$INPUT_REF")
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+            echo "Single-nation run: $INPUT_REF"
+            exit 0
+          fi
+          # Fleet run: active nations from the registry. The ref is the
+          # hostname label of each nation's supabase_url.
+          ROWS=$(curl -sf "$PLATFORM_REGISTRY_URL/rest/v1/nations_public?select=subdomain,supabase_url" \
+                   -H "apikey: $PLATFORM_REGISTRY_ANON" \
+                   -H "Authorization: Bearer $PLATFORM_REGISTRY_ANON" || echo '')
+          MATRIX=$(echo "$ROWS" | jq -c '[.[]
+                     | select(.supabase_url != null and .supabase_url != "")
+                     | {subdomain: .subdomain,
+                        ref: (.supabase_url | sub("^https?://"; "") | split(".")[0])}
+                     | select(.ref | test("^[a-z0-9]{15,}$"))]' 2>/dev/null || echo '[]')
+          COUNT=$(echo "$MATRIX" | jq 'length')
+          if [ "$COUNT" -eq 0 ]; then
+            if [ -n "$FALLBACK" ]; then
+              echo "::warning::Registry unreachable or empty - falling back to SUPABASE_PROJECT_ID."
+              MATRIX=$(printf '[{"subdomain":"fallback","ref":"%s"}]' "$FALLBACK")
+            else
+              echo "::error::Registry unreachable and no SUPABASE_PROJECT_ID fallback set."
+              exit 1
+            fi
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Deploying to $(echo "$MATRIX" | jq -r '[.[].subdomain] | join(", ")')"
+
+  # ── Deploy the nation functions to each project in parallel ─────────────────
+  deploy:
+    needs: refs
+    if: needs.refs.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # one nation failing must not block the rest
+      max-parallel: 4
+      matrix:
+        nation: ${{ fromJson(needs.refs.outputs.matrix) }}
+    name: deploy (${{ matrix.nation.subdomain }})
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check for Supabase secrets
-        id: secrets
-        run: |
-          if [ -n "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && [ -n "${{ secrets.SUPABASE_PROJECT_ID }}" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping deploy - add SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_ID repo secrets to enable auto-deploy."
-          fi
-
       - name: Set up Supabase CLI
-        if: steps.secrets.outputs.ready == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Deploy each function
-        if: steps.secrets.outputs.ready == 'true'
+      - name: Deploy each function to ${{ matrix.nation.subdomain }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-          INPUT_REF: ${{ github.event.inputs.project_ref }}
+          REF: ${{ matrix.nation.ref }}
         run: |
           set -e
-          # A manual run may target a specific nation project (e.g. a newly
-          # provisioned one) via the project_ref input; otherwise the default
-          # SUPABASE_PROJECT_ID secret is used.
-          REF="${INPUT_REF:-$PROJECT_ID}"
-          echo "Deploying nation functions to project: $REF"
+          echo "Deploying nation functions to ${{ matrix.nation.subdomain }} ($REF)"
           for dir in supabase/functions/*/; do
             name="$(basename "$dir")"
             # Skip shared/util folders (conventionally prefixed with _).
             case "$name" in _*) echo "Skipping helper folder: $name"; continue;; esac
             # Skip control-plane functions: they deploy to the fnhub-platform
-            # project (not this nation project) via `supabase functions deploy
-            # <name> --project-ref <platform-ref>`. See supabase/functions/<name>/README.
+            # project via deploy-platform-functions.yml, never to nation projects.
             case "$name" in provision-nation|report-nation-usage|recurring-invoices|set-nation-secret|enter-nation|gen-support-key|run-nation-migration) echo "Skipping platform-only function: $name"; continue;; esac
             if [ ! -f "${dir}index.ts" ]; then
               echo "No index.ts in $name - skipping"
@@ -79,4 +138,4 @@ jobs:
               supabase functions deploy "$name" --project-ref "$REF"
             fi
           done
-          echo "All functions deployed."
+          echo "All functions deployed to ${{ matrix.nation.subdomain }}."
