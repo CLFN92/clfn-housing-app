@@ -207,23 +207,45 @@ serve(async (req) => {
     const body   = await req.json().catch(() => ({}))
     const action = String(body.action || '')
 
+    // --- portal_info: PRE-LOGIN. Tells the sign-in screen whether the portal
+    // is open and whether a band number is required. Never discloses the
+    // nation's 3-digit prefix itself. ---
+    if (action === 'portal_info') {
+      const adminI = createClient(SUPABASE_URL, SERVICE_KEY)
+      const enabled = await portalEnabled(adminI)
+      const prefix = enabled ? await nationBandPrefix(adminI) : ''
+      return json({ ok: true, enabled, band_required: !!prefix, closed_message: enabled ? undefined : PORTAL_CLOSED_MSG })
+    }
+
     // --- request_link: PRE-LOGIN. Generate a magic link and email it through
     // the nation's OWN pipeline (not Supabase's default sender). No user JWT;
     // the client calls this with the anon key like any public endpoint. ---
     if (action === 'request_link') {
       const linkEmail = String(body.email || '').trim().toLowerCase()
       if (!isValidEmail(linkEmail)) return json({ error: 'Please enter a valid email address.' }, 400)
-      // If this nation has no email provider configured, tell the client so it
-      // can fall back to Supabase's built-in sender rather than fail.
-      if (!emailConfigured()) return json({ error: 'email_not_configured' }, 503)
       const rawRedirect = String(body.redirect_to || '').trim()
       const redirectTo  = isSafeRedirect(rawRedirect) ? rawRedirect : undefined
       const ip = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim()
       const admin0 = createClient(SUPABASE_URL, SERVICE_KEY)
       if (!(await portalEnabled(admin0))) return json({ error: PORTAL_CLOSED_MSG, portal_disabled: true }, 503)
-      // Rate-limit; respond with generic success either way so we never reveal
-      // whether an address exists or signal that a bomb attempt was throttled.
+      // Rate-limit BEFORE the band-number gate so prefix guessing burns the
+      // same per-email/per-IP budget as link requests -- the gate can't be
+      // used as a free verification oracle. Generic success either way so we
+      // never reveal whether an address exists or that a throttle fired.
       if (await magicLinkRateLimited(admin0, linkEmail, ip)) return json({ ok: true })
+      // Front-door band-number gate (when the nation number is configured):
+      // no sign-in link is sent unless the 10-digit registry number starts
+      // with the nation's 3-digit band number. Errors never disclose the
+      // expected prefix. The submit action re-verifies regardless.
+      const gatePrefix = await nationBandPrefix(admin0)
+      if (gatePrefix) {
+        const gateBand = String(body.band || '').replace(/[\s-]/g, '')
+        if (!/^\d{10}$/.test(gateBand)) return json({ error: 'Please enter your 10-digit band (registry) number.' }, 400)
+        if (gateBand.slice(0, 3) !== gatePrefix) return json({ error: 'Your band number could not be verified for this nation. Please check the number on your status card, or contact the Housing office.' }, 400)
+      }
+      // If this nation has no email provider configured, tell the client so it
+      // can fall back to Supabase's built-in sender rather than fail.
+      if (!emailConfigured()) return json({ error: 'email_not_configured' }, 503)
       const sent = await sendMagicLink(admin0, linkEmail, redirectTo)
       if (!sent.ok) {
         console.warn('[applicant-intake] magic link failed: ' + sent.error)

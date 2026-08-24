@@ -58,17 +58,52 @@
   }
 
   // ---- Views ----------------------------------------------------------------
+  // Front-door state from portal_info: whether sign-in also requires a band
+  // number, and whether the portal is open at all. The 3-digit prefix itself
+  // is never sent to the client (anti-spoofing) — the server checks it.
+  var _loginBandRequired = false;
   function showLogin(prefill) {
     app.innerHTML =
       '<h1>Housing application portal</h1>'
       + '<p class="sub">Sign in with your email. We\'ll send you a secure link — no password to remember. Clicking the link confirms your email and signs you in.</p>'
       + '<label for="em">Email address</label>'
       + '<input id="em" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="' + esc(prefill || '') + '"/>'
+      + '<div id="band_row" style="display:none;">'
+      +   '<label for="lband">Band / membership number</label>'
+      +   '<input id="lband" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 5512345678" maxlength="14"/>'
+      +   '<p class="sub" style="margin:4px 0 0;">Your 10-digit registry number, as shown on your status card.</p>'
+      + '</div>'
       + '<div class="msg" id="lmsg"></div>'
       + '<button class="btn" id="lbtn" type="button">Email me a sign-in link</button>'
       + '<div class="foot">Your information is kept private and reviewed only by the Housing office.</div>';
     document.getElementById('lbtn').addEventListener('click', sendLink);
     document.getElementById('em').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLink(); });
+    _loginApplyPortalInfo();
+  }
+
+  // Ask the server whether the portal is open and whether a band number is
+  // required, then adapt the sign-in screen. Fails open (plain email sign-in)
+  // if the call can't complete — the server still enforces everything.
+  async function _loginApplyPortalInfo() {
+    try {
+      var r = await fetch(FN, {
+        method: 'POST', headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + ANON, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'portal_info' })
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (d && d.ok && d.enabled === false) {
+        app.innerHTML = '<div class="center"><h1>Applications are closed</h1><p class="sub">'
+          + esc(d.closed_message || 'Online applications are currently closed. Please contact the Housing office.') + '</p></div>';
+        return;
+      }
+      _loginBandRequired = !!(d && d.band_required);
+      var row = document.getElementById('band_row');
+      if (row && _loginBandRequired) {
+        row.style.display = '';
+        var b = document.getElementById('lband');
+        if (b) b.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLink(); });
+      }
+    } catch (e) { /* fail open — server-side gates still apply */ }
   }
 
   function setMsg(id, text, kind) {
@@ -98,23 +133,38 @@
   async function sendLink() {
     var em = (document.getElementById('em').value || '').trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { setMsg('lmsg', 'Please enter a valid email address.', 'err'); return; }
+    var band = '';
+    if (_loginBandRequired) {
+      band = ((document.getElementById('lband') || {}).value || '').replace(/[\s-]/g, '');
+      if (!/^\d{10}$/.test(band)) { setMsg('lmsg', 'Please enter your 10-digit band (registry) number, as shown on your status card.', 'err'); return; }
+    }
     var btn = document.getElementById('lbtn'); btn.disabled = true; btn.textContent = 'Sending…';
     function fail(msg) { setMsg('lmsg', msg || 'Could not send the link. Please try again.', 'err'); btn.disabled = false; btn.textContent = 'Email me a sign-in link'; }
+    function ok() {
+      // Remember the verified number so the application form pre-fills it —
+      // the applicant shouldn't have to type it twice.
+      if (band) { try { localStorage.setItem('clfn_apply_band', band); } catch (e) {} }
+      showCheckEmail(em);
+    }
     try {
       // Preferred: our branded pipeline (the nation's own sender via applicant-intake).
       var r = await fetch(FN, {
         method: 'POST', headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + ANON, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'request_link', email: em, redirect_to: REDIRECT })
+        body: JSON.stringify({ action: 'request_link', email: em, redirect_to: REDIRECT, band: band || undefined })
       });
       var d = await r.json().catch(function () { return {}; });
-      if (r.ok && d && d.ok) { showCheckEmail(em); return; }
+      if (r.ok && d && d.ok) { ok(); return; }
+      // Portal switched off: a 503 too, but must NOT fall back to Supabase's
+      // sender — that would sneak past the closed portal.
+      if (d && d.portal_disabled) { fail(d.error || 'Online applications are currently closed. Please contact the Housing office.'); return; }
       // No provider configured for this nation -> Supabase's built-in sender.
+      // (Reached only after the server's band gate passed, when configured.)
       if (r.status === 503 || (d && d.error === 'email_not_configured')) {
-        if (await _otpFallback(em)) { showCheckEmail(em); return; }
+        if (await _otpFallback(em)) { ok(); return; }
       }
       fail(d && d.error && d.error !== 'email_not_configured' ? d.error : null);
     } catch (e) {
-      if (await _otpFallback(em)) { showCheckEmail(em); return; }
+      if (await _otpFallback(em)) { ok(); return; }
       fail('Network error. Please try again.');
     }
   }
@@ -523,6 +573,8 @@
 
   window.applyStart = function (type) {
     _wiz = { type: type || 'new', id: null, step: 0, payload: {} };
+    // Pre-fill the band number verified at sign-in (typed once, used twice).
+    try { var sb = localStorage.getItem('clfn_apply_band'); if (sb && !_wiz.payload.band) _wiz.payload.band = sb; } catch (e) {}
     wizRender();
   };
   window.applyContinue = async function (id) {
