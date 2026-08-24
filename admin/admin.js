@@ -927,6 +927,12 @@
       +       '<div><label>Tax rate (%)</label><input id="cn-inv-tax" type="number" step="0.01" min="0" placeholder="0" value="0"/></div>'
       +       '<div><label>Due date</label><input id="cn-inv-due" type="date" value="' + _dPlus(30) + '"/><div class="sub" style="font-size:11px;margin-top:2px;">Defaults to 30 days after today (net 30).</div></div>'
       +     '</div>'
+      +     '<div style="display:grid;grid-template-columns:150px 110px 1fr;gap:10px;">'
+      +       '<div><label>Discount</label><select id="cn-inv-disc-type"><option value="">None</option><option value="percent">Percent (%)</option><option value="fixed">Fixed ($)</option></select></div>'
+      +       '<div><label>Value</label><input id="cn-inv-disc-value" type="number" step="0.01" min="0" placeholder="0"/></div>'
+      +       '<div><label>Reason shown on invoice (optional)</label><input id="cn-inv-disc-label" placeholder="e.g. Multi-nation partnership discount"/></div>'
+      +     '</div>'
+      +     '<p class="sub" style="margin:2px 0 8px;font-size:11px;">The discount is taken off the subtotal <b>before tax</b> and prints as its own line on the PDF.</p>'
       +     '<label>Invoice notes (optional)</label><input id="cn-inv-notes" placeholder="Payable within 30 days; e-transfer to..."/>'
       +     '<div class="msg" id="cn-inv-msg"></div>'
       +     '<button class="btn" type="button" data-act="inv-create" data-sub="' + esc(n.subdomain) + '" data-id="' + esc(n.id) + '">Create invoice &amp; PDF</button>'
@@ -1906,6 +1912,15 @@
     var it = FEE_SCHEDULE[parseInt(sel.value, 10)]; if (!it) return;
     window.invAddLine({ d: it.d, q: (it.q != null ? it.q : 1), p: it.custom ? '' : it.p });
   };
+  // Discount helper: percent-of-base or fixed dollars, clamped to [0, base].
+  // Returns the rounded dollar amount taken off. Used by manual invoices, the
+  // interest recompute, and recurring-billing generation so the three paths
+  // can never disagree on the math.
+  function _calcDiscount(base, type, value){
+    if ((type !== 'percent' && type !== 'fixed') || !(value > 0)) return 0;
+    var d = (type === 'percent') ? base * value / 100 : value;
+    return Math.round(Math.min(d, Math.max(base, 0)) * 100) / 100;
+  }
   function _collectInvLines(){
     var out = [];
     Array.prototype.forEach.call(document.querySelectorAll('#cn-inv-lines .inv-line'), function(row){
@@ -1949,6 +1964,7 @@
         if (x.status !== 'void' && x.status !== 'paid' && x.status !== 'carried') acts += '<button class="btn sm danger" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="void" data-sub="' + esc(sub) + '">Void</button>';
         var meta = [];
         if (x.due_date)  meta.push('due ' + esc(x.due_date));
+        if (Number(x.discount) > 0.005) meta.push('discount -' + _money(x.discount));
         if (paidAmt > 0.005 && bal > 0.005) meta.push('paid ' + _money(paidAmt) + ' of ' + _money(x.total));
         if (x.paid_date) meta.push((bal > 0.005 ? 'last pmt ' : 'paid ') + esc(x.paid_date));
         if (bal > 0.005 && (x.status === 'sent' || x.status === 'partial')) meta.push('<b style="color:var(--danger);">balance ' + _money(bal) + '</b>');
@@ -2050,9 +2066,12 @@
       dlgAlert('As of ' + asOf + ', this invoice is ' + (days < 0 ? Math.abs(days) + ' day(s) before the due date' : days + ' day(s) past due') + '. Per Section 7.5, interest applies only to amounts more than 30 days overdue.', { title: 'No interest added' });
       return;
     }
-    // Base = existing non-interest lines; interest accrues on the pre-tax amount.
+    // Base = existing non-interest lines; interest accrues on the pre-tax,
+    // post-discount amount (the discount is what the nation actually owed).
     var base = (inv.line_items || []).filter(function(l){ return !l.interest; });
-    var principal = base.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0);
+    var baseSubtotal = Math.round(base.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
+    var discount = _calcDiscount(baseSubtotal, inv.discount_type, Number(inv.discount_value) || 0);
+    var principal = Math.round((baseSubtotal - discount) * 100) / 100;
     var months = days / 30;
     var interest = Math.round(principal * INTEREST_MONTHLY * months * 100) / 100;
     if (interest <= 0){ dlgAlert('Computed interest is $0.00 — nothing to add.'); return; }
@@ -2061,9 +2080,13 @@
     var lines = base.concat([line]);
     var subtotal = Math.round(lines.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
     var taxRate = Number(inv.tax_rate) || 0;
-    var tax = Math.round(subtotal * taxRate) / 100;
-    var total = Math.round((subtotal + tax) * 100) / 100;
-    var pr = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { line_items: lines, subtotal: subtotal, tax: tax, total: total, updated_at: new Date().toISOString() }, 'return=minimal');
+    // Discount stays anchored to the non-interest base; tax on the discounted amount.
+    var taxable = Math.round((subtotal - discount) * 100) / 100;
+    var tax = Math.round(taxable * taxRate) / 100;
+    var total = Math.round((taxable + tax) * 100) / 100;
+    var _patch = { line_items: lines, subtotal: subtotal, tax: tax, total: total, updated_at: new Date().toISOString() };
+    if (discount > 0) _patch.discount = discount;
+    var pr = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), _patch, 'return=minimal');
     if (pr.ok){
       await audit('nation_invoice_interest', sub, inv.number + ': ' + _money(interest) + ' (' + days + 'd)');
       renderNationInvoices(sub); loadNicSummary(sub);
@@ -2078,10 +2101,16 @@
     var taxRate = parseFloat((document.getElementById('cn-inv-tax') || {}).value || '0') || 0;
     var due = (document.getElementById('cn-inv-due') || {}).value || _dPlus(30);
     var inotes = (document.getElementById('cn-inv-notes') || {}).value || '';
-    var subtotal = lines.reduce(function(a, l){ return a + (l.qty * l.unit_price); }, 0);
-    var tax = Math.round(subtotal * taxRate) / 100;
-    var total = Math.round((subtotal + tax) * 100) / 100;
-    subtotal = Math.round(subtotal * 100) / 100;
+    var discType  = ((document.getElementById('cn-inv-disc-type') || {}).value || '') || null;
+    var discValue = parseFloat((document.getElementById('cn-inv-disc-value') || {}).value || '0') || 0;
+    var discLabel = ((document.getElementById('cn-inv-disc-label') || {}).value || '').trim();
+    if (discType === 'percent' && discValue > 100){ setMsg('cn-inv-msg', 'Percent discount cannot exceed 100%.'); return; }
+    var subtotal = Math.round(lines.reduce(function(a, l){ return a + (l.qty * l.unit_price); }, 0) * 100) / 100;
+    // Discount comes off the subtotal; tax is charged on the discounted base.
+    var discount = _calcDiscount(subtotal, discType, discValue);
+    var taxable = Math.round((subtotal - discount) * 100) / 100;
+    var tax = Math.round(taxable * taxRate) / 100;
+    var total = Math.round((taxable + tax) * 100) / 100;
     setMsg('cn-inv-msg', 'Creating...', 'ok');
     ensureJsPdf(async function(){
       try {
@@ -2090,6 +2119,9 @@
         var inv = { subdomain: sub, number: number, issue_date: today, due_date: due, currency: 'CAD',
                     line_items: lines, subtotal: subtotal, tax_rate: taxRate, tax: tax, total: total,
                     amount_paid: 0, status: 'draft', notes: inotes, created_by: jwtEmail() };
+        // Discount columns are only sent when one applies, so invoice creation
+        // keeps working on a platform DB that predates nation_invoice_discounts.sql.
+        if (discount > 0){ inv.discount_type = discType; inv.discount_value = discValue; inv.discount = discount; inv.discount_label = discLabel || null; }
         var r = await api('POST', '/nation_invoices', inv, 'return=minimal');
         if (!r.ok){ var t = await r.text(); setMsg('cn-inv-msg', /duplicate|unique/i.test(t) ? 'Number collision, try again.' : 'Could not save invoice.'); return; }
         // Settle any invoices whose balance was carried onto this one, so the
@@ -2110,6 +2142,9 @@
         setMsgWithView('cn-inv-msg', 'Invoice ' + number + ' created and filed in Documents.', viewUrl);
         document.getElementById('cn-inv-lines').innerHTML = ''; invAddLine();
         var tn = document.getElementById('cn-inv-notes'); if (tn) tn.value = '';
+        var dt = document.getElementById('cn-inv-disc-type');  if (dt) dt.value = '';
+        var dv = document.getElementById('cn-inv-disc-value'); if (dv) dv.value = '';
+        var dl2 = document.getElementById('cn-inv-disc-label'); if (dl2) dl2.value = '';
         renderNationInvoices(sub); renderNationDocsCard(sub); loadNicSummary(sub);
       } catch (e){ setMsg('cn-inv-msg', 'Could not create: ' + String(e && e.message || e)); }
     }, function(){ setMsg('cn-inv-msg', 'Could not load the PDF generator (offline?).'); });
@@ -2159,6 +2194,11 @@
     doc.setDrawColor(225); doc.line(cQty - 10, y, cAmt, y); y += 16;
     function totalRow(label, val, bold){ t(label, cUnit, y, { size: bold ? 11 : 10, align: 'right', style: bold ? 'bold' : 'normal' }); t(val, cAmt, y, { size: bold ? 11 : 10, align: 'right', style: bold ? 'bold' : 'normal' }); y += bold ? 18 : 15; }
     totalRow('Subtotal', _money(inv.subtotal));
+    if (Number(inv.discount) > 0.005){
+      var _dl = inv.discount_label ? String(inv.discount_label)
+              : (inv.discount_type === 'percent' ? (Number(inv.discount_value) + '%') : '');
+      totalRow('Discount' + (_dl ? ' - ' + _dl : ''), '-' + _money(inv.discount));
+    }
     if (Number(inv.tax_rate)) totalRow('Tax (' + inv.tax_rate + '%)', _money(inv.tax));
     totalRow('Total (' + inv.currency + ')', _money(inv.total), true);
     // Payment status: show amount received + balance due once a payment exists.
@@ -2224,7 +2264,7 @@
     var r = await api('GET', '/nation_billing?subdomain=eq.' + encodeURIComponent(sub) + '&order=created_at.asc&limit=1');
     var row = (r.ok ? await r.json().catch(function(){ return []; }) : [])[0] || null;
     window._nicBilling = row;
-    var b = row || { cadence: 'monthly', description: '', unit_amount: '', tax_rate: 0, next_run_date: _dPlus(30), anchor_day: '', due_days: 30, auto_send: false, recipient_email: '', cc_emails: '', active: true };
+    var b = row || { cadence: 'monthly', description: '', unit_amount: '', tax_rate: 0, next_run_date: _dPlus(30), anchor_day: '', due_days: 30, auto_send: false, recipient_email: '', cc_emails: '', active: true, discount_type: '', discount_value: '', discount_label: '' };
     var cadOpts = BILL_CADENCE.map(function(c){ return '<option value="' + c[0] + '"' + (b.cadence === c[0] ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('');
     var g2 = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
     var statusLine = row
@@ -2244,6 +2284,16 @@
       +   '<div><label>Amount per period (CAD)</label><input id="cn-bill-amount" type="number" step="0.01" value="' + esc(b.unit_amount === '' ? '' : b.unit_amount) + '"/></div>'
       +   '<div><label>Tax rate (%)</label><input id="cn-bill-tax" type="number" step="0.01" value="' + esc(b.tax_rate || 0) + '"/></div>'
       + '</div>'
+      + '<div style="display:grid;grid-template-columns:150px 110px 1fr;gap:10px;">'
+      +   '<div><label>Discount</label><select id="cn-bill-disc-type">'
+      +     '<option value=""' + (!b.discount_type ? ' selected' : '') + '>None</option>'
+      +     '<option value="percent"' + (b.discount_type === 'percent' ? ' selected' : '') + '>Percent (%)</option>'
+      +     '<option value="fixed"' + (b.discount_type === 'fixed' ? ' selected' : '') + '>Fixed ($)</option>'
+      +   '</select></div>'
+      +   '<div><label>Value</label><input id="cn-bill-disc-value" type="number" step="0.01" min="0" value="' + esc(b.discount_value || '') + '"/></div>'
+      +   '<div><label>Reason shown on invoice (optional)</label><input id="cn-bill-disc-label" value="' + esc(b.discount_label || '') + '" placeholder="e.g. Multi-nation partnership discount"/></div>'
+      + '</div>'
+      + '<div class="sub" style="font-size:11px;margin:2px 0 0;">Standing discount for this nation: taken off the period fee <b>before tax</b> on every generated invoice (carried-forward balances are never re-discounted), and printed as its own line.</div>'
       + '<div style="' + g2 + '">'
       +   '<div><label>Bill on day of month (1-28, optional)</label><input id="cn-bill-anchor" type="number" min="1" max="28" value="' + esc(b.anchor_day || '') + '"/></div>'
       +   '<div><label>Payment due (days)</label><input id="cn-bill-due" type="number" min="0" value="' + esc(b.due_days == null ? 30 : b.due_days) + '"/></div>'
@@ -2274,6 +2324,9 @@
       description: v('cn-bill-desc'),
       unit_amount: parseFloat(v('cn-bill-amount')) || 0,
       tax_rate: parseFloat(v('cn-bill-tax')) || 0,
+      discount_type: (v('cn-bill-disc-type') === 'percent' || v('cn-bill-disc-type') === 'fixed') ? v('cn-bill-disc-type') : null,
+      discount_value: parseFloat(v('cn-bill-disc-value')) || 0,
+      discount_label: v('cn-bill-disc-label') || null,
       anchor_day: v('cn-bill-anchor') ? parseInt(v('cn-bill-anchor'), 10) : null,
       due_days: v('cn-bill-due') ? parseInt(v('cn-bill-due'), 10) : 30,
       auto_send: cb('cn-bill-autosend'),
@@ -2286,6 +2339,7 @@
     var b = _readBilling();
     if (!b.description){ setMsg('cn-bill-msg', 'Enter a line description.'); return; }
     if (!(b.unit_amount > 0)){ setMsg('cn-bill-msg', 'Enter an amount greater than zero.'); return; }
+    if (b.discount_type === 'percent' && b.discount_value > 100){ setMsg('cn-bill-msg', 'Percent discount cannot exceed 100%.'); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(b.next_run_date)){ setMsg('cn-bill-msg', 'Pick the next invoice date.'); return; }
     if (b.auto_send && !b.recipient_email){ setMsg('cn-bill-msg', 'Auto-send needs a billing email.'); return; }
     var existing = window._nicBilling, r;
@@ -2310,21 +2364,26 @@
   window.runNationBilling = async function(sub){
     var b = window._nicBilling; if (!b){ setMsg('cn-bill-msg', 'Save the schedule first.'); return; }
     var n = _nations.filter(function(x){ return x.subdomain === sub; })[0];
-    var total = Math.round((Number(b.unit_amount) || 0) * (1 + (Number(b.tax_rate) || 0) / 100) * 100) / 100;
-    if (!(await dlgConfirm('Generate an invoice now from this schedule for ' + (n ? n.display_name : sub) + '?\n\nThis creates ' + _money(total) + ' and advances the next date. Email is only sent by the automated scheduler, not this manual run.', { title: 'Generate now', okText: 'Generate' }))) return;
+    var _estBase = Math.round((Number(b.unit_amount) || 0) * 100) / 100;
+    var _estDisc = _calcDiscount(_estBase, b.discount_type, Number(b.discount_value) || 0);
+    var total = Math.round((_estBase - _estDisc) * (1 + (Number(b.tax_rate) || 0) / 100) * 100) / 100;
+    if (!(await dlgConfirm('Generate an invoice now from this schedule for ' + (n ? n.display_name : sub) + '?\n\nThis creates ' + _money(total) + (_estDisc > 0 ? ' (after a ' + _money(_estDisc) + ' discount)' : '') + ' and advances the next date. Email is only sent by the automated scheduler, not this manual run.', { title: 'Generate now', okText: 'Generate' }))) return;
     setMsg('cn-bill-msg', 'Generating...', 'ok');
     ensureJsPdf(async function(){
       try {
         var subtotal = Math.round((Number(b.unit_amount) || 0) * 100) / 100;
         var taxRate = Number(b.tax_rate) || 0;
-        var tax = Math.round(subtotal * taxRate) / 100;
-        var tot = Math.round((subtotal + tax) * 100) / 100;
+        var discount = _calcDiscount(subtotal, b.discount_type, Number(b.discount_value) || 0);
+        var taxable = Math.round((subtotal - discount) * 100) / 100;
+        var tax = Math.round(taxable * taxRate) / 100;
+        var tot = Math.round((taxable + tax) * 100) / 100;
         var today = new Date().toISOString().slice(0, 10);
         var due = _dPlus(Number(b.due_days) || 30);
         var number = await nextInvoiceNumber();
         var inv = { subdomain: sub, number: number, issue_date: today, due_date: due, currency: 'CAD',
           line_items: [{ description: b.description, qty: 1, unit_price: subtotal }], subtotal: subtotal, tax_rate: taxRate, tax: tax, total: tot,
           amount_paid: 0, status: 'sent', notes: 'Generated from recurring schedule.', created_by: jwtEmail() };
+        if (discount > 0){ inv.discount_type = b.discount_type; inv.discount_value = Number(b.discount_value) || 0; inv.discount = discount; inv.discount_label = b.discount_label || null; }
         var r = await api('POST', '/nation_invoices', inv, 'return=minimal');
         if (!r.ok){ var t = await r.text(); setMsg('cn-bill-msg', /duplicate|unique/i.test(t) ? 'Number collision, try again.' : 'Could not create invoice.'); return; }
         var doc = buildInvoicePdf(n, inv); var fname = number + '.pdf'; var blob = doc.output('blob'); var viewUrl = URL.createObjectURL(blob); doc.save(fname);

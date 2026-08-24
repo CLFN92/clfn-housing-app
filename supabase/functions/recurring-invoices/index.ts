@@ -105,7 +105,18 @@ serve(async (req) => {
 
       const feeSubtotal = Math.round((Number(sch.unit_amount) || 0) * 100) / 100
       const taxRate     = Number(sch.tax_rate) || 0
-      const feeTax      = Math.round(feeSubtotal * taxRate) / 100
+      // Standing per-nation discount: percent-of-fee or fixed dollars, clamped
+      // to the fee, taken off BEFORE tax. Never applied to carried-forward
+      // balances -- those are already tax-inclusive prior totals.
+      const discType    = (sch.discount_type === 'percent' || sch.discount_type === 'fixed') ? sch.discount_type : null
+      const discValue   = Number(sch.discount_value) || 0
+      let discount = 0
+      if (discType && discValue > 0) {
+        discount = discType === 'percent' ? feeSubtotal * discValue / 100 : discValue
+        discount = Math.round(Math.min(discount, feeSubtotal) * 100) / 100
+      }
+      const feeTaxable  = Math.round((feeSubtotal - discount) * 100) / 100
+      const feeTax      = Math.round(feeTaxable * taxRate) / 100
       const dueDate     = addDays(today, Number(sch.due_days) || 30)
       const lineItems: any[] = [{ description: sch.description, qty: 1, unit_price: feeSubtotal }]
 
@@ -133,7 +144,7 @@ serve(async (req) => {
 
       const subtotal = Math.round((feeSubtotal + carried) * 100) / 100
       const tax      = feeTax
-      const total    = Math.round((subtotal + tax) * 100) / 100
+      const total    = Math.round((subtotal - discount + tax) * 100) / 100
 
       if (dryRun) {
         results.push({ subdomain: sub, would_bill: total, would_carry: carried, carried_from: carriedRefs, next_run_date: sch.next_run_date, dryRun: true })
@@ -153,10 +164,16 @@ serve(async (req) => {
       for (let attempt = 0; attempt < 6 && !inserted; attempt++) {
         seq += 1
         number = 'HLH-' + year + '-' + String(seq).padStart(2, '0')
-        const row = {
+        const row: any = {
           subdomain: sub, number, issue_date: today, due_date: dueDate, currency: 'CAD',
           line_items: lineItems, subtotal, tax_rate: taxRate, tax, total, amount_paid: 0,
           status: 'sent', notes: 'Auto-generated recurring invoice.', created_by: 'recurring',
+        }
+        // Sent only when a discount applies -- keeps inserts working on a DB
+        // that predates nation_invoice_discounts.sql.
+        if (discount > 0) {
+          row.discount_type = discType; row.discount_value = discValue
+          row.discount = discount; row.discount_label = sch.discount_label || null
         }
         const { data: ins, error: insErr } = await admin.from('nation_invoices').insert(row).select('id, number').limit(1)
         if (!insErr && ins && ins[0]) { inserted = ins[0]; break }
@@ -198,6 +215,7 @@ serve(async (req) => {
           try {
             const html = invoiceHtml(nation.display_name || sub, sub, {
               number, issue_date: today, due_date: dueDate, line_items: lineItems, subtotal, tax_rate: taxRate, tax, total,
+              discount, discount_type: discType, discount_value: discValue, discount_label: sch.discount_label || null,
             })
             const cc = String(sch.cc_emails || '').split(',').map((s: string) => s.trim()).filter(Boolean)
             const send = await fetch('https://api.resend.com/emails', {
@@ -251,6 +269,7 @@ function invoiceHtml(nationName: string, sub: string, inv: any): string {
       '<th style="padding:6px 8px;text-align:right;">Amount</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<div style="text-align:right;margin-top:10px;font-size:13px;">' +
       'Subtotal ' + money(inv.subtotal) + '<br>' +
+      (Number(inv.discount) > 0 ? ('Discount' + (inv.discount_label ? ' - ' + esc(String(inv.discount_label)) : (inv.discount_type === 'percent' ? ' (' + inv.discount_value + '%)' : '')) + ' -' + money(inv.discount) + '<br>') : '') +
       (Number(inv.tax_rate) ? ('Tax (' + inv.tax_rate + '%) ' + money(inv.tax) + '<br>') : '') +
       '<b style="font-size:15px;">Total (CAD) ' + money(inv.total) + '</b></div>' +
     '<p style="color:#57503F;font-size:12px;margin-top:16px;">Payment due within ' +
