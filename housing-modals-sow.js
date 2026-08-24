@@ -1533,7 +1533,10 @@ function _sowSafePreprintSave(){
   var _ex = (_sowUnitId && window._sowEditingProjectNumber && typeof getSowByProjectNumber === 'function')
     ? getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber) : null;
   if(_ex && (_sowIsApproved(_ex) || _ex.archived || _ex.cancelled || _ex.system_approved)) return;
-  saveSOW();
+  // keepOpen: this save is a side effect of printing, not the user moving the
+  // request forward — without it, saveSOW's completion path closes the modal
+  // (and navigates back to the origin page) right under the print preview.
+  saveSOW({ keepOpen: true });
 }
 window._sowSafePreprintSave = _sowSafePreprintSave;
 

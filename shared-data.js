@@ -4730,7 +4730,7 @@ function printWorkOrder(){
   // downgrades the status). Falls back to the old unconditional save only if
   // the guard helper isn't loaded on this page.
   if (typeof _sowSafePreprintSave === 'function') _sowSafePreprintSave();
-  else saveSOW();
+  else saveSOW({ keepOpen: true });   // printing must never close the form under the preview
   var get = function(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; };
   var items = collectSowItems().filter(function(it){ return it.category||it.description||it.quote||it.cost; });
   var today = new Date().toLocaleDateString('en-CA');
