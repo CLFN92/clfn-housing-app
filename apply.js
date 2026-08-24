@@ -275,7 +275,9 @@
     { title: 'Applicant', render: function (p) {
         return '<div class="grid2">' + wf('First name', 'w_fn', p.fn) + wf('Last name', 'w_ln', p.ln) + '</div>'
           + wf('Date of birth', 'w_dob', p.dob, 'date')
-          + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band)
+          // Placeholder uses a deliberately FAKE 55-prefix example -- never the
+          // nation's real band prefix (anti-spoofing; see _bandRequired above).
+          + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band, 'text', null, 'e.g. 5512345678')
           +   wf('Marital status', 'w_marital', p.marital, 'select', ['Single', 'Married', 'Common-law', 'Separated', 'Divorced', 'Widowed']) + '</div>'
           + (_bandRequired
               ? '<p class="sub" style="margin:-4px 0 10px;">Your 10-digit registry number, as shown on your status card.</p>'

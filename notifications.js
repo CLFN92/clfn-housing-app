@@ -3486,7 +3486,7 @@ async function renderConfigPanel() {
     +     '<div class="cfg-row">'
     +       '<div class="cfg-label">Nation number (band membership #)</div>'
     +       '<div class="cfg-value" style="display:flex;align-items:center;gap:8px;">'
-    +         '<input type="text" id="cfg_nation_band" inputmode="numeric" maxlength="3" placeholder="e.g. 192" value="' + _ntfEsc(String((window._appSettings && window._appSettings.nation_band_number) || '')) + '"'
+    +         '<input type="text" id="cfg_nation_band" inputmode="numeric" maxlength="3" placeholder="e.g. 550" value="' + _ntfEsc(String((window._appSettings && window._appSettings.nation_band_number) || '')) + '"'
     +         ' style="width:80px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"/>'
     +         '<button type="button" class="btn btn-primary btn-sm" onclick="saveNationBandNumber()">Save</button>'
     +       '</div>'
