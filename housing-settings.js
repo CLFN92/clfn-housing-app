@@ -480,6 +480,34 @@ function onAppTypeChange() {
     if (typeof openCommercialApp === 'function') openCommercialApp();
     return onAppTypeChange();
   }
+
+  // HARD RULE — a current tenant (unit assigned to them) can never be typed
+  // as a New Application: they already have a house on reserve, so their
+  // request is a Transfer (different unit) or a File Update. Revert the radio
+  // to the saved type and explain. Skipped during programmatic restore.
+  if (!window._appTypeRestoring) {
+    var _newEl2 = document.getElementById('apptype_new');
+    if (_newEl2 && _newEl2.checked && typeof currentAppId !== 'undefined' && currentAppId
+        && typeof _appIsTenancyHolder === 'function') {
+      var _cur2 = ((typeof applications !== 'undefined' && applications) || []).find(function(a){ return a && a.id === currentAppId; });
+      if (_cur2 && (_cur2.appType || 'new_housing') !== 'new_housing' && _appIsTenancyHolder(_cur2)) {
+        var _rv2 = _cur2.appType === 'existing_tenant' ? 'apptype_existing'
+                 : _cur2.appType === 'transfer_request' ? 'apptype_transfer' : null;
+        if (_rv2) {
+          _newEl2.checked = false;
+          var _rv2El = document.getElementById(_rv2);
+          if (_rv2El) _rv2El.checked = true;
+          if (typeof showToast === 'function') showToast(
+            (((_cur2.fn||'')+' '+(_cur2.ln||'')).trim() || 'This applicant') + ' is assigned to '
+            + (_cur2.assignedAddress || 'a unit') + ' — a current tenant cannot file a New Application. Use Transfer Request (seeking a different unit) or File Update. To mark them as no longer housed, clear the unit link first.',
+            { type:'error' });
+          window._appTypeRestoring = true;
+          try { return onAppTypeChange(); } finally { window._appTypeRestoring = false; }
+        }
+      }
+    }
+  }
+
   var isExisting = !!(document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked);
   var isTransfer = !!(document.getElementById('apptype_transfer') && document.getElementById('apptype_transfer').checked);
   var isNew      = !isExisting && !isTransfer;

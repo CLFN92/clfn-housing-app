@@ -3267,6 +3267,19 @@ window.inviteApplicantToPortal = inviteApplicantToPortal;
 // Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit
 // tenant gate, and the Add-Tenant modal so the four can no longer drift with
 // different checks and different error messages.
+// Is this applicant a CURRENT TENANT — i.e. does a real unit assignment back
+// them? True when the application carries an assignment (status/assignedUnit)
+// or a non-archived unit's assignedTo points at it. Used by the hard rule
+// that a current tenant can never be typed as a New Application (they file a
+// Transfer Request or File Update instead).
+function _appIsTenancyHolder(app){
+  if (!app) return false;
+  if (app.status === 'assigned' || app.assignedUnit) return true;
+  var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : (window.housingUnits || []);
+  return units.some(function(u){ return u && !u.archived && u.assignedTo === app.id; });
+}
+window._appIsTenancyHolder = _appIsTenancyHolder;
+
 function appAssignabilityStatus(app, unit){
   if(!app) return { ok:false, reason:'Application not found' };
   if(app.archived) return { ok:false, reason:'Application is archived' };

@@ -217,6 +217,17 @@ function validateStep0() {
   // conditionals above). "Own home on reserve" contradicts a New Application;
   // Living Situation "Other" is the escape hatch for genuine edge cases.
   var _apt = (typeof getAppType === 'function') ? getAppType() : 'new_housing';
+  // HARD RULE backstop: a current tenant (real unit assignment) can never be
+  // a New Application — the radio guard in onAppTypeChange reverts the UI,
+  // this blocks any path that slips past it.
+  if (_apt === 'new_housing' && typeof currentAppId !== 'undefined' && currentAppId
+      && typeof _appIsTenancyHolder === 'function') {
+    var _curTen = ((typeof applications !== 'undefined' && applications) || []).find(function(a){ return a && a.id === currentAppId; });
+    if (_curTen && _appIsTenancyHolder(_curTen)) {
+      errs.push('This applicant is assigned to ' + (_curTen.assignedAddress || 'a unit')
+        + ' — a current tenant cannot file a New Application. Change the Application Type to Transfer Request or File Update, or clear the unit link first.');
+    }
+  }
   if (_apt === 'new_housing' && fld('reserve') === 'On Reserve') {
     var _ls = fld('living_situation');
     if (!_ls) {
