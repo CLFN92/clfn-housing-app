@@ -1508,6 +1508,14 @@ function _renderLandingKpis(){
   // housed. Commercial (business/department) applications are excluded — they
   // request buildings, not waitlist spots, and were inflating this count.
   var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial'; }, true);
+  // Subset annotation: new applications still sitting in DRAFT (started but
+  // never submitted) — same population rules as the New Applications row.
+  var draftApps = apps.filter(function(a){
+    if(!a || a.archived || a.status !== 'draft') return false;
+    if(_isHoused(a)) return false;
+    var t = a.appType || 'new_housing';
+    return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial';
+  }).length;
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
@@ -1516,6 +1524,7 @@ function _renderLandingKpis(){
   setKpi('kpi_under_repair',    underRepairN);
   setKpi('kpi_condemned',       condemnedN);
   setKpi('kpi_new_apps',        newApps);
+  setKpi('kpi_draft_apps',      draftApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
 
@@ -1627,9 +1636,10 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests') {
+  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps') {
     var _typeCfg = {
-      new_apps:       { title:'New Applications',                          pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request'; }, empty:'No active new applications.' },
+      new_apps:       { title:'New Applications',                          pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No active new applications.' },
+      draft_apps:     { title:'New Applications — In Draft',               pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No draft applications.' },
       file_updates:   { title:'File Updates — Existing Tenant',            pred:function(t){ return t==='existing_tenant'; },   empty:'No active file updates.' },
       house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' }
     }[type];
@@ -1640,7 +1650,8 @@ function showHousingKpiDrilldown(type) {
     var _isHoused2 = function(a){ return a.status === 'assigned' || !!a.assignedUnit || !!_housedIds2[a.id]; };
     var rows = apps.filter(function(a){
       if (!a || a.archived || a.status==='declined') return false;
-      if (type === 'new_apps' && _isHoused2(a)) return false;
+      if ((type === 'new_apps' || type === 'draft_apps') && _isHoused2(a)) return false;
+      if (type === 'draft_apps' && a.status !== 'draft') return false;
       return _typeCfg.pred(a.appType || 'new_housing');
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
     exportHeaders = ['Applicant','App ID','Tier','Score','Status','Days Waiting'];
