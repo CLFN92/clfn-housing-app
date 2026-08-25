@@ -249,6 +249,9 @@ window.CLFN_CONFIG_LOADED = true;
           }
         }
       } catch (e) { /* branding refresh is best-effort */ }
+      // Let already-booted pages re-apply branding (e.g. apply.html re-sets
+      // its --accent) without waiting for the next visit's cache.
+      try { window.dispatchEvent(new CustomEvent('fnhub:registry-refreshed')); } catch (e) {}
       var knownNow = !!(window.NATIONS_DIRECTORY[host] || window.NATIONS_DIRECTORY[sub]);
       // Only a brand-new, previously-unresolvable nation triggers a one-time reload.
       if (!knownBefore && added && knownNow && !sessionStorage.getItem('_fnhub_reg_reloaded')) {

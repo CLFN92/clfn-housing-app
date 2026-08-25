@@ -18,11 +18,18 @@
   var app = document.getElementById('app');
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
 
-  // Nation branding.
-  var nn = document.getElementById('nname'), nl = document.getElementById('nlogo');
-  if (nn) nn.textContent = (NC.display_name || NC.short || 'Housing') + ' Housing';
-  if (nl) nl.textContent = ((NC.short || 'H').charAt(0) || 'H').toUpperCase();
-  if (NC.primary_color) document.documentElement.style.setProperty('--accent', NC.primary_color);
+  // Nation branding — applied at boot and re-applied when the registry
+  // refresh lands mid-visit (a stale localStorage cache otherwise leaves the
+  // OLD brand colour on buttons until the next visit).
+  function _applyBranding() {
+    var C = window.NATION_CONFIG || NC;
+    var nn = document.getElementById('nname'), nl = document.getElementById('nlogo');
+    if (nn) nn.textContent = (C.display_name || C.short || 'Housing') + ' Housing';
+    if (nl) nl.textContent = ((C.short || 'H').charAt(0) || 'H').toUpperCase();
+    if (C.primary_color) document.documentElement.style.setProperty('--accent', C.primary_color);
+  }
+  _applyBranding();
+  window.addEventListener('fnhub:registry-refreshed', _applyBranding);
 
   function getAT() { return localStorage.getItem(LS_AT) || ''; }
   function getRT() { return localStorage.getItem(LS_RT) || ''; }
@@ -135,7 +142,8 @@
     var band = '';
     if (_loginBandRequired) {
       band = ((document.getElementById('lband') || {}).value || '').replace(/[\s-]/g, '');
-      if (!/^\d{10}$/.test(band)) { setMsg('lmsg', 'Please enter your 10-digit band (registry) number, as shown on your status card.', 'err'); return; }
+      // Generic on purpose — never disclose the expected length or prefix.
+      if (!/^\d{10}$/.test(band)) { setMsg('lmsg', 'That band / membership number could not be verified. Please check the number on your status card, or contact the Housing office.', 'err'); return; }
     }
     var btn = document.getElementById('lbtn'); btn.disabled = true; btn.textContent = 'Sending…';
     function fail(msg) { setMsg('lmsg', msg || 'Could not send the link. Please try again.', 'err'); btn.disabled = false; btn.textContent = 'Email me a sign-in link'; }
@@ -513,13 +521,13 @@
   }
 
   function _evtBtn() { return (typeof event !== 'undefined' && event && event.target) ? event.target : null; }
-  // Band-number FORMAT check only (10 digits). The nation-prefix match is
-  // enforced server-side at submit — the portal never knows the prefix, so a
-  // wrong-nation number is rejected there with a generic message.
+  // Band-number FORMAT check only. The nation-prefix match is enforced
+  // server-side at submit — the portal never knows the prefix. The message is
+  // deliberately generic: it never discloses the expected length or prefix.
   function _bandError(p) {
     if (!_bandRequired) return '';
     var band = String(p.band || '').replace(/[\s-]/g, '');
-    if (!/^\d{10}$/.test(band)) return 'Please enter your 10-digit band (registry) number, as shown on your status card.';
+    if (!/^\d{10}$/.test(band)) return 'That band / membership number could not be verified. Please check the number on your status card, or contact the Housing office.';
     p.band = band;
     return '';
   }

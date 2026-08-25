@@ -126,6 +126,8 @@ async function portalEnabled(admin: any): Promise<boolean> {
   return !(v === false || v === 'false')
 }
 const PORTAL_CLOSED_MSG = 'Online applications are currently closed. Please contact the Housing office.'
+// Generic on purpose -- never disclose the expected length or prefix.
+const BAND_FAIL_MSG = 'That band / membership number could not be verified. Please check the number on your status card, or contact the Housing office.'
 
 // Only allow magic-link redirects back to our own hosts (defense in depth;
 // Supabase also validates against its Redirect URL allow-list).
@@ -240,8 +242,8 @@ serve(async (req) => {
       const gatePrefix = await nationBandPrefix(admin0)
       if (gatePrefix) {
         const gateBand = String(body.band || '').replace(/[\s-]/g, '')
-        if (!/^\d{10}$/.test(gateBand)) return json({ error: 'Please enter your 10-digit band (registry) number.' }, 400)
-        if (gateBand.slice(0, 3) !== gatePrefix) return json({ error: 'Your band number could not be verified for this nation. Please check the number on your status card, or contact the Housing office.' }, 400)
+        if (!/^\d{10}$/.test(gateBand)) return json({ error: BAND_FAIL_MSG }, 400)
+        if (gateBand.slice(0, 3) !== gatePrefix) return json({ error: BAND_FAIL_MSG }, 400)
       }
       // If this nation has no email provider configured, tell the client so it
       // can fall back to Supabase's built-in sender rather than fail.
@@ -416,10 +418,10 @@ serve(async (req) => {
       if (reqPrefix) {
         const band = String(p.band || '').replace(/[\s-]/g, '')
         if (!/^\d{10}$/.test(band)) {
-          return json({ error: 'Please enter your 10-digit band (registry) number on the Applicant step.' }, 400)
+          return json({ error: BAND_FAIL_MSG }, 400)
         }
         if (band.slice(0, 3) !== reqPrefix) {
-          return json({ error: 'Your band number could not be verified for this nation. Please check the number on your status card, or contact the Housing office.' }, 400)
+          return json({ error: BAND_FAIL_MSG }, 400)
         }
         p.band = band   // persist the normalized (digits-only) form
       }
