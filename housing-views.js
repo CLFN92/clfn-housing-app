@@ -1518,9 +1518,6 @@ function _renderLandingKpis(){
     var t = a.appType || 'new_housing';
     return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial';
   }).length;
-  // Deceased applications: their own group — kept as records, excluded from
-  // every type row above (and already zero-scored / off Match / unassignable).
-  var deceasedApps = apps.filter(function(a){ return a && !a.archived && a.deceased; }).length;
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
@@ -1530,17 +1527,19 @@ function _renderLandingKpis(){
   setKpi('kpi_condemned',       condemnedN);
   setKpi('kpi_new_apps',        newApps);
   setKpi('kpi_draft_apps',      draftApps);
-  setKpi('kpi_deceased_apps',   deceasedApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
 
-  // "Likely already housed" review link — new-housing apps whose applicant
+  // "Likely already housed" quick action — new-housing apps whose applicant
   // already has a home on file (candidates to reclassify). Hidden when zero.
-  var _lhBtn = document.getElementById('kpi_likely_housed_btn');
+  var _lhBtn = document.getElementById('qa_likely_housed_btn');
   if (_lhBtn) {
     var _lhN = (typeof _housingLikelyHousedApps === 'function') ? _housingLikelyHousedApps().length : 0;
-    if (_lhN > 0) { _lhBtn.textContent = 'Review ' + _lhN + ' likely already-housed →'; _lhBtn.style.display = ''; }
-    else { _lhBtn.style.display = 'none'; }
+    var _lhMeta = document.getElementById('qa_likely_housed_meta');
+    if (_lhN > 0) {
+      if (_lhMeta) _lhMeta.textContent = _lhN + ' to review';
+      _lhBtn.style.display = '';
+    } else { _lhBtn.style.display = 'none'; }
   }
 
   // Scroll-collapse: shrink the KPI strip to icon-only once the page scrolls,
@@ -1584,7 +1583,9 @@ function showHousingKpiDrilldown(type) {
   }
   function appRow(a, cols) {
     var sid = (a.id||'').replace(/'/g,"\\'");
-    return '<tr class="clickable" onclick="_closeHousingKpiDrill();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">'
+    // Stamp which drill list opened the app so the form's Back button returns
+    // to this list (reopened fresh) instead of the landing page.
+    return '<tr class="clickable" onclick="_closeHousingKpiDrill();window._appFormReturnDrill=\''+type+'\';if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">'
       + cols + '</tr>';
   }
 
@@ -1817,7 +1818,7 @@ function showLikelyHousedReport(){
       + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
       +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'transfer_request\')">&rarr; Transfer</button>'
       +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'existing_tenant\')">&rarr; File Update</button>'
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeLikelyHoused();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeLikelyHoused();window._appFormReturnDrill=\'likely_housed\';if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
       + '</div></td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No new applications match an existing tenancy — your New Applications count looks clean.</td></tr>';

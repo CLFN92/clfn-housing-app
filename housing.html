@@ -139,17 +139,10 @@
           <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_file_updates">—</span>
         </div>
         <div onclick="showHousingKpiDrilldown('house_requests')" role="button" tabindex="0" title="Existing tenant · transfer"
-             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border);">
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;">
           <span style="font-size:12px;color:var(--text);">Existing House Request</span>
           <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_house_requests">—</span>
         </div>
-        <div onclick="showHousingKpiDrilldown('deceased_apps')" role="button" tabindex="0" title="Applications whose applicant is deceased — kept as records, excluded from the groups above"
-             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;">
-          <span style="font-size:12px;color:var(--muted);">Deceased</span>
-          <span style="font-size:15px;font-weight:800;color:var(--muted);" id="kpi_deceased_apps">—</span>
-        </div>
-        <button id="kpi_likely_housed_btn" onclick="showLikelyHousedReport()" style="display:none;margin-top:8px;background:none;border:none;color:#2563eb;font-size:11px;font-weight:700;cursor:pointer;padding:4px 0;text-align:left;text-decoration:underline;">Review likely already-housed &rarr;</button>
-        <button onclick="showReconcileReport()" style="margin-top:6px;background:none;border:none;color:#2563eb;font-size:11px;font-weight:700;cursor:pointer;padding:4px 0;text-align:left;text-decoration:underline;">Reconcile units &amp; applications &rarr;</button>
       </div>
     </div>
   </div>
@@ -193,6 +186,16 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/><path d="M9 7h6M9 11H7"/></svg>
         Renovation Questionnaire
         <span class="qa-meta">Guided scope of work</span>
+      </button>
+      <button class="qa-btn" data-qa="likely-housed" id="qa_likely_housed_btn" style="display:none;" title="New-housing applications whose applicant already has a home on file — candidates to reclassify">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5L12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>
+        Review Likely Already-Housed
+        <span class="qa-meta" id="qa_likely_housed_meta">&mdash;</span>
+      </button>
+      <button class="qa-btn" data-qa="reconcile" title="Cross-check units against applications and fix mismatched statuses">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Reconcile Units &amp; Applications
+        <span class="qa-meta">Data health check</span>
       </button>
       <button class="qa-btn" data-qa="rent-payment" disabled title="Coming soon" data-roles="cfo,finance_l1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
@@ -305,6 +308,7 @@
 </div>
 <div id="appProgressFoot" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--dark2);border-top:1px solid var(--dark3);padding:10px 20px;z-index:100;">
   <div style="max-width:900px;margin:0 auto;display:flex;align-items:center;gap:12px;">
+    <span id="app_saved_indicator" style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;"></span>
     <div style="flex:1;height:4px;background:var(--dark3);border-radius:2px;overflow:hidden;">
       <div id="pfill" style="height:100%;background:var(--yellow);border-radius:2px;width:0%;transition:width .3s;"></div>
     </div>
@@ -387,6 +391,16 @@
             </div>
           </div>
       </div>
+      <div class="card" id="onrez_status_card" style="border:2px solid var(--yellow);">
+        <div class="ctitle">&#127968; Residency &amp; Housing Status</div>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">Where the applicant lives today. Flags members who are <strong>on reserve with a reserve address but no home of their own</strong> (staying with family / doubled up) so they stand out for scoring and matching.</p>
+        <div class="fg c2">
+          <div class="f" data-req="reserve"><label>On Reserve Status <span class="r">*</span></label><select id="reserve" onchange="if(typeof _syncOnRezBadge==='function')_syncOnRezBadge();"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
+          <div class="f"><label>Living Situation</label><select id="living_situation" onchange="if(typeof _syncOnRezBadge==='function')_syncOnRezBadge();"><option value="">Select</option><option value="own_home">Living in own home</option><option value="family_on_reserve">Staying with family on reserve (not own home)</option><option value="renting_off_reserve">Renting / living off reserve</option><option value="no_fixed_address">Homeless / no fixed address</option><option value="other">Other</option></select></div>
+        </div>
+        <div id="onrez_badge" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--warn-amber-bg);color:var(--warn-amber-text);">&#128101; On reserve &mdash; no home of their own (doubled up)</div>
+        <div id="nofixed_badge" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--danger-bg);color:var(--danger);">&#128680; No fixed address / homeless</div>
+      </div>
       <div class="card">
         <div class="ctitle">Personal Information</div>
         <div class="fg c2">
@@ -394,8 +408,6 @@
           <div class="f" data-req="ln"><label>Last Name <span class="r">*</span></label><input type="text" id="ln" placeholder="Last name" oninput="liveSync()"/></div>
           <div class="f" data-req="dob"><label>Date of Birth <span class="r">*</span></label><input type="date" id="dob"/></div>
           <div class="f"><label>Band Number</label><input type="number" id="band" placeholder="Band number"/></div>
-          <div class="f" data-req="reserve"><label>On Reserve Status <span class="r">*</span></label><select id="reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
-          <div class="f"><label>Living Situation</label><select id="living_situation"><option value="">Select</option><option value="own_home">Living in own home</option><option value="family_on_reserve">Staying with family on reserve (not own home)</option><option value="renting_off_reserve">Renting / living off reserve</option><option value="no_fixed_address">Homeless / no fixed address</option><option value="other">Other</option></select></div>
           <div class="f"><label>Deceased</label><label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;padding-top:8px;"><input type="checkbox" id="deceased_flag" onchange="var w=document.getElementById('deceased_date_wrap'); if(w) w.style.display=this.checked?'':'none'; if(typeof triggerV2Score==='function') triggerV2Score(); if(typeof persistDeceasedChange==='function') persistDeceasedChange();" style="width:auto;accent-color:var(--yellow);"/> Applicant is deceased</label></div>
           <div class="f" id="deceased_date_wrap" style="display:none;"><label>Date of Death</label><input type="date" id="deceased_date" onchange="if(typeof persistDeceasedChange==='function') persistDeceasedChange();"/></div>
           <div class="f" data-req="marital"><label>Marital Status <span class="r">*</span></label><select id="marital"><option value="">Select</option><option>Single</option><option>Married</option><option>Common-Law</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>

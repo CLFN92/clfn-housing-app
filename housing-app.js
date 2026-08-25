@@ -786,6 +786,29 @@ function _appSigImg(appId, canvasId, sigKey){
   var prev = (((applications || []).find(function(a){ return a && a.id === appId; })) || {}).sig || {};
   return (prev[sigKey] && prev[sigKey].image) || '';
 }
+// "Last saved" indicator in the wizard's progress footer. Called by
+// saveApplicationWithDraftFallback (shared-data.js) after every application
+// save — auto-saves on step navigation, type changes, deceased changes, and
+// explicit saves all stamp it. ok === false means the save was queued locally
+// (offline / degraded mode), which is still safe — say so instead of a time.
+window._appStampSaved = function(appId, ok){
+  try {
+    var el = document.getElementById('app_saved_indicator');
+    if (!el) return;
+    var al = document.getElementById('appLayout');
+    if (!al || al.style.display === 'none') return;               // wizard closed
+    if (typeof currentAppId !== 'undefined' && currentAppId && appId && currentAppId !== appId) return;
+    el.textContent = ok
+      ? ('✓ Auto-saved ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}))
+      : '🕒 Saved on this device — will sync when connection returns';
+  } catch(e){}
+};
+function _appResetSavedIndicator(msg){
+  var el = document.getElementById('app_saved_indicator');
+  if (el) el.textContent = msg || '💾 Auto-saves as you go';
+}
+window._appResetSavedIndicator = _appResetSavedIndicator;
+
 function saveApplicationRecord(opts){
   var appType = typeof getAppType === 'function' ? getAppType() : 'new_housing';
   var isFileUpdate = (appType === 'existing_tenant');

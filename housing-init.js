@@ -147,6 +147,12 @@ function closeApplicationForm(){
   var apf = document.getElementById('appProgressFoot'); if(apf) apf.style.display='none';
   var em = document.getElementById('editModal'); if(em) em.classList.remove('on');
 
+  // If the app was opened from a KPI drilldown list (or the Likely Already
+  // Housed report), Back should land on that list again — captured here,
+  // reopened after the underlying view is restored below.
+  var _returnDrill = window._appFormReturnDrill || null;
+  window._appFormReturnDrill = null;
+
   // Cross-page referrer wins — the user came from match.html (or similar)
   // via a hard navigation, so the in-memory _navStack is empty on this page
   // and would otherwise dump them at home/landing.
@@ -179,6 +185,16 @@ function closeApplicationForm(){
     showEmployeeHome();
   }
   window._navSkipPush = false;
+
+  // Reopen the drill list on top of the restored view (recomputed fresh, so
+  // any status/type change made in the form is already reflected).
+  if (_returnDrill) {
+    if (_returnDrill === 'likely_housed') {
+      if (typeof showLikelyHousedReport === 'function') showLikelyHousedReport();
+    } else if (typeof showHousingKpiDrilldown === 'function') {
+      showHousingKpiDrilldown(_returnDrill);
+    }
+  }
 }
 
 function newApp(){
@@ -194,6 +210,7 @@ function newApp(){
   // Reset editing state
   currentAppId = null;
   window._appFormReturnTo = null;
+  window._appFormReturnDrill = null;   // fresh apps aren't drill-launched
   _step6DocLib = null;       // reset so DocLibrary re-mounts for new app ID
   _step6DocLibAppId = null;  // companion tracker — must be cleared together
   // Hide Internal Notes tab — re-appears after the first auto-save.
@@ -249,6 +266,10 @@ function newApp(){
   applyTenancyFieldRoles();
   buildV2FormSelects();
   triggerV2Score();
+  // Fields are cleared above — hide any stale Residency-card flag badges.
+  if (typeof _syncOnRezBadge === 'function') _syncOnRezBadge();
+  // Fresh form — reset the last-saved indicator until the first auto-save.
+  if (typeof _appResetSavedIndicator === 'function') _appResetSavedIndicator();
 }
 
 
@@ -2366,6 +2387,10 @@ function _runQuickAction(action){
     if(typeof showWorklist === 'function') showWorklist();
   } else if(action === 'run-match'){
     if(typeof showMatch === 'function') showMatch();
+  } else if(action === 'likely-housed'){
+    if(typeof showLikelyHousedReport === 'function') showLikelyHousedReport();
+  } else if(action === 'reconcile'){
+    if(typeof showReconcileReport === 'function') showReconcileReport();
   } else if(action === 'rent-payment'){
     showToast('Coming soon — Finance module.', {type:'info'});
   }

@@ -587,6 +587,23 @@ function persistDeceasedChange(){
 }
 window.persistDeceasedChange = persistDeceasedChange;
 
+// Residency & Housing Status card (Step 0): live flag badges for members who
+// are on reserve but without a home of their own. Pure display — reads the
+// real `reserve` + `living_situation` fields, writes nothing.
+function _syncOnRezBadge(){
+  try {
+    var reserve = (document.getElementById('reserve') || {}).value || '';
+    var livsit  = (document.getElementById('living_situation') || {}).value || '';
+    var onRezNoHouse = reserve === 'On Reserve' && livsit === 'family_on_reserve';
+    var noFixed      = livsit === 'no_fixed_address';
+    var b1 = document.getElementById('onrez_badge');
+    var b2 = document.getElementById('nofixed_badge');
+    if (b1) b1.style.display = onRezNoHouse ? '' : 'none';
+    if (b2) b2.style.display = noFixed ? '' : 'none';
+  } catch(e){}
+}
+window._syncOnRezBadge = _syncOnRezBadge;
+
 // ── Transfer request: search and pre-populate from existing tenant record ──
 function transferTenantSearch(q) {
   var results = document.getElementById('transfer_tenant_results');

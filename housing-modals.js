@@ -2600,6 +2600,8 @@ window.openEditModal = function(appId) {
 
   // Store the ID so saveApplicationRecord knows which record to update
   currentAppId = app.id;
+  // Neutral last-saved indicator until the first save of this editing session.
+  if (typeof _appResetSavedIndicator === 'function') _appResetSavedIndicator('💾 Changes auto-save as you go');
   // Existing application → Internal Notes tab is available immediately.
   if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
   // Apply or remove the signature-panel lock based on the app's status —
@@ -2625,6 +2627,7 @@ window.openEditModal = function(appId) {
   set('band',         app.band);
   set('reserve',      app.reserve);
   set('living_situation', app.livingSituation);
+  if (typeof _syncOnRezBadge === 'function') _syncOnRezBadge();   // Residency card flag badges
   set('marital',      app.marital);
   set('phone',        app.phone?formatPhone(app.phone):'');
   set('email',        app.email);

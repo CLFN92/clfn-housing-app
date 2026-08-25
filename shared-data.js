@@ -696,7 +696,12 @@ function saveWithDraftFallback(entityType, id, entity){
 // ── Per-entity convenience wrappers ──────────────────────────────────────────
 function saveApplicationWithDraftFallback(app){
   if(!app || !app.id) return Promise.resolve(false);
-  return saveWithDraftFallback('app', app.id, app);
+  return saveWithDraftFallback('app', app.id, app).then(function(ok){
+    // Application-wizard "last saved" indicator (housing-app.js) — no-op on
+    // pages without the wizard or when it's closed.
+    if (typeof window._appStampSaved === 'function') window._appStampSaved(app.id, ok);
+    return ok;
+  });
 }
 function saveUnitWithDraftFallback(unit){
   if(!unit || !unit.id) return Promise.resolve(false);

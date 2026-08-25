@@ -376,7 +376,7 @@ function _clearLocalClientState() {
     '_unitPhotos','_staffCache','_editingUnitId','_rbaUnitId','_sowUnitId',
     '_currentDetailUnitId','_ctLastSaved','_pendingLookupUser','_currentScorecardApp',
     '_auStagedPhotos','_ueStagedPhotos','_rpPendingPhotos','_rpStoredPhotos',
-    '_rpUnitId','_tenantFilesUnitId','_appFormReturnTo','_appMenuId',
+    '_rpUnitId','_tenantFilesUnitId','_appFormReturnTo','_appFormReturnDrill','_appMenuId',
     '_userLookupTimer','_ctEditIdx','_ctFilter','_sowWasPreviouslySaved',
     '_sowAfterContractorSave','_rpAfterContractorSave','_printPanelDoc'
   ];

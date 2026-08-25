@@ -215,6 +215,8 @@
       body: JSON.stringify(body)
     }).then(function(r){
       if(!r.ok) return r.text().then(function(t){ throw new Error('HTTP '+r.status+': '+t); });
+      var ind = document.getElementById('tic_saved_indicator');
+      if(ind) ind.textContent = '✓ Saved ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
       return r.json();
     });
   }
@@ -981,6 +983,7 @@
         // is already the save confirmation; a toast per field is noisy when
         // editing several Overview fields in a row.
         if (key === TIC_C.tenancy_status && body[key] === 'banished') _ticSyncBanishedToBcr();
+        if (key === TIC_C.tenancy_status && body[key] === 'deceased') _ticSyncDeceasedToApplication();
       })
       .catch(function(err){
         inp.classList.remove('tic-saving');
@@ -1007,6 +1010,64 @@
     }
     if (typeof showToast === 'function') showToast('Add ' + name + ' to the BCR (banishment) list to keep eligibility checks in sync.', {type:'info'});
     if (typeof openBcrManager === 'function') openBcrManager(name);
+  }
+
+  // Flow a Tenancy Status of "deceased" onto the person's housing application
+  // (the deceased flag zero-scores it, keeps it off Match, and blocks
+  // assignment). One-way, like the Banished→BCR sync — clearing the status
+  // does not un-flag the application; staff do that from the application form.
+  function _ticSyncDeceasedToApplication(){
+    try {
+      var t = _ticState.tenant || {};
+      var u = _ticState.unit   || {};
+      var name  = t[TIC_C.full_name] || u.assignedName || '';
+      var appId = t[TIC_C.application_id] || u.assignedTo || '';
+      var today = new Date().toISOString().slice(0, 10);
+      var role  = window.currentRole || 'staff';
+
+      // In-memory first (pages that loaded applications[] at boot).
+      var apps = (typeof applications !== 'undefined' && applications) ? applications : (window.applications || []);
+      var app = null;
+      if (appId) app = apps.find(function(a){ return a && a.id === appId; });
+      if (!app && name) {
+        var lc = name.trim().toLowerCase();
+        app = apps.find(function(a){
+          return a && !a.archived && (((a.fn || '') + ' ' + (a.ln || '')).trim().toLowerCase() === lc);
+        });
+      }
+      if (app) {
+        if (app.deceased) return;   // already flagged
+        app.deceased = true;
+        if (!app.deceasedDate) app.deceasedDate = today;
+        if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
+        else if (typeof sbSaveApplication === 'function') sbSaveApplication(app).catch(function(){});
+        if (typeof auditEntry === 'function') auditEntry(app.id, 'app_deceased_set', 'Marked deceased from the Tenant Card (Tenancy Status)', role);
+        if (typeof showToast === 'function') showToast('Application for ' + name + ' marked Deceased.', {type:'info'});
+        if (typeof _renderLandingKpis === 'function') try { _renderLandingKpis(); } catch(e){}
+        return;
+      }
+
+      // Not in memory (e.g. tenants.html) — patch the application's data blob
+      // by id. `deceased` rides the jsonb, so only that column is touched.
+      if (!appId) {
+        if (name && typeof showToast === 'function') showToast('No linked application found for ' + name + ' — if they have one on file, open it and tick Deceased there too.', {type:'info'});
+        return;
+      }
+      _ticGet('housing_applications?id=eq.' + encodeURIComponent(appId) + '&select=id,data')
+        .then(function(rows){
+          if (!rows || rows._ticMissing || rows._ticError || !rows[0]) return;
+          var d = rows[0].data || {};
+          if (d.deceased) return;
+          d.deceased = true;
+          if (!d.deceasedDate) d.deceasedDate = today;
+          return _ticWrite('PATCH', 'housing_applications?id=eq.' + encodeURIComponent(appId), { data: d })
+            .then(function(){
+              if (typeof auditEntry === 'function') auditEntry(appId, 'app_deceased_set', 'Marked deceased from the Tenant Card (Tenancy Status)', role);
+              if (typeof showToast === 'function') showToast('Application' + (name ? ' for ' + name : '') + ' marked Deceased.', {type:'info'});
+            });
+        })
+        .catch(function(e){ console.warn('[TIC] deceased -> application sync failed:', e); });
+    } catch(e){ console.warn('[TIC] deceased sync:', e); }
   }
 
   function _ticToggleHomeCare(){
@@ -2395,6 +2456,14 @@
 
     var footer = modal.querySelector('.tic-footer');
     if(footer) footer.addEventListener('click', _ticOnFooterClick);
+    // "Last saved" indicator — TIC fields auto-save per field; this gives a
+    // persistent timestamp alongside the brief per-field highlight.
+    if(footer && !footer.querySelector('#tic_saved_indicator')){
+      var savedEl = document.createElement('span');
+      savedEl.id = 'tic_saved_indicator';
+      savedEl.style.cssText = 'font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;align-self:center;';
+      footer.insertBefore(savedEl, footer.firstChild);
+    }
 
     // Scroll-collapse: shrink the info strip to icon-only once the tab body
     // scrolls, freeing space on tablet/mobile (shared-ui.js).
@@ -2418,6 +2487,8 @@
     _ticState.ledger = null; _ticState.notes = []; _ticState.applicationNotes = [];
     _ticState.movementLog = [];
     _ticSyncFooter();   // hide View Unit until the assigned unit resolves
+    var _si = document.getElementById('tic_saved_indicator');
+    if(_si) _si.textContent = _ticReadOnlyRole() ? '' : '💾 Fields save automatically';
     _ticApplyCommercialMode();   // restore all tabs until the tenant resolves
     _ticDocLib = null; _ticDocLibKey = null;
     _ticUtilDocLib = null; _ticUtilDocLibKey = null;
