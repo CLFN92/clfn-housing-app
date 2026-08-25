@@ -559,6 +559,10 @@ function onAppTypeChange() {
       }
     }
   } catch(e){ console.warn('[appType] persist-on-change failed:', e); }
+
+  // Residency-card badges depend on the application type (the on-reserve
+  // prompts only apply to New Applications) — resync on every type change.
+  if (typeof _syncOnRezBadge === 'function') _syncOnRezBadge();
 }
 
 // Persist the Deceased flag + date immediately while EDITING a saved
@@ -594,12 +598,22 @@ function _syncOnRezBadge(){
   try {
     var reserve = (document.getElementById('reserve') || {}).value || '';
     var livsit  = (document.getElementById('living_situation') || {}).value || '';
+    var apt     = (typeof getAppType === 'function') ? getAppType() : 'new_housing';
+    var isNewApp = (apt === 'new_housing');
     var onRezNoHouse = reserve === 'On Reserve' && livsit === 'family_on_reserve';
     var noFixed      = livsit === 'no_fixed_address';
+    // New-Application on-reserve screens: prompt while Living Situation is
+    // blank; flag the own-home contradiction (that's a transfer/file update).
+    var prompt   = isNewApp && reserve === 'On Reserve' && !livsit;
+    var conflict = isNewApp && reserve === 'On Reserve' && livsit === 'own_home';
     var b1 = document.getElementById('onrez_badge');
     var b2 = document.getElementById('nofixed_badge');
+    var b3 = document.getElementById('onrez_prompt');
+    var b4 = document.getElementById('onrez_conflict');
     if (b1) b1.style.display = onRezNoHouse ? '' : 'none';
     if (b2) b2.style.display = noFixed ? '' : 'none';
+    if (b3) b3.style.display = prompt ? '' : 'none';
+    if (b4) b4.style.display = conflict ? '' : 'none';
   } catch(e){}
 }
 window._syncOnRezBadge = _syncOnRezBadge;

@@ -1518,6 +1518,15 @@ function _renderLandingKpis(){
     var t = a.appType || 'new_housing';
     return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial';
   }).length;
+  // Subset annotation: doubled-up members — on reserve without a home of
+  // their own (staying with family). Same population rules as New Applications.
+  var doubledApps = apps.filter(function(a){
+    if(!a || a.archived || a.status === 'declined' || a.status === 'draft' || a.deceased) return false;
+    if(_isHoused(a)) return false;
+    var t = a.appType || 'new_housing';
+    if(t === 'existing_tenant' || t === 'transfer_request' || t === 'commercial') return false;
+    return a.livingSituation === 'family_on_reserve';
+  }).length;
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
@@ -1527,6 +1536,7 @@ function _renderLandingKpis(){
   setKpi('kpi_condemned',       condemnedN);
   setKpi('kpi_new_apps',        newApps);
   setKpi('kpi_draft_apps',      draftApps);
+  setKpi('kpi_doubled_apps',    doubledApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
 
@@ -1643,10 +1653,11 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps' || type === 'deceased_apps') {
+  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps' || type === 'deceased_apps' || type === 'doubled_apps') {
     var _typeCfg = {
       new_apps:       { title:'New Applications',                          pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No active new applications.' },
       draft_apps:     { title:'New Applications — In Draft',               pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No draft applications.' },
+      doubled_apps:   { title:'New Applications — Doubled Up (on reserve)', pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No doubled-up applicants on file.' },
       file_updates:   { title:'File Updates — Existing Tenant',            pred:function(t){ return t==='existing_tenant'; },   empty:'No active file updates.' },
       house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' },
       deceased_apps:  { title:'Applications — Deceased',                   pred:function(){ return true; },                     empty:'No deceased-flagged applications.' }
@@ -1661,8 +1672,9 @@ function showHousingKpiDrilldown(type) {
       // Deceased apps live only in their own group; every other group excludes them.
       if (type === 'deceased_apps') return !!a.deceased;
       if (a.deceased || a.status==='declined') return false;
-      if ((type === 'new_apps' || type === 'draft_apps') && _isHoused2(a)) return false;
+      if ((type === 'new_apps' || type === 'draft_apps' || type === 'doubled_apps') && _isHoused2(a)) return false;
       if (type === 'draft_apps' && a.status !== 'draft') return false;
+      if (type === 'doubled_apps' && (a.status === 'draft' || a.livingSituation !== 'family_on_reserve')) return false;
       return _typeCfg.pred(a.appType || 'new_housing');
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
     exportHeaders = ['Applicant','App ID','Tier','Score','Status','Days Waiting'];

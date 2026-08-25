@@ -211,6 +211,20 @@ function validateStep0() {
   if(houseTog && houseTog.checked) {
     if(!fld('homeCondition')) errs.push('Home condition is required when a current unit is selected.');
   }
+  // On-reserve screen for New Applications — catches doubled-up members at
+  // intake. Always enforced for this combination, regardless of the global
+  // Required Fields config (same pattern as the arrears/home-condition
+  // conditionals above). "Own home on reserve" contradicts a New Application;
+  // Living Situation "Other" is the escape hatch for genuine edge cases.
+  var _apt = (typeof getAppType === 'function') ? getAppType() : 'new_housing';
+  if (_apt === 'new_housing' && fld('reserve') === 'On Reserve') {
+    var _ls = fld('living_situation');
+    if (!_ls) {
+      errs.push('On-reserve applicant: select their Living Situation — if they are not in their own home, choose "Staying with family on reserve (doubled up)".');
+    } else if (_ls === 'own_home') {
+      errs.push('On-reserve applicant in their own home should not be a New Application — change the Application Type to Transfer Request (seeking a different unit) or File Update, or correct the Living Situation.');
+    }
+  }
   return errs;
 }
 function validateStep2() {

@@ -129,9 +129,14 @@
           <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_new_apps">—</span>
         </div>
         <div onclick="showHousingKpiDrilldown('draft_apps')" role="button" tabindex="0" title="New applications started but not yet submitted"
-             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:0 0 6px 12px;border-bottom:1px solid var(--border);">
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:0 0 6px 12px;">
           <span style="font-size:11px;color:var(--muted);">&#8627; of which in Draft</span>
           <span style="font-size:14px;font-weight:800;color:var(--muted);" id="kpi_draft_apps">—</span>
+        </div>
+        <div onclick="showHousingKpiDrilldown('doubled_apps')" role="button" tabindex="0" title="New applications from members on reserve without a home of their own (staying with family)"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:0 0 6px 12px;border-bottom:1px solid var(--border);">
+          <span style="font-size:11px;color:var(--muted);">&#8627; of which Doubled Up</span>
+          <span style="font-size:14px;font-weight:800;color:var(--muted);" id="kpi_doubled_apps">—</span>
         </div>
         <div onclick="showHousingKpiDrilldown('file_updates')" role="button" tabindex="0" title="Existing tenant · file update"
              style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border);">
@@ -400,6 +405,8 @@
         </div>
         <div id="onrez_badge" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--warn-amber-bg);color:var(--warn-amber-text);">&#128101; On reserve &mdash; no home of their own (doubled up)</div>
         <div id="nofixed_badge" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--danger-bg);color:var(--danger);">&#128680; No fixed address / homeless</div>
+        <div id="onrez_prompt" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;background:var(--warn-amber-bg);color:var(--warn-amber-text);">&#128203; On reserve &mdash; select their Living Situation before continuing. If they are not in their own home, choose <strong>&ldquo;Staying with family on reserve (doubled up)&rdquo;</strong>.</div>
+        <div id="onrez_conflict" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--danger-bg);color:var(--danger);">&#9888;&#65039; On-reserve applicant in their own home &mdash; this should be a <strong>Transfer Request</strong> (seeking a different unit) or <strong>File Update</strong>, not a New Application.</div>
       </div>
       <div class="card">
         <div class="ctitle">Personal Information</div>
