@@ -266,6 +266,17 @@ function _caPersist(app, okMsg, auditAction){
     }
     if (typeof showToast === 'function') showToast('✓ ' + okMsg, {type:'info'});
     closeCommercialApp();
+    // Reached from the residential wizard's Business/Department radio, the
+    // wizard is still the visible view behind the modal -- close it so staff
+    // land back where they started (usually the landing page) instead of a
+    // fresh application form.
+    try {
+      var _wiz = document.getElementById('appLayout');
+      if (_wiz && _wiz.offsetHeight > 0) {
+        if (typeof closeApplicationForm === 'function') closeApplicationForm();
+        else if (typeof showLanding === 'function') showLanding();
+      }
+    } catch(e){ /* view handoff is best-effort */ }
     if (typeof renderApplications === 'function') renderApplications();
     if (typeof renderWorklist === 'function') renderWorklist();
   }).catch(function(err){
