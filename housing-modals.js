@@ -2589,6 +2589,7 @@ window.openEditModal = function(appId) {
   set('dob',          app.dob);
   set('band',         app.band);
   set('reserve',      app.reserve);
+  set('living_situation', app.livingSituation);
   set('marital',      app.marital);
   set('phone',        app.phone?formatPhone(app.phone):'');
   set('email',        app.email);

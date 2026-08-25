@@ -1324,11 +1324,20 @@ function scoreApplicationLocally(app) {
     if (v === undefined && fallbackKey !== undefined) v = sec[fallbackKey];
     return Number(v) || 0;
   }
-  var urgentPts = pts('urgent_need', app.urgentNeed || 'none', 'none');
+  // Living-situation fallback (feeds EXISTING factors, no new knobs): when no
+  // explicit urgent-need category was set, a no-fixed-address applicant scores
+  // the model's own "homeless" points. Never overrides a staff-set category.
+  var _effUrgentNeed = app.urgentNeed;
+  if ((!_effUrgentNeed || _effUrgentNeed === 'none') && app.livingSituation === 'no_fixed_address') {
+    _effUrgentNeed = 'homeless';
+  }
+  var urgentPts = pts('urgent_need', _effUrgentNeed || 'none', 'none');
   var healthPts = pts('health_risk', app.healthRisk || 'none', 'none');
-  // Overcrowding only applies if the applicant has an existing house — if they
-  // have no current home, "over occupancy" isn't a meaningful housing-need signal.
-  var overcrowdingPts = app.haveHouse
+  // Overcrowding applies when the applicant lives in a house that is over
+  // occupancy: their own (haveHouse), or — the doubled-up case — a family
+  // member's home on reserve that is not their own. A member couch-surfing in
+  // a packed relative's house scored ZERO here before, understating real need.
+  var overcrowdingPts = (app.haveHouse || app.livingSituation === 'family_on_reserve')
     ? Math.min(10, Math.max(0, parseInt(app.personsOverStandard || '0') || 0))
     : 0;
   var H = M.household || {};

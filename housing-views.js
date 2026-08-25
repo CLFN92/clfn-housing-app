@@ -47,6 +47,17 @@ function _roomBedLabel(u) {
 // (probationary) units, set via the Edit Unit modal. Mirrors the ELDERS UNIT
 // badge markup pattern used alongside it. See liveMatchPriorityModel
 // (scoring.js) for how each type affects Match placement order.
+// Living-situation badge for application rows/cards. Distinguishes members
+// who live ON reserve but not in their own home (doubled up with family —
+// neither a transfer nor an ordinary off-reserve applicant) and those with no
+// fixed address. Keys come from shared-config's LIVING_SITUATIONS.
+function _livingSituationBadge(a) {
+  var ls = a && a.livingSituation;
+  if (ls === 'family_on_reserve') return '<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:var(--dark);padding:1px 7px;border-radius:4px;white-space:nowrap;">👥 Doubled up · on reserve</span>';
+  if (ls === 'no_fixed_address')  return '<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 7px;border-radius:4px;white-space:nowrap;">No fixed address</span>';
+  return '';
+}
+
 function _assignmentTypeBadge(u) {
   if (!u || !u.assignmentType) return '';
   if (u.assignmentType === 'temporary') return '<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 5px;border-radius:6px;">TEMPORARY</span>';
@@ -774,6 +785,7 @@ function renderMatchView(){
         +'<div style="font-weight:700;font-size:13px;color:var(--text);text-decoration:underline;text-underline-offset:2px;">'+name+'</div>'
         +'<div class="js-lbl-sm">'+app.id+'</div>'
         +(isTransfer?'<div style="margin-top:4px;"><span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez'+(curAddr?' · '+curAddr:'')+'</span> <span style="font-size:10px;color:var(--muted);font-weight:600;">transfer</span></div>':'')
+        +(!isTransfer && _livingSituationBadge(app) ? '<div style="margin-top:4px;">'+_livingSituationBadge(app)+'</div>' : '')
       +'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:18px;font-weight:800;color:'+tCol+';">'+(app.score||0)+'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:11px;font-weight:700;color:'+tCol+';">'+tier+'</td>'
@@ -816,6 +828,7 @@ function renderMatchView(){
     );
     var badges = [];
     if (isTransfer) badges.push('<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez'+(curAddr?' · '+curAddr:'')+'</span>');
+    if (!isTransfer && _livingSituationBadge(app)) badges.push(_livingSituationBadge(app));
     var metas = [
       {k:'Score',     v: app.score||0},
       {k:'Reserve',   v: app.reserve||''},

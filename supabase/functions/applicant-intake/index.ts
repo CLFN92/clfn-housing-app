@@ -337,7 +337,7 @@ serve(async (req) => {
             if (!src) continue
             const d = (src.data && typeof src.data === 'object') ? src.data : {}
             const payload: Record<string, unknown> = {}
-            const scalarKeys = ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp']
+            const scalarKeys = ['fn','ln','dob','band','marital','reserve','livingSituation','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp']
             for (const k of scalarKeys) { if (d[k] !== undefined && d[k] !== null && d[k] !== '') payload[k] = d[k] }
             if (d.coApp) payload.coApp = d.coApp
             for (const k of ['habitants','incomes','references','pets']) { if (Array.isArray(d[k]) && d[k].length) payload[k] = d[k] }

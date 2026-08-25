@@ -907,6 +907,7 @@ function saveApplicationRecord(opts){
     dob:         fv('dob'),
     band:        fv('band'),
     reserve:     fsel('reserve'),
+    livingSituation: fsel('living_situation'),
     marital:     fsel('marital'),
     phone:       fv('phone'),
     email:       fv('email'),
@@ -1182,6 +1183,7 @@ function popReview(){
     row('Date of Birth', fld('dob')) +
     row('Band Number', band!=='—'?band:'') +
     row('Reserve Status', fld('reserve')) +
+    row('Living Situation', (typeof livingSituationLabel === 'function' ? livingSituationLabel(fld('living_situation')) : '') || '') +
     row('Marital Status', fld('marital')) +
     row('Phone', fld('phone')) +
     row('Email', fld('email')) +
@@ -1733,6 +1735,7 @@ function printApplicationPreview() {
       +row('Date of Birth',        fld('dob'))
       +row('Band Number',          fld('band'))
       +row('On Reserve Status',    fld('reserve'))
+      +row('Living Situation',     (typeof livingSituationLabel === 'function' ? livingSituationLabel(fld('living_situation')) : '') || '')
       +row('Marital Status',       fld('marital'))
       +row('Cell Phone',           fld('phone'))
       +row('Email Address',        fld('email'))

@@ -346,6 +346,22 @@
     return out;
   }
 
+  // Living situation: keys from shared-config's LIVING_SITUATIONS registry
+  // are stored on the application; the wf() select works with label strings,
+  // so map label <-> key on render/collect.
+  function _livsitList() { return window.LIVING_SITUATIONS || []; }
+  function _livsitLabels() { return _livsitList().map(function (o) { return o.label; }); }
+  function _livsitLabel(key) {
+    var L = _livsitList();
+    for (var i = 0; i < L.length; i++) { if (L[i].key === key) return L[i].label; }
+    return '';
+  }
+  function _livsitKey(label) {
+    var L = _livsitList();
+    for (var i = 0; i < L.length; i++) { if (L[i].label === label) return L[i].key; }
+    return '';
+  }
+
   var WIZ_STEPS = [
     { title: 'Applicant', render: function (p) {
         return '<div class="grid2">' + wf('First name', 'w_fn', p.fn) + wf('Last name', 'w_ln', p.ln) + '</div>'
@@ -353,6 +369,7 @@
           + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band)
           +   wf('Marital status', 'w_marital', p.marital, 'select', ['Single', 'Married', 'Common-law', 'Separated', 'Divorced', 'Widowed']) + '</div>'
           + wf('Reserve status', 'w_reserve', p.reserve, 'select', ['On Reserve', 'Off Reserve'])
+          + wf('Where do you live right now?', 'w_livsit', _livsitLabel(p.livingSituation), 'select', _livsitLabels())
           + '<div class="grid2">' + wf('Phone', 'w_phone', p.phone, 'tel') + wf('Email', 'w_email', p.email, 'email') + '</div>'
           + '<h4 style="margin:16px 0 2px;">Current address</h4>'
           + wf('Street address', 'w_street', p.street)
@@ -369,6 +386,7 @@
           + '</div>';
       }, collect: function (p) {
         p.fn = wfVal('w_fn'); p.ln = wfVal('w_ln'); p.dob = wfVal('w_dob'); p.band = wfVal('w_band');
+        p.livingSituation = _livsitKey(wfVal('w_livsit'));
         p.marital = wfVal('w_marital'); p.reserve = wfVal('w_reserve'); p.phone = wfVal('w_phone'); p.email = wfVal('w_email');
         p.street = wfVal('w_street'); p.city = wfVal('w_city'); p.province = wfVal('w_province'); p.postal = wfVal('w_postal'); p.occDate = wfVal('w_occDate');
         p.homeless = wfVal('w_homeless'); p.haveHouse = wfVal('w_haveHouse'); p.hasCoApp = wfVal('w_hasco');

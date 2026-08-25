@@ -110,6 +110,26 @@ window.PLATFORM_REGISTRY_URL  = window.PLATFORM_REGISTRY_URL  || 'https://dnaxul
 window.PLATFORM_REGISTRY_ANON = window.PLATFORM_REGISTRY_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuYXh1bHNkZXRsbnB1cGVnb2lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NDQ5OTksImV4cCI6MjEwMTAyMDk5OX0.HYKgIe_inzHFk518ilfmhQUqtlldkTSoiwnmcwuaw_A';
 window._REG_CACHE_KEY = 'fnhub_nations_registry_v1';
 
+// ── Living situation (applications) ─────────────────────────────────────────
+// Where the applicant actually lives today. Captures the members who live ON
+// reserve but not in their own home (staying with family / doubled up) — they
+// are neither transfers (no unit of their own) nor ordinary off-reserve
+// applicants, and need to be statused differently. Keys ride the application
+// data jsonb (no migration); labels are the single source for the staff
+// wizard, the applicant portal, and badges.
+window.LIVING_SITUATIONS = [
+  { key: 'own_home',            label: 'Living in own home' },
+  { key: 'family_on_reserve',   label: 'Staying with family on reserve (not own home)' },
+  { key: 'renting_off_reserve', label: 'Renting / living off reserve' },
+  { key: 'no_fixed_address',    label: 'Homeless / no fixed address' },
+  { key: 'other',               label: 'Other' }
+];
+window.livingSituationLabel = function (key) {
+  var L = window.LIVING_SITUATIONS || [];
+  for (var i = 0; i < L.length; i++) { if (L[i].key === key) return L[i].label; }
+  return '';
+};
+
 window._mapNationRow = function(r){
   if (!r || !r.subdomain) return null;
   var sub = String(r.subdomain).toLowerCase();
