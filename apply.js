@@ -256,15 +256,16 @@
     if (editable.length) {
       cardTitle = 'Continue your application';
       if (editable[0].status === 'changes_requested') cardHint = '<p class="sub" style="margin:6px 0 12px;color:#9a3412;">The Housing office asked for some changes. Continue to update and resubmit.</p>';
-      actionHtml = '<button class="btn" type="button" onclick="applyContinue(\'' + esc(editable[0].id) + '\')">Continue &rarr;</button>';
+      actionHtml = '<button class="btn" type="button" onclick="applyContinue(\'' + esc(editable[0].id) + '\')">Continue &rarr;</button>'
+        + '<button class="btn ghost" type="button" onclick="showTypeChooser()">Start a different application</button>';
     } else if (hasApp) {
       cardTitle = 'Manage your housing';
-      actionHtml = '<button class="btn" type="button" onclick="applyStart(\'update\')">Update my application</button>'
-        + '<button class="btn ghost" type="button" onclick="applyStart(\'transfer\')">Request a transfer</button>';
+      cardHint = '<p class="sub" style="margin:6px 0 12px;">Update your file, request a transfer, or start a new application.</p>';
+      actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Start an application</button>';
     } else {
       cardTitle = 'Apply for housing';
       cardHint = '<p class="sub" style="margin:6px 0 12px;">Start your housing application. You can save and come back any time.</p>';
-      actionHtml = '<button class="btn" type="button" onclick="applyStart(\'new\')">Start a new application</button>';
+      actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Start an application</button>';
     }
 
     app.innerHTML =
@@ -273,6 +274,37 @@
       + '<div class="card"><h3>Your applications</h3>' + listHtml + '</div>'
       + '<div class="card"><h3>' + cardTitle + '</h3>' + cardHint + actionHtml + '</div>';
   }
+
+  // ── Application-type chooser ────────────────────────────────────────────────
+  // Mirrors the staff wizard's Application Type card: the member picks what
+  // kind of application they are making before the form opens. Business /
+  // Department requests are deliberately NOT offered here — those go through
+  // the Housing office directly (and the intake API only accepts the three
+  // community types).
+  var APPLY_TYPES = [
+    { key: 'new', title: 'New Housing Application',
+      desc: 'You are applying for a housing unit of your own. Your application will be scored and ranked on the waitlist.' },
+    { key: 'update', title: 'Existing Tenant — File Update',
+      desc: 'You already rent a unit and are updating the information on your file. This is not scored or ranked.' },
+    { key: 'transfer', title: 'Existing Tenant — New Housing Request',
+      desc: 'You currently rent a unit and are applying to move to a different one. This will be scored and ranked.' }
+  ];
+  window.showTypeChooser = function () {
+    app.innerHTML =
+      '<h1>What kind of application?</h1>'
+      + '<p class="sub" style="margin:0 0 16px;">Choose the option that matches your situation.</p>'
+      + APPLY_TYPES.map(function (t) {
+          return '<button type="button" class="typecard" data-apptype="' + esc(t.key) + '"'
+            + ' style="display:block;width:100%;text-align:left;background:var(--surface,#fff);border:2px solid var(--hair);border-radius:11px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:inherit;">'
+            + '<div style="font-weight:700;font-size:15px;">' + esc(t.title) + '</div>'
+            + '<div class="sub" style="margin:4px 0 0;">' + t.desc + '</div>'
+            + '</button>';
+        }).join('')
+      + '<button class="btn ghost" type="button" onclick="showDashboardPublic()" style="margin-top:8px;">&larr; Back</button>';
+    Array.prototype.forEach.call(document.querySelectorAll('.typecard'), function (b) {
+      b.addEventListener('click', function () { applyStart(b.getAttribute('data-apptype') || 'new'); });
+    });
+  };
 
   // Fetch one of the applicant's own submissions in full (RLS: owner only).
   async function apiGetSubmission(id) {
@@ -471,7 +503,8 @@
     app.innerHTML =
       '<div style="display:flex;gap:4px;margin:4px 0 14px;">' + dots + '</div>'
       + '<h1 style="margin:0 0 2px;">' + wfEsc(s.title) + '</h1>'
-      + '<p class="sub">Step ' + (_wiz.step + 1) + ' of ' + n + '</p>'
+      + '<p class="sub">Step ' + (_wiz.step + 1) + ' of ' + n
+      +   ((TYPE_LABEL[_wiz.type]) ? ' &middot; ' + wfEsc(TYPE_LABEL[_wiz.type]) : '') + '</p>'
       + '<form id="wizf" novalidate onsubmit="return false;">' + s.render(_wiz.payload) + '</form>'
       + '<div class="msg" id="wmsg"></div>'
       + '<div style="display:flex;gap:10px;margin-top:18px;">'
