@@ -70,8 +70,7 @@
       + '<input id="em" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="' + esc(prefill || '') + '"/>'
       + '<div id="band_row" style="display:none;">'
       +   '<label for="lband">Band / membership number</label>'
-      +   '<input id="lband" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 5512345678" maxlength="14"/>'
-      +   '<p class="sub" style="margin:4px 0 0;">Your 10-digit registry number, as shown on your status card.</p>'
+      +   '<input id="lband" type="text" inputmode="numeric" autocomplete="off" maxlength="14"/>'
       + '</div>'
       + '<div class="msg" id="lmsg"></div>'
       + '<button class="btn" id="lbtn" type="button">Email me a sign-in link</button>'
@@ -325,13 +324,8 @@
     { title: 'Applicant', render: function (p) {
         return '<div class="grid2">' + wf('First name', 'w_fn', p.fn) + wf('Last name', 'w_ln', p.ln) + '</div>'
           + wf('Date of birth', 'w_dob', p.dob, 'date')
-          // Placeholder uses a deliberately FAKE 55-prefix example -- never the
-          // nation's real band prefix (anti-spoofing; see _bandRequired above).
-          + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band, 'text', null, 'e.g. 5512345678')
+          + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band)
           +   wf('Marital status', 'w_marital', p.marital, 'select', ['Single', 'Married', 'Common-law', 'Separated', 'Divorced', 'Widowed']) + '</div>'
-          + (_bandRequired
-              ? '<p class="sub" style="margin:-4px 0 10px;">Your 10-digit registry number, as shown on your status card.</p>'
-              : '')
           + wf('Reserve status', 'w_reserve', p.reserve, 'select', ['On Reserve', 'Off Reserve'])
           + '<div class="grid2">' + wf('Phone', 'w_phone', p.phone, 'tel') + wf('Email', 'w_email', p.email, 'email') + '</div>'
           + '<h4 style="margin:16px 0 2px;">Current address</h4>'
