@@ -552,6 +552,8 @@ function renderMatchView(){
   // once everyone else is back in the running.
   var eligibleApps = allApps.filter(function(a){
     if(a.archived) return false;
+    // Deceased applicants never rank or match (score is zeroed too).
+    if(a.deceased) return false;
     // Existing-tenant FILE UPDATES are record updates, not housing requests, and
     // are never scored/ranked -> they must never appear on Match, regardless of
     // unit or status.
@@ -1896,14 +1898,18 @@ function _housingReconcile(){
   var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
   var norm  = function(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); };
 
-  // Every unit lands in exactly one bucket.
-  var buckets = { assigned:[], vacant:[], reno:[], reserved:[], archived:[], other:[] };
+  // Every unit lands in exactly one bucket. Condemned gets its OWN bucket:
+  // it used to fall into `other` ("Other / no status"), which both mislabeled
+  // a legitimate state and put condemned units in the Set-to-Vacant sweep's
+  // target list — one click away from becoming assignable again.
+  var buckets = { assigned:[], vacant:[], reno:[], reserved:[], condemned:[], archived:[], other:[] };
   units.forEach(function(u){
     if(!u) return;
     if(u.archived){ buckets.archived.push(u); return; }
     var st = (u.status||'').toLowerCase();
     if(u.assignedName || u.assignedTo){ buckets.assigned.push(u); }
     else if(st === 'vacant'){ buckets.vacant.push(u); }
+    else if(st === 'condemned'){ buckets.condemned.push(u); }
     else if(u.under_renovation || st.indexOf('renovat') !== -1 || st.indexOf('repair') !== -1){ buckets.reno.push(u); }
     else if(st === 'reserved'){ buckets.reserved.push(u); }
     else { buckets.other.push(u); }
@@ -1951,7 +1957,7 @@ function showReconcileReport(){
   var R = _housingReconcile();
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
   var uAddr = function(u){ return ((u.num||'')+' '+(u.street||'')).trim() || u.id || '—'; };
-  var gap = R.buckets.reno.concat(R.buckets.reserved, R.buckets.other);   // the "not assigned / not vacant" units
+  var gap = R.buckets.reno.concat(R.buckets.reserved, R.buckets.condemned, R.buckets.other);   // the "not assigned / not vacant" units
   // Break the gap down by its raw status value so the "other / no status" units
   // are explained (e.g. left as 'updated' after an edit, or blank).
   var gapByStatus = {};
@@ -1963,7 +1969,7 @@ function showReconcileReport(){
   var _otherN = R.buckets.other.length;
   var markVacantBtn = _otherN
     ? '<button class="btn btn-primary" style="margin-bottom:10px;" onclick="_reconMarkVacant()">&#8635; Set '+_otherN+' no-status unit'+(_otherN===1?'':'s')+' to Vacant</button>'
-      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These have no tenant and no clear status. Units under renovation or reserved are left as-is.</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These have no tenant and no clear status. Units under renovation, reserved, or condemned are left as-is.</div>'
     : '';
 
   function tile(label, val, color){
@@ -1981,6 +1987,7 @@ function showReconcileReport(){
     + stateRow('Vacant', R.buckets.vacant)
     + stateRow('Under renovation / repair', R.buckets.reno)
     + stateRow('Reserved (no tenant)', R.buckets.reserved)
+    + stateRow('Condemned', R.buckets.condemned, R.buckets.condemned.length ? 'left as-is' : '')
     + stateRow('Other / no status', R.buckets.other, R.buckets.other.length ? 'see below' : '')
     + stateRow('Archived', R.buckets.archived)
     + '<tr style="border-top:2px solid var(--border);"><td style="font-weight:800;">Total units</td><td class="std-cell-right" style="font-weight:800;">'+R.totalUnits+'</td><td></td></tr>'
@@ -1989,7 +1996,8 @@ function showReconcileReport(){
   var gapTbl = gap.length
     ? '<table class="tbl"><thead><tr><th>Unit</th><th>State</th><th>Status field</th></tr></thead><tbody>'
       + gap.map(function(u){
-          var state = (u.under_renovation || (u.status||'').toLowerCase().indexOf('renovat')!==-1 || (u.status||'').toLowerCase().indexOf('repair')!==-1) ? 'Under renovation'
+          var state = (u.status||'').toLowerCase()==='condemned' ? 'Condemned'
+                    : (u.under_renovation || (u.status||'').toLowerCase().indexOf('renovat')!==-1 || (u.status||'').toLowerCase().indexOf('repair')!==-1) ? 'Under renovation'
                     : ((u.status||'').toLowerCase()==='reserved' ? 'Reserved' : 'Other / no status');
           return '<tr class="clickable" onclick="_closeReconcile();window.location.href=\'inventory.html?unit='+esc(String(u.id).replace(/'/g,""))+'\'">'
             + '<td style="font-weight:600;">'+esc(uAddr(u))+'</td><td>'+state+'</td><td class="std-cell-muted">'+esc(u.status||'(none)')+'</td></tr>';
@@ -2123,7 +2131,7 @@ async function _reconMarkVacant(){
   var targets = _housingReconcile().buckets.other;
   if (!targets.length) { if (typeof showToast === 'function') showToast('Nothing to update.', {type:'info'}); return; }
   var go = (typeof showConfirm === 'function')
-    ? await showConfirm({ title:'Set to Vacant?', message:'Set ' + targets.length + ' unit' + (targets.length===1?'':'s') + ' that have no tenant and no clear status to Vacant (available for assignment)? Units under renovation or reserved are not touched.', confirmText:'Set to Vacant', cancelText:'Cancel' })
+    ? await showConfirm({ title:'Set to Vacant?', message:'Set ' + targets.length + ' unit' + (targets.length===1?'':'s') + ' that have no tenant and no clear status to Vacant (available for assignment)? Units under renovation, reserved, or condemned are not touched.', confirmText:'Set to Vacant', cancelText:'Cancel' })
     : window.confirm('Set ' + targets.length + ' units to Vacant?');
   if (!go) return;
   var done = 0;
