@@ -3262,15 +3262,24 @@ window.inviteApplicantToPortal = inviteApplicantToPortal;
 // Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit
 // tenant gate, and the Add-Tenant modal so the four can no longer drift with
 // different checks and different error messages.
-function appAssignabilityStatus(app){
+function appAssignabilityStatus(app, unit){
   if(!app) return { ok:false, reason:'Application not found' };
   if(app.archived) return { ok:false, reason:'Application is archived' };
   if(app.deceased) return { ok:false, reason:'Applicant is deceased — this application cannot be assigned' };
-  // Commercial (business/department) applications are assigned to buildings
-  // through their own review modal (openCommercialAssign) — they never belong
-  // in the residential Match queue or the standard unit-assignment paths.
+  // Commercial (business/department) applications are assigned to BUILDINGS,
+  // never residential units. With a unit in hand (unit card / Add-Tenant), a
+  // commercial app may be assigned when the unit is a commercial, admin, or
+  // band building — type must match type. Without unit context (Match queue
+  // inclusion etc.) they stay excluded from the residential paths.
   if((app.appType || app.app_type) === 'commercial'){
-    return { ok:false, reason:'Commercial applications are assigned from the Business/Department review modal' };
+    var _sec = window._SECONDARY_TYPES || ['commercial_building', 'admin_building', 'band_building'];
+    if(unit && _sec.indexOf(unit.type) !== -1){
+      // building types match — fall through to the status check below
+    } else if(unit){
+      return { ok:false, reason:'Commercial applications can only be assigned to a commercial, admin, or band building — this unit is residential' };
+    } else {
+      return { ok:false, reason:'Commercial applications are assigned from the Business/Department review modal, or from a commercial building\'s unit card' };
+    }
   }
   var s = app.status || '';
   var ok = (s === 'ed_approved' || s === 'mgr_approved' || s === 'hm_approved');
@@ -3281,6 +3290,35 @@ function appAssignabilityStatus(app){
 function appIsAssignable(app){ return appAssignabilityStatus(app).ok; }
 window.appAssignabilityStatus = appAssignabilityStatus;
 window.appIsAssignable = appIsAssignable;
+
+// After a commercial (business/department) application is assigned to a
+// building, type the trigger-created tenant row: business/department kind,
+// contact person, rent, and the application link. Mirrors the commercial
+// review modal's own patch so a unit-card assignment is not second-class
+// (the delay lets the housing_units sync trigger create the tenant first).
+function sbTypeCommercialTenantForAssignment(app, unit){
+  try {
+    if(!app || (app.appType || app.app_type) !== 'commercial' || !unit) return;
+    var org = app.orgName || app.fn || '';
+    if(!org) return;
+    var rent = parseFloat(String(app.rentAmount || '').replace(/[^0-9.\-]/g, ''));
+    var fields = {
+      tenant_type:     app.kind === 'department' ? 'department' : 'business',
+      contact_person:  app.contactPerson || null,
+      application_id:  app.id,
+      current_unit_id: unit.id
+    };
+    if(!isNaN(rent)) fields.monthly_rent = rent;
+    setTimeout(function(){
+      fetch(SUPABASE_URL + '/rest/v1/tenants?full_name=eq.' + encodeURIComponent(org) + '&merged_into=is.null', {
+        method: 'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify(fields)
+      }).catch(function(e){ console.warn('[commercial] tenant type patch failed:', e); });
+    }, 700);
+  } catch(e){ console.warn('[commercial] tenant typing threw:', e); }
+}
+window.sbTypeCommercialTenantForAssignment = sbTypeCommercialTenantForAssignment;
 
 // Whenever a unit is assigned to an application, mirror the tenancy back onto
 // the application record (assignedUnit / assignedAddress / status='assigned').

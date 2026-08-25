@@ -772,7 +772,7 @@ function saveUnitEdit(){
       // never drift. Any approved-flavour status is fine regardless of role;
       // ED can assign hm_approved file updates, HM can assign past ed_approved.
       var _as = (typeof appAssignabilityStatus === 'function')
-        ? appAssignabilityStatus(linkedApp2)
+        ? appAssignabilityStatus(linkedApp2, u)
         : { ok:false, reason:'Approval required before assigning' };
       if(!_as.ok) {
         // Roll back the in-place assignment mutation so a repeat Save can't
@@ -789,6 +789,13 @@ function saveUnitEdit(){
       // Manager", misattributing the sign-off).
       u.tenantApprovedBy = CLFN_PERMS.roleLabel(role2);
       u.tenantApprovedAt = new Date().toISOString().split('T')[0];
+      // Commercial → building assignment from the unit card: carry the
+      // cost-centre onto the building (never overwriting one already set) and
+      // type the tenant row like the review modal's own assign path does.
+      if((linkedApp2.appType || linkedApp2.app_type) === 'commercial'){
+        if(linkedApp2.deptNumber && !u.deptNumber) u.deptNumber = linkedApp2.deptNumber;
+        if(typeof sbTypeCommercialTenantForAssignment === 'function') sbTypeCommercialTenantForAssignment(linkedApp2, u);
+      }
     }
   }
   // Save unit to Supabase
@@ -2429,7 +2436,7 @@ function saveAddTenant(){
   // app was never written back, leaking the tenant onto Match. Enforce the same
   // rule as every other assignment path.
   if(linkedApp && typeof appAssignabilityStatus === 'function'){
-    var _as = appAssignabilityStatus(linkedApp);
+    var _as = appAssignabilityStatus(linkedApp, units[idx]);
     if(!_as.ok){ showErr('⚠ ' + _as.reason); return; }
   }
 
@@ -2438,6 +2445,12 @@ function saveAddTenant(){
   units[idx].assignedDate=date;
   units[idx].status=status;
   saveUnitWithDraftFallback(units[idx]);
+  // Commercial → building: type the tenant row (business/department, contact,
+  // rent, app link) exactly like the review modal's assign path.
+  if(linkedApp && (linkedApp.appType || linkedApp.app_type) === 'commercial'
+     && typeof sbTypeCommercialTenantForAssignment === 'function'){
+    sbTypeCommercialTenantForAssignment(linkedApp, units[idx]);
+  }
   // Always write the tenancy back onto the application so the applicant drops
   // out of the Match queue and every status view reflects the placement.
   if(typeof writeTenancyToApplication === 'function') writeTenancyToApplication(units[idx]);
