@@ -1476,6 +1476,17 @@ function _renderLandingKpis(){
   var vacant = units.filter(function(u){
     return u && !u.archived && u.status === 'vacant';
   }).length;
+  // Vacant-card breakdown: houses out of service (same state tests as the
+  // reconcile report's buckets, so the two never disagree).
+  var condemnedN = units.filter(function(u){
+    return u && !u.archived && (u.status||'').toLowerCase() === 'condemned';
+  }).length;
+  var underRepairN = units.filter(function(u){
+    if(!u || u.archived) return false;
+    var st = (u.status||'').toLowerCase();
+    if(st === 'condemned') return false;
+    return u.under_renovation || st.indexOf('renovat') !== -1 || st.indexOf('repair') !== -1;
+  }).length;
 
   // Application-type breakdown (active = non-archived, not declined):
   //   new_housing      → New Applications (seeking a new unit)
@@ -1493,13 +1504,17 @@ function _renderLandingKpis(){
       return pred(a.appType || 'new_housing');
     }).length;
   }
-  // New Applications = the real waitlist: seeking-a-unit apps that are NOT housed.
-  var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request'; }, true);
+  // New Applications = the real waitlist: seeking-a-unit apps that are NOT
+  // housed. Commercial (business/department) applications are excluded — they
+  // request buildings, not waitlist spots, and were inflating this count.
+  var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial'; }, true);
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
   setKpi('kpi_open_apps',       openApps);
   setKpi('kpi_vacant',          vacant);
+  setKpi('kpi_under_repair',    underRepairN);
+  setKpi('kpi_condemned',       condemnedN);
   setKpi('kpi_new_apps',        newApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
