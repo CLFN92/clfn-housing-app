@@ -68,7 +68,27 @@
   // Front-door state from portal_info: whether sign-in also requires a band
   // number, and whether the portal is open at all. The 3-digit prefix itself
   // is never sent to the client (anti-spoofing) — the server checks it.
-  var _loginBandRequired = false;
+  // The band_required answer is CACHED per device so the field renders
+  // instantly on every visit after the first — without the cache, the field
+  // popped in only after the portal_info round-trip (a visible delay on edge
+  // function cold starts). The fresh server answer still reconciles silently.
+  var LS_BANDREQ = 'clfn_apply_band_req';
+  var _loginBandRequired = (function () {
+    try { return localStorage.getItem(LS_BANDREQ) === '1'; } catch (e) { return false; }
+  })();
+  function _setBandRowVisible(on) {
+    _loginBandRequired = !!on;
+    var row = document.getElementById('band_row');
+    if (!row) return;
+    row.style.display = on ? '' : 'none';
+    if (on) {
+      var b = document.getElementById('lband');
+      if (b && !b._enterWired) {
+        b._enterWired = true;
+        b.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLink(); });
+      }
+    }
+  }
   function showLogin(prefill) {
     app.innerHTML =
       '<h1>Housing application portal</h1>'
@@ -84,6 +104,7 @@
       + '<div class="foot">Your information is kept private and reviewed only by the Housing office.</div>';
     document.getElementById('lbtn').addEventListener('click', sendLink);
     document.getElementById('em').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLink(); });
+    if (_loginBandRequired) _setBandRowVisible(true);   // instant, from cache
     _loginApplyPortalInfo();
   }
 
@@ -102,12 +123,9 @@
           + esc(d.closed_message || 'Online applications are currently closed. Please contact the Housing office.') + '</p></div>';
         return;
       }
-      _loginBandRequired = !!(d && d.band_required);
-      var row = document.getElementById('band_row');
-      if (row && _loginBandRequired) {
-        row.style.display = '';
-        var b = document.getElementById('lband');
-        if (b) b.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLink(); });
+      if (d && d.ok) {
+        try { localStorage.setItem(LS_BANDREQ, d.band_required ? '1' : '0'); } catch (e) {}
+        _setBandRowVisible(!!d.band_required);
       }
     } catch (e) { /* fail open — server-side gates still apply */ }
   }
