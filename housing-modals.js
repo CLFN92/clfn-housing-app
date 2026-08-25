@@ -827,10 +827,13 @@ function ueTenantSearch(q) {
   var apps = typeof applications !== 'undefined' ? applications : [];
   var role = window.currentRole || 'housing_employee_l1';
 
-  // Show ed_approved to all roles; also mgr_approved for HM and ED
+  // Show ed_approved to all roles; management also sees mgr_approved and
+  // hm_approved — the SAME approved set the shared appAssignabilityStatus
+  // rule accepts. hm_approved was missing here, so an HM-approved applicant
+  // was "approved" everywhere else but invisible in this search.
   var eligible = apps.filter(function(a) {
     if (a.status === APP_STATUS.ED_APPROVED) return true;
-    if ((ROLE.isManagement(role)) && a.status === APP_STATUS.MGR_APPROVED) return true;
+    if (ROLE.isManagement(role) && (a.status === APP_STATUS.MGR_APPROVED || a.status === APP_STATUS.HM_APPROVED)) return true;
     return false;
   });
 
@@ -861,9 +864,10 @@ function ueTenantSearch(q) {
   dd.innerHTML = matches.map(function(a) {
     var name = ((a.fn || '') + ' ' + (a.ln || '')).trim() || 'Unknown';
     var isED = a.status === APP_STATUS.ED_APPROVED;
-    var statusLabel = isED ? 'ED Approved' : 'HM Recommended';
-    var statusColor = isED ? 'var(--success)' : '#1d4ed8';
-    var statusBg    = isED ? 'var(--success-bg)'  : 'var(--info-blue-bg)';
+    var isHMApp = a.status === APP_STATUS.HM_APPROVED;
+    var statusLabel = isED ? 'ED Approved' : isHMApp ? 'HM Approved' : 'HM Recommended';
+    var statusColor = (isED || isHMApp) ? 'var(--success)' : '#1d4ed8';
+    var statusBg    = (isED || isHMApp) ? 'var(--success-bg)'  : 'var(--info-blue-bg)';
     window._ueTenantMatches[a.id] = {name: name, status: a.status};
     return '<div onmousedown="ueTenantSelectById(\''+a.id+'\')"'
       + ' style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;"'
@@ -2295,11 +2299,13 @@ function atSearchApps(q){
   var dd=document.getElementById('at_app_dropdown');
   if(!dd) return;
   var apps=typeof applications!=='undefined'?applications:(window.SP_APPLICATIONS||[]);
-  // ed_approved = fully approved; mgr_approved = HM recommended (HM role can assign)
+  // ed_approved = fully approved; mgr_approved = HM recommended (HM role can
+  // assign); hm_approved = HM final approval — all three are the shared
+  // appAssignabilityStatus approved set (hm_approved was missing here).
   var role = window.currentRole || 'housing_employee_l1';
   var valid=apps.filter(function(a){
     if(APPROVAL_AUTHORITY.can('finalApproveApp', role) || APPROVAL_AUTHORITY.can('reviewApplication', role))
-      return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
+      return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.HM_APPROVED;
     return a.status===APP_STATUS.ED_APPROVED;
   });
   var matches=q.trim().length>0
@@ -2347,10 +2353,11 @@ function atSelectApp(appId,name,status){
   var hidden=document.getElementById('at_appid_val'); if(hidden) hidden.value=appId;
   var sel=document.getElementById('at_app_selected');
   if(sel){
-    var statusCol=status===APP_STATUS.ED_APPROVED?'var(--success)':status===APP_STATUS.MGR_APPROVED?'var(--info-blue)':'var(--warn-amber)';
-    var statusBg=status===APP_STATUS.ED_APPROVED?'var(--success-bg)':status===APP_STATUS.MGR_APPROVED?'var(--info-blue-bg)':'var(--warn-amber-bg)';
+    var _approved = (status===APP_STATUS.ED_APPROVED||status===APP_STATUS.HM_APPROVED);
+    var statusCol=_approved?'var(--success)':status===APP_STATUS.MGR_APPROVED?'var(--info-blue)':'var(--warn-amber)';
+    var statusBg=_approved?'var(--success-bg)':status===APP_STATUS.MGR_APPROVED?'var(--info-blue-bg)':'var(--warn-amber-bg)';
     var statusLabel=formatAppStatusLabel(status,{variant:'add_tenant'})||status;
-    var warn=status!==APP_STATUS.ED_APPROVED&&status!==APP_STATUS.MGR_APPROVED
+    var warn=!_approved&&status!==APP_STATUS.MGR_APPROVED
       ? '<div style="font-size:11px;color:var(--warn-amber);margin-top:4px;">⚠️ This application has not been fully approved. Housing Manager confirmation required before assigning.</div>'
       : (status===APP_STATUS.MGR_APPROVED?'<div style="font-size:11px;color:var(--info-blue);margin-top:4px;">ℹ️ Recommended by HM — awaiting Executive Director final approval.</div>':'');
     sel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;">'
