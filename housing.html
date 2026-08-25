@@ -258,11 +258,14 @@
      Steps show STATE (✓ done / current / upcoming), never numbers — numbers
      went stale whenever role-gated or type-skipped steps changed visibility. -->
 <div id="stepProgressBar" style="display:none;">
-  <div class="spb-row">
-    <button type="button" onclick="closeApplicationForm()" class="back-btn-yellow spb-back">
+  <div class="page-back-row">
+    <button type="button" onclick="closeApplicationForm()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
+  </div>
+  <div class="spb-card">
+  <div class="spb-row">
     <div class="spb-tabs-row">
       <button onclick="goTo(0)" id="spb_0" class="spb-btn">
         <span id="spb_num_0" class="spb-dot"></span>
@@ -309,12 +312,13 @@
         <span id="spb_lbl_11" class="spb-lbl">Internal Notes <span class="spb-lbl-sub">(Internal)</span></span>
       </button>
     </div>
-    <div id="appLayout_ctx_bar" style="display:none;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;">
+    <div id="appLayout_ctx_bar" style="display:none;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;padding-right:10px;">
       <span id="appLayout_title" class="spb-ctx-name"></span>
       <span id="appLayout_subtitle" class="spb-ctx-sub"></span>
     </div>
   </div>
   <div class="spb-fill-bar"><div id="spb_fill" class="spb-fill-bar-inner"></div></div>
+  </div>
 </div>
 <div id="appProgressFoot" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--dark2);border-top:1px solid var(--dark3);padding:10px 20px;z-index:100;">
   <div style="max-width:900px;margin:0 auto;display:flex;align-items:center;gap:12px;">

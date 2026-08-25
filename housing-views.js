@@ -2000,10 +2000,26 @@ function _housingReconcile(){
     return true;
   });
 
+  // New Applications from ON-RESERVE members with no Living Situation on file
+  // (or an own-home contradiction) — the doubled-up cleanup backlog. These
+  // predate the Living Situation field; new intakes can't reach this state
+  // (the on-reserve validation blocks them).
+  var _housedIds3 = {};
+  units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds3[u.assignedTo] = true; });
+  var onRezUnclassified = activeApps.filter(function(a){
+    if(a.deceased || a.status === 'draft') return false;
+    var t = a.appType || 'new_housing';
+    if(t === 'existing_tenant' || t === 'transfer_request' || t === 'commercial') return false;
+    if(a.status === 'assigned' || a.assignedUnit || _housedIds3[a.id]) return false;   // housed — Likely-Housed handles those
+    if((a.reserve || '') !== 'On Reserve') return false;
+    var ls = a.livingSituation || '';
+    return ls === '' || ls === 'own_home';
+  }).sort(function(x,y){ return (y.score||0)-(x.score||0); });
+
   // Total = ACTIVE units only — archived (demolished/removed) units are
   // history, not stock, so they don't inflate the headline count. They keep
   // their own state-table row for the full accounting.
-  return { totalUnits:(units.length - buckets.archived.length), buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp };
+  return { totalUnits:(units.length - buckets.archived.length), buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp, onRezUnclassified:onRezUnclassified };
 }
 
 function showReconcileReport(){
@@ -2080,6 +2096,33 @@ function showReconcileReport(){
       + '</tbody></table>'
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">No stale unit links.</div>';
 
+  // On-reserve New Applications with no living situation — doubled-up cleanup.
+  var _orN = R.onRezUnclassified.length;
+  var _orBlankN = R.onRezUnclassified.filter(function(a){ return !a.livingSituation; }).length;
+  var onRezBulkBtn = _orBlankN
+    ? '<button class="btn btn-primary" style="margin-bottom:10px;" onclick="_reconMarkAllDoubledUp()">&#128101; Mark all '+_orBlankN+' as Doubled Up</button>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">On-reserve members with a New Application, no unit, and no Living Situation on file. Marking them Doubled Up sets Living Situation to &ldquo;Staying with family on reserve&rdquo; — they stay New Applications and keep their place on the waitlist. Anyone listed with &ldquo;own home&rdquo; should be opened and reclassified instead.</div>'
+    : '';
+  var onRezTbl = _orN
+    ? '<table class="tbl"><thead><tr><th>Applicant</th><th>Status</th><th class="std-cell-right">Score</th><th>Living Situation</th><th></th></tr></thead><tbody>'
+      + R.onRezUnclassified.slice(0,120).map(function(a){
+          var sid = (a.id||'').replace(/'/g,"\\'");
+          var lsLbl = a.livingSituation === 'own_home'
+            ? '<span style="font-weight:700;color:var(--danger);">Own home — reclassify</span>'
+            : '<span class="std-cell-muted">(not set)</span>';
+          return '<tr><td style="font-weight:600;">'+esc((a.fn||'')+' '+(a.ln||''))+'</td>'
+            + '<td class="std-cell-muted">'+esc((typeof formatAppStatusLabel==='function' ? formatAppStatusLabel(a.status,{variant:'kpi'}) : a.status) || a.status || '')+'</td>'
+            + '<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
+            + '<td>'+lsLbl+'</td>'
+            + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
+            + (a.livingSituation === 'own_home' ? '' :
+               '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reconMarkDoubledUp(\''+sid+'\')">&#128101; Doubled Up</button>')
+            + '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeReconcile();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+            + '</div></td></tr>';
+        }).join('')
+      + '</tbody></table>' + (_orN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_orN+'.</div>' : '')
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every on-reserve new application has a living situation on file.</div>';
+
   var noAppTbl = R.occNoApp.length
     ? '<table class="tbl"><thead><tr><th>Unit</th><th>Tenant</th></tr></thead><tbody>'
       + R.occNoApp.slice(0,80).map(function(u){
@@ -2132,6 +2175,9 @@ function showReconcileReport(){
     +   gapStatusTbl
     +   markVacantBtn
     +   gapTbl
+    +   secH('On-reserve new applications — living situation not set', R.onRezUnclassified.length, R.onRezUnclassified.length?'var(--warn-amber-text)':null)
+    +   onRezBulkBtn
+    +   onRezTbl
     +   secH('People with more than one application', R.dupExtra+' extra', R.dupExtra?'#b45309':null)
     +   dupTbl
     +   secH('Applications with a stale unit link', R.stale.length, R.stale.length?'#b45309':null)
@@ -2200,6 +2246,55 @@ async function _lhMarkNotHoused(appId){
   showLikelyHousedReport();  // refresh — the row drops off the list
 }
 window._lhMarkNotHoused = _lhMarkNotHoused;
+
+// Reconcile: doubled-up cleanup — stamp Living Situation on on-reserve New
+// Applications that predate the field. Per-row and bulk variants; both
+// management-only, audited, and refresh the report + KPIs.
+function _reconStampDoubledUp(a, role){
+  a.livingSituation = 'family_on_reserve';
+  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  if (typeof auditEntry === 'function') auditEntry(a.id, 'app_marked_doubled_up',
+    'Living Situation set to staying-with-family (doubled up) via reconciliation', role);
+}
+async function _reconMarkDoubledUp(appId){
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var a = apps.find(function(x){ return x && x.id === appId; });
+  if (!a) return;
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
+    return;
+  }
+  _reconStampDoubledUp(a, role);
+  if (typeof showToast === 'function') showToast(((a.fn||'')+' '+(a.ln||'')).trim() + ' marked Doubled Up.', {type:'info'});
+  if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showReconcileReport();
+}
+window._reconMarkDoubledUp = _reconMarkDoubledUp;
+async function _reconMarkAllDoubledUp(){
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
+    return;
+  }
+  var R = _housingReconcile();
+  // Bulk skips the own-home contradictions — those need a person to reclassify.
+  var list = R.onRezUnclassified.filter(function(a){ return !a.livingSituation; });
+  if (!list.length) return;
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({
+        title: 'Mark ' + list.length + ' applicant' + (list.length===1?'':'s') + ' as Doubled Up?',
+        message: 'Sets Living Situation to "Staying with family on reserve (doubled up)" on every on-reserve New Application with no living situation on file. They stay New Applications and keep their waitlist place. Each change is audited.',
+        confirmText: 'Mark all Doubled Up', cancelText: 'Cancel' })
+    : window.confirm('Mark ' + list.length + ' applicants as Doubled Up?');
+  if (!go) return;
+  list.forEach(function(a){ _reconStampDoubledUp(a, role); });
+  if (typeof showToast === 'function') showToast(list.length + ' applicant' + (list.length===1?'':'s') + ' marked Doubled Up.', {type:'info'});
+  if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showReconcileReport();
+}
+window._reconMarkAllDoubledUp = _reconMarkAllDoubledUp;
 
 async function _reconClearLink(appId){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];

@@ -934,25 +934,29 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 /* Divider row */
 .row-divider { border-bottom: 1px solid var(--border); }
 
-/* Step progress bar — dark tabbed nav strip */
+/* Step progress bar — light page chrome: standard back row (same placement/
+   design as every other page) + a bordered stepper card below it. All accents
+   ride the nation theme tokens (var(--yellow)/var(--accent-ink)); no dark
+   strip, no literal brand colors. */
 #stepProgressBar {
-  background: var(--dark);
-  border-bottom: 1px solid var(--dark3);
+  background: var(--bg);
+  padding: 0 clamp(14px, 3vw, 28px) 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
-/* Slim single-row stepper: Back + state-dot pills + notes pill + context.
-   Nation theming: every accent rides var(--yellow)/var(--accent-ink)/
-   var(--on-accent) (set per-nation by the theme); the white rgba()s are
-   neutral on-dark ink, not brand colors. */
+#stepProgressBar .page-back-row { margin-bottom: 12px; }   /* spacer under the app header */
+.spb-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
 .spb-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 14px;
-}
-.spb-back {
-  padding: 6px 12px;
-  font-size: 12px;
-  flex-shrink: 0;
 }
 .spb-tabs-row {
   display: flex;
@@ -962,6 +966,7 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   scrollbar-width: none;
   flex: 1;
   min-width: 0;
+  padding: 0 4px;
 }
 .spb-tabs-row::-webkit-scrollbar { display: none; }
 
@@ -969,23 +974,23 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 10px 10px 8px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
-  color: rgba(255,255,255,.38);
+  color: var(--muted);
   white-space: nowrap;
   transition: color .15s, border-color .15s;
   flex-shrink: 0;
 }
-.spb-btn:hover { color: rgba(255,255,255,.7); }
+.spb-btn:hover { color: var(--text); }
 .spb-btn.active {
-  color: #fff;
+  color: var(--text);
   border-bottom-color: var(--accent-ink);
 }
-.spb-btn.done { color: rgba(255,255,255,.55); }
+.spb-btn.done { color: var(--text); opacity: .75; }
 
 /* Step state dot — ✓ done / filled current / hollow upcoming. No numbers:
    they went stale whenever role/type visibility changed. */
@@ -993,7 +998,7 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,.3);
+  border: 1.5px solid color-mix(in srgb, var(--muted) 55%, transparent);
   background: transparent;
   color: var(--accent-ink);
   display: flex;
@@ -1008,24 +1013,26 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   border-color: var(--yellow);
 }
 .spb-btn.done .spb-dot {
-  border-color: color-mix(in srgb, var(--yellow) 55%, transparent);
+  border-color: color-mix(in srgb, var(--yellow) 70%, transparent);
 }
 
 /* Internal Notes — compact pill at the end of the strip */
 .spb-notes-pill {
-  margin-left: 6px;
+  margin: 6px 6px 6px 8px;
+  padding: 4px 10px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--yellow) 7%, transparent);
-  color: rgba(255,255,255,.75);
+  background: color-mix(in srgb, var(--yellow) 12%, transparent);
+  color: var(--muted);
   border-bottom: 2px solid transparent;
+  align-self: center;
 }
-.spb-notes-pill:hover  { background: color-mix(in srgb, var(--yellow) 13%, transparent); }
-.spb-notes-pill.active { background: color-mix(in srgb, var(--yellow) 18%, transparent); color: var(--accent-ink); }
+.spb-notes-pill:hover  { background: color-mix(in srgb, var(--yellow) 22%, transparent); color: var(--text); }
+.spb-notes-pill.active { background: color-mix(in srgb, var(--yellow) 30%, transparent); color: var(--accent-ink); }
 .spb-notes-icon { font-size: 13px; flex-shrink: 0; }
 
 /* Applicant context (name + Editing badge) — right side of the strip */
-.spb-ctx-name { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.92); white-space: nowrap; }
-.spb-ctx-sub  { font-size: 11px; color: rgba(255,255,255,.55); white-space: nowrap; }
+.spb-ctx-name { font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.spb-ctx-sub  { font-size: 11px; color: var(--muted); white-space: nowrap; }
 @media (max-width: 760px) {
   #appLayout_ctx_bar { display: none !important; }  /* strip space goes to the pills on phones */
 }
@@ -1038,7 +1045,7 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .spb-lbl-sub { font-size: 9px; font-weight: 500; opacity: .7; margin-left: 2px; }
 
 /* Thin yellow progress fill line at the bottom of the strip */
-.spb-fill-bar { height: 2px; background: rgba(255,255,255,.08); }
+.spb-fill-bar { height: 3px; background: var(--border); }
 .spb-fill-bar-inner { height: 100%; background: var(--yellow); width: 0%; transition: width .3s; }
 
 /* Field row with icon */
