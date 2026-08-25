@@ -254,60 +254,65 @@
 </div>
 
 
-<!-- ── STEP PROGRESS BAR ── -->
+<!-- ── STEP PROGRESS BAR — slim single-row stepper ──
+     Steps show STATE (✓ done / current / upcoming), never numbers — numbers
+     went stale whenever role-gated or type-skipped steps changed visibility. -->
 <div id="stepProgressBar" style="display:none;">
-  <div class="spb-back-row">
-    <button type="button" onclick="closeApplicationForm()" class="btn-header-ghost">
+  <div class="spb-row">
+    <button type="button" onclick="closeApplicationForm()" class="back-btn-yellow spb-back">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
-  </div>
-  <div class="spb-tabs-row">
-    <button onclick="goTo(0)" id="spb_0" class="spb-btn">
-      <span id="spb_num_0" class="spb-num">1</span>
-      <span id="spb_lbl_0" class="spb-lbl">Applicant</span>
-    </button>
-    <button onclick="goTo(1)" id="spb_1" class="spb-btn">
-      <span id="spb_num_1" class="spb-num">2</span>
-      <span id="spb_lbl_1" class="spb-lbl">Employment</span>
-    </button>
-    <button onclick="goTo(2)" id="spb_2" class="spb-btn">
-      <span id="spb_num_2" class="spb-num">3</span>
-      <span id="spb_lbl_2" class="spb-lbl">Co-Applicant</span>
-    </button>
-    <button onclick="goTo(3)" id="spb_3" class="spb-btn">
-      <span id="spb_num_3" class="spb-num">4</span>
-      <span id="spb_lbl_3" class="spb-lbl">Household</span>
-    </button>
-    <button onclick="goTo(4)" id="spb_4" class="spb-btn">
-      <span id="spb_num_4" class="spb-num">5</span>
-      <span id="spb_lbl_4" class="spb-lbl">Emergency Contacts</span>
-    </button>
-    <button onclick="goTo(5)" id="spb_5" class="spb-btn">
-      <span id="spb_num_5" class="spb-num">6</span>
-      <span id="spb_lbl_5" class="spb-lbl">Pets</span>
-    </button>
-    <button onclick="goTo(9)" id="spb_9" class="spb-btn hm-ed-only">
-      <span id="spb_num_9" class="spb-num">7</span>
-      <span id="spb_lbl_9" class="spb-lbl">Housing Needs</span>
-    </button>
-    <button onclick="goTo(10)" id="spb_10" class="spb-btn hm-ed-only">
-      <span id="spb_num_10" class="spb-num">8</span>
-      <span id="spb_lbl_10" class="spb-lbl">Tenancy History</span>
-    </button>
-    <button onclick="goTo(6)" id="spb_6" class="spb-btn">
-      <span id="spb_num_6" class="spb-num">7</span>
-      <span id="spb_lbl_6" class="spb-lbl">Documents</span>
-    </button>
-    <button onclick="goTo(8)" id="spb_7" class="spb-btn">
-      <span id="spb_num_7" class="spb-num">8</span>
-      <span id="spb_lbl_7" class="spb-lbl">Review</span>
-    </button>
-  </div>
-  <div id="spb_notes_row" class="spb-notes-row staff-only" style="display:none;" onclick="goTo(11)">
-    <span class="spb-notes-icon">📝</span>
-    <span id="spb_lbl_11" class="spb-notes-label">Internal Notes <span class="spb-lbl-sub">(Internal)</span></span>
-    <span class="spb-notes-chevron">›</span>
+    <div class="spb-tabs-row">
+      <button onclick="goTo(0)" id="spb_0" class="spb-btn">
+        <span id="spb_num_0" class="spb-dot"></span>
+        <span id="spb_lbl_0" class="spb-lbl">Applicant</span>
+      </button>
+      <button onclick="goTo(1)" id="spb_1" class="spb-btn">
+        <span id="spb_num_1" class="spb-dot"></span>
+        <span id="spb_lbl_1" class="spb-lbl">Employment</span>
+      </button>
+      <button onclick="goTo(2)" id="spb_2" class="spb-btn">
+        <span id="spb_num_2" class="spb-dot"></span>
+        <span id="spb_lbl_2" class="spb-lbl">Co-Applicant</span>
+      </button>
+      <button onclick="goTo(3)" id="spb_3" class="spb-btn">
+        <span id="spb_num_3" class="spb-dot"></span>
+        <span id="spb_lbl_3" class="spb-lbl">Household</span>
+      </button>
+      <button onclick="goTo(4)" id="spb_4" class="spb-btn">
+        <span id="spb_num_4" class="spb-dot"></span>
+        <span id="spb_lbl_4" class="spb-lbl">Emergency Contacts</span>
+      </button>
+      <button onclick="goTo(5)" id="spb_5" class="spb-btn">
+        <span id="spb_num_5" class="spb-dot"></span>
+        <span id="spb_lbl_5" class="spb-lbl">Pets</span>
+      </button>
+      <button onclick="goTo(9)" id="spb_9" class="spb-btn hm-ed-only">
+        <span id="spb_num_9" class="spb-dot"></span>
+        <span id="spb_lbl_9" class="spb-lbl">Housing Needs</span>
+      </button>
+      <button onclick="goTo(10)" id="spb_10" class="spb-btn hm-ed-only">
+        <span id="spb_num_10" class="spb-dot"></span>
+        <span id="spb_lbl_10" class="spb-lbl">Tenancy History</span>
+      </button>
+      <button onclick="goTo(6)" id="spb_6" class="spb-btn">
+        <span id="spb_num_6" class="spb-dot"></span>
+        <span id="spb_lbl_6" class="spb-lbl">Documents</span>
+      </button>
+      <button onclick="goTo(8)" id="spb_7" class="spb-btn">
+        <span id="spb_num_7" class="spb-dot"></span>
+        <span id="spb_lbl_7" class="spb-lbl">Review</span>
+      </button>
+      <button type="button" onclick="goTo(11)" id="spb_notes_row" class="spb-btn spb-notes-pill staff-only" style="display:none;">
+        <span class="spb-notes-icon">&#128221;</span>
+        <span id="spb_lbl_11" class="spb-lbl">Internal Notes <span class="spb-lbl-sub">(Internal)</span></span>
+      </button>
+    </div>
+    <div id="appLayout_ctx_bar" style="display:none;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;">
+      <span id="appLayout_title" class="spb-ctx-name"></span>
+      <span id="appLayout_subtitle" class="spb-ctx-sub"></span>
+    </div>
   </div>
   <div class="spb-fill-bar"><div id="spb_fill" class="spb-fill-bar-inner"></div></div>
 </div>

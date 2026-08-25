@@ -939,9 +939,20 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   background: var(--dark);
   border-bottom: 1px solid var(--dark3);
 }
-.spb-back-row {
-  padding: 8px 14px 6px;
-  border-bottom: 1px solid rgba(255,255,255,.07);
+/* Slim single-row stepper: Back + state-dot pills + notes pill + context.
+   Nation theming: every accent rides var(--yellow)/var(--accent-ink)/
+   var(--on-accent) (set per-nation by the theme); the white rgba()s are
+   neutral on-dark ink, not brand colors. */
+.spb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+}
+.spb-back {
+  padding: 6px 12px;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 .spb-tabs-row {
   display: flex;
@@ -949,14 +960,16 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
 }
 .spb-tabs-row::-webkit-scrollbar { display: none; }
 
 .spb-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 10px 14px 9px;
+  gap: 6px;
+  padding: 8px 10px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -974,45 +987,47 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 }
 .spb-btn.done { color: rgba(255,255,255,.55); }
 
-/* Internal Notes row — independent button below the step tabs */
-.spb-notes-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  border-top: 1px solid rgba(255,255,255,.07);
-  background: rgba(248,228,26,.04);
-  cursor: pointer;
-  transition: background .15s;
-}
-.spb-notes-row:hover { background: rgba(248,228,26,.09); }
-.spb-notes-row.active { background: rgba(248,228,26,.12); }
-.spb-notes-icon  { font-size: 14px; flex-shrink: 0; }
-.spb-notes-label { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.75); flex: 1; }
-.spb-notes-row.active .spb-notes-label { color: var(--accent-ink); }
-.spb-notes-chevron { font-size: 16px; color: rgba(255,255,255,.3); line-height: 1; }
-
-.spb-num {
-  width: 20px;
-  height: 20px;
+/* Step state dot — ✓ done / filled current / hollow upcoming. No numbers:
+   they went stale whenever role/type visibility changed. */
+.spb-dot {
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: rgba(255,255,255,.1);
-  color: rgba(255,255,255,.4);
-  font-size: 10px;
-  font-weight: 700;
+  border: 1.5px solid rgba(255,255,255,.3);
+  background: transparent;
+  color: var(--accent-ink);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background .15s, color .15s;
+  box-sizing: border-box;
+  transition: background .15s, border-color .15s;
 }
-.spb-btn.active .spb-num {
+.spb-btn.active .spb-dot {
   background: var(--yellow);
-  color: var(--dark);
+  border-color: var(--yellow);
 }
-.spb-btn.done .spb-num {
-  background: rgba(248,228,26,.15);
-  color: var(--accent-ink);
+.spb-btn.done .spb-dot {
+  border-color: color-mix(in srgb, var(--yellow) 55%, transparent);
+}
+
+/* Internal Notes — compact pill at the end of the strip */
+.spb-notes-pill {
+  margin-left: 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--yellow) 7%, transparent);
+  color: rgba(255,255,255,.75);
+  border-bottom: 2px solid transparent;
+}
+.spb-notes-pill:hover  { background: color-mix(in srgb, var(--yellow) 13%, transparent); }
+.spb-notes-pill.active { background: color-mix(in srgb, var(--yellow) 18%, transparent); color: var(--accent-ink); }
+.spb-notes-icon { font-size: 13px; flex-shrink: 0; }
+
+/* Applicant context (name + Editing badge) — right side of the strip */
+.spb-ctx-name { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.92); white-space: nowrap; }
+.spb-ctx-sub  { font-size: 11px; color: rgba(255,255,255,.55); white-space: nowrap; }
+@media (max-width: 760px) {
+  #appLayout_ctx_bar { display: none !important; }  /* strip space goes to the pills on phones */
 }
 
 .spb-lbl {

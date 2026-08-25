@@ -2000,7 +2000,10 @@ function _housingReconcile(){
     return true;
   });
 
-  return { totalUnits:units.length, buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp };
+  // Total = ACTIVE units only — archived (demolished/removed) units are
+  // history, not stock, so they don't inflate the headline count. They keep
+  // their own state-table row for the full accounting.
+  return { totalUnits:(units.length - buckets.archived.length), buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp };
 }
 
 function showReconcileReport(){
@@ -2041,8 +2044,8 @@ function showReconcileReport(){
     + stateRow('Reserved (no tenant)', R.buckets.reserved)
     + stateRow('Condemned', R.buckets.condemned, R.buckets.condemned.length ? 'accepted state' : '')
     + stateRow('Other / no status', R.buckets.other, R.buckets.other.length ? 'see below' : '')
-    + stateRow('Archived', R.buckets.archived)
-    + '<tr style="border-top:2px solid var(--border);"><td style="font-weight:800;">Total units</td><td class="std-cell-right" style="font-weight:800;">'+R.totalUnits+'</td><td></td></tr>'
+    + stateRow('Archived', R.buckets.archived, R.buckets.archived.length ? 'not counted in total' : '')
+    + '<tr style="border-top:2px solid var(--border);"><td style="font-weight:800;">Total active units</td><td class="std-cell-right" style="font-weight:800;">'+R.totalUnits+'</td><td></td></tr>'
     + '</tbody></table>';
 
   var gapTbl = gap.length
@@ -2117,7 +2120,7 @@ function showReconcileReport(){
     + '</div>'
     + '<div class="modal-body" style="padding:16px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;">'
     +   '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">'
-    +     tile('Total units', R.totalUnits)
+    +     tile('Total active units', R.totalUnits)
     +     tile('Assigned', R.buckets.assigned.length)
     +     tile('Vacant', R.buckets.vacant.length)
     +     tile('Not assigned/vacant', gap.length, gap.length ? '#b45309' : '')
@@ -2166,12 +2169,18 @@ async function _lhMarkNotHoused(appId){
   var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
   var linked = units.filter(function(u){ return u && !u.archived && u.assignedTo === appId; });
   var addr = linked.length ? (((linked[0].num||'')+' '+(linked[0].street||'')).trim()) : (a.assignedAddress || 'the linked unit');
+  // Message reflects what will actually change: a unit genuinely pointing at
+  // this application gets unlinked (keeping its tenant name); an app-side-only
+  // stale link (migrated data — no unit points back) is just cleared.
+  var msg = linked.length
+    ? (name + ' lives at ' + addr + ' but it is not their own home (doubled up). This unlinks their application from the unit — the unit keeps its tenant name and stays occupied — keeps the application a New Application, and returns them to the waitlist and Match.')
+    : (name + ' is not the tenant of record on any unit — their application just carries an old link to ' + addr + ' from the previous system. This clears that stale link, keeps the application a New Application, and returns them to the waitlist and Match. No unit record is changed.');
   var go = (typeof showConfirm === 'function')
     ? await showConfirm({
         title: 'Mark ' + name + ' as not housed?',
-        message: name + ' lives at ' + addr + ' but it is not their own home (doubled up). This unlinks their application from the unit — the unit keeps its tenant name and stays occupied — keeps the application a New Application, and returns them to the waitlist and Match.',
+        message: msg,
         confirmText: 'Not housed — unlink', cancelText: 'Cancel' })
-    : window.confirm('Mark ' + name + ' as not housed and unlink ' + addr + '?');
+    : window.confirm('Mark ' + name + ' as not housed and clear the link to ' + addr + '?');
   if (!go) return;
   // Unit side: drop the application link, keep the household's name/occupancy.
   linked.forEach(function(u){

@@ -409,29 +409,41 @@ function goTo(s){
   if(s === 6) _initStep6DocLib();
   // Restore toggle states for new step
 
-  // Sync step progress bar — fill bar + step states
-  var _spbSteps = [0,1,2,3,4,5,6,8];
-  var _totalSteps = 8;
-  var _activeIdx = _spbSteps.indexOf(s);
-  if(_activeIdx < 0) _activeIdx = 0;
+  // Sync step progress bar — fill line + step states. Pills carry STATE
+  // (✓ done / filled current / hollow upcoming), never numbers. Order and
+  // "done" are computed from the VISIBLE pills in DOM order, so role-gated
+  // steps (9/10, which the old fixed loop never touched) and type-skipped
+  // steps can't desync anything.
+  var _pillDefs = [
+    {id:'spb_0',step:0},{id:'spb_1',step:1},{id:'spb_2',step:2},{id:'spb_3',step:3},
+    {id:'spb_4',step:4},{id:'spb_5',step:5},{id:'spb_9',step:9},{id:'spb_10',step:10},
+    {id:'spb_6',step:6},{id:'spb_7',step:8}
+  ];
+  var _visible = _pillDefs.filter(function(p){
+    var b = document.getElementById(p.id);
+    return b && getComputedStyle(b).display !== 'none';
+  });
+  var _activeIdx = -1;
+  _visible.forEach(function(p, i){ if(p.step === s) _activeIdx = i; });
   var _fill = document.getElementById('spb_fill');
-  if(_fill) _fill.style.width = Math.round((_activeIdx / (_totalSteps - 1)) * 100) + '%';
-
-  for(var _si=0; _si<8; _si++) {
-    var _btn = document.getElementById('spb_'+_si);
-    var _num = document.getElementById('spb_num_'+_si);
-    if(!_btn) continue;
-    var _stepNum = _spbSteps[_si];
-    var _done    = _stepNum < s && s !== 0;
-    var _active  = _stepNum === s;
+  if(_fill && _activeIdx >= 0 && _visible.length > 1) {
+    _fill.style.width = Math.round((_activeIdx / (_visible.length - 1)) * 100) + '%';
+  }
+  _pillDefs.forEach(function(p){
+    var _btn = document.getElementById(p.id);
+    if(!_btn) return;
+    var _idx    = _visible.indexOf(p);
+    var _active = p.step === s;
+    var _done   = _activeIdx >= 0 && _idx >= 0 && _idx < _activeIdx;
     _btn.classList.toggle('active', _active);
     _btn.classList.toggle('done', _done && !_active);
-    if(_num) {
-      _num.innerHTML = _done && !_active
-        ? '<svg viewBox="0 0 10 10" width="10" height="10"><polyline points="1,5 4,8 9,2" stroke="currentColor" stroke-width="2" fill="none"/></svg>'
-        : String(_si+1);
+    var _dot = _btn.querySelector('.spb-dot');
+    if(_dot) {
+      _dot.innerHTML = (_done && !_active)
+        ? '<svg viewBox="0 0 10 10" width="8" height="8"><polyline points="1,5 4,8 9,2" stroke="currentColor" stroke-width="2" fill="none"/></svg>'
+        : '';
     }
-  }
+  });
 
   // Leaving the Internal Notes row — reset its highlight.
   var _notesBtn = document.getElementById('spb_notes_row');
