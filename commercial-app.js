@@ -120,6 +120,23 @@ function openCommercialApp(id){
   _caEnsureModal();
   var modal = document.getElementById('commercialAppModal');
   if (!modal) { if (typeof showToast==='function') showToast('Commercial application not available on this page.', { type:'error' }); return; }
+  // Boot deep links (?openScorecard= / ?openApp= from the worklist Review
+  // button) route commercial apps straight here BEFORE any page view was
+  // shown -- the modal then floated over an empty page, and closing it after
+  // approve/assign stranded the user on a blank screen. Put the landing page
+  // behind the modal whenever nothing is visible.
+  try {
+    var _anyViewVisible = Array.prototype.some.call(
+      document.querySelectorAll('.page-view'),
+      function(v){ return v.offsetHeight > 0; }
+    );
+    var _wiz = document.getElementById('appLayout');
+    if (!_anyViewVisible && !(_wiz && _wiz.offsetHeight > 0)) {
+      if (typeof showLanding === 'function') showLanding();
+      else if (typeof showEmployeeHome === 'function') showEmployeeHome();
+      else if (typeof showWorklist === 'function') showWorklist();
+    }
+  } catch(e){ /* background view is best-effort */ }
   var existing = id
     ? (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id === id && a.appType === 'commercial'; })
     : null;
