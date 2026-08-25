@@ -561,6 +561,32 @@ function onAppTypeChange() {
   } catch(e){ console.warn('[appType] persist-on-change failed:', e); }
 }
 
+// Persist the Deceased flag + date immediately while EDITING a saved
+// application — like the type change, the wizard only auto-saves on forward
+// step navigation, so ticking Deceased and leaving the page silently lost it.
+// Wired to the checkbox + date onchange in housing.html. No-op on new
+// (unsaved) applications — the flag rides the normal first save there.
+function persistDeceasedChange(){
+  try {
+    if (window._appTypeRestoring) return;
+    if (typeof currentAppId === 'undefined' || !currentAppId) return;
+    var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+    var cur = apps.find(function(a){ return a && a.id === currentAppId; });
+    if (!cur) return;
+    var flag = !!(document.getElementById('deceased_flag')||{}).checked;
+    var date = ((document.getElementById('deceased_date')||{}).value || '');
+    if (!!cur.deceased === flag && (cur.deceasedDate || '') === date) return;
+    cur.deceased = flag;
+    cur.deceasedDate = date;
+    if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(cur);
+    if (typeof auditEntry === 'function') auditEntry(cur.id, flag ? 'app_deceased_set' : 'app_deceased_cleared',
+      flag ? ('Applicant marked deceased' + (date ? ' — ' + date : '')) : 'Deceased status cleared', window.currentRole || 'staff');
+    if (typeof showToast === 'function') showToast(flag ? 'Marked deceased — saved' : 'Deceased status cleared — saved', {type:'info'});
+    if (typeof _renderLandingKpis === 'function') try { _renderLandingKpis(); } catch(e){}
+  } catch(e){ console.warn('[deceased] persist failed:', e); }
+}
+window.persistDeceasedChange = persistDeceasedChange;
+
 // ── Transfer request: search and pre-populate from existing tenant record ──
 function transferTenantSearch(q) {
   var results = document.getElementById('transfer_tenant_results');

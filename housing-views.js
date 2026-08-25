@@ -1483,6 +1483,7 @@ function _renderLandingKpis(){
   }).length;
   var underRepairN = units.filter(function(u){
     if(!u || u.archived) return false;
+    if(u.assignedTo || u.assignedName) return false;   // occupied units being repaired aren't vacant stock
     var st = (u.status||'').toLowerCase();
     if(st === 'condemned') return false;
     return u.under_renovation || st.indexOf('renovat') !== -1 || st.indexOf('repair') !== -1;
@@ -1500,6 +1501,7 @@ function _renderLandingKpis(){
   function _activeOfType(pred, excludeHoused){
     return apps.filter(function(a){
       if(!a || a.archived || a.status === 'declined') return false;
+      if(a.deceased) return false;   // deceased apps live in their own group
       if(excludeHoused && _isHoused(a)) return false;
       return pred(a.appType || 'new_housing');
     }).length;
@@ -1511,11 +1513,14 @@ function _renderLandingKpis(){
   // Subset annotation: new applications still sitting in DRAFT (started but
   // never submitted) — same population rules as the New Applications row.
   var draftApps = apps.filter(function(a){
-    if(!a || a.archived || a.status !== 'draft') return false;
+    if(!a || a.archived || a.status !== 'draft' || a.deceased) return false;
     if(_isHoused(a)) return false;
     var t = a.appType || 'new_housing';
     return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial';
   }).length;
+  // Deceased applications: their own group — kept as records, excluded from
+  // every type row above (and already zero-scored / off Match / unassignable).
+  var deceasedApps = apps.filter(function(a){ return a && !a.archived && a.deceased; }).length;
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
@@ -1525,6 +1530,7 @@ function _renderLandingKpis(){
   setKpi('kpi_condemned',       condemnedN);
   setKpi('kpi_new_apps',        newApps);
   setKpi('kpi_draft_apps',      draftApps);
+  setKpi('kpi_deceased_apps',   deceasedApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
 
@@ -1636,12 +1642,13 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps') {
+  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps' || type === 'deceased_apps') {
     var _typeCfg = {
       new_apps:       { title:'New Applications',                          pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No active new applications.' },
       draft_apps:     { title:'New Applications — In Draft',               pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No draft applications.' },
       file_updates:   { title:'File Updates — Existing Tenant',            pred:function(t){ return t==='existing_tenant'; },   empty:'No active file updates.' },
-      house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' }
+      house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' },
+      deceased_apps:  { title:'Applications — Deceased',                   pred:function(){ return true; },                     empty:'No deceased-flagged applications.' }
     }[type];
     title = _typeCfg.title;
     // New Applications drilldown excludes housed (linked) apps, matching the KPI.
@@ -1649,7 +1656,10 @@ function showHousingKpiDrilldown(type) {
     units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds2[u.assignedTo] = true; });
     var _isHoused2 = function(a){ return a.status === 'assigned' || !!a.assignedUnit || !!_housedIds2[a.id]; };
     var rows = apps.filter(function(a){
-      if (!a || a.archived || a.status==='declined') return false;
+      if (!a || a.archived) return false;
+      // Deceased apps live only in their own group; every other group excludes them.
+      if (type === 'deceased_apps') return !!a.deceased;
+      if (a.deceased || a.status==='declined') return false;
       if ((type === 'new_apps' || type === 'draft_apps') && _isHoused2(a)) return false;
       if (type === 'draft_apps' && a.status !== 'draft') return false;
       return _typeCfg.pred(a.appType || 'new_housing');

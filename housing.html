@@ -110,7 +110,7 @@
       <div class="kpi-meta">Available for assignment</div>
       <div class="kpi-breakdown" style="display:flex;flex-direction:column;margin-top:6px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:12px;color:var(--text);">Under repair / renovation</span>
+          <span style="font-size:12px;color:var(--text);" title="Vacant units currently under repair or renovation — occupied units being repaired are not counted">Under repair / renovation</span>
           <span style="font-size:15px;font-weight:800;color:var(--text);" id="kpi_under_repair">—</span>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;">
@@ -139,9 +139,14 @@
           <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_file_updates">—</span>
         </div>
         <div onclick="showHousingKpiDrilldown('house_requests')" role="button" tabindex="0" title="Existing tenant · transfer"
-             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;">
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border);">
           <span style="font-size:12px;color:var(--text);">Existing House Request</span>
           <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_house_requests">—</span>
+        </div>
+        <div onclick="showHousingKpiDrilldown('deceased_apps')" role="button" tabindex="0" title="Applications whose applicant is deceased — kept as records, excluded from the groups above"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;">
+          <span style="font-size:12px;color:var(--muted);">Deceased</span>
+          <span style="font-size:15px;font-weight:800;color:var(--muted);" id="kpi_deceased_apps">—</span>
         </div>
         <button id="kpi_likely_housed_btn" onclick="showLikelyHousedReport()" style="display:none;margin-top:8px;background:none;border:none;color:#2563eb;font-size:11px;font-weight:700;cursor:pointer;padding:4px 0;text-align:left;text-decoration:underline;">Review likely already-housed &rarr;</button>
         <button onclick="showReconcileReport()" style="margin-top:6px;background:none;border:none;color:#2563eb;font-size:11px;font-weight:700;cursor:pointer;padding:4px 0;text-align:left;text-decoration:underline;">Reconcile units &amp; applications &rarr;</button>
@@ -391,8 +396,8 @@
           <div class="f"><label>Band Number</label><input type="number" id="band" placeholder="Band number"/></div>
           <div class="f" data-req="reserve"><label>On Reserve Status <span class="r">*</span></label><select id="reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
           <div class="f"><label>Living Situation</label><select id="living_situation"><option value="">Select</option><option value="own_home">Living in own home</option><option value="family_on_reserve">Staying with family on reserve (not own home)</option><option value="renting_off_reserve">Renting / living off reserve</option><option value="no_fixed_address">Homeless / no fixed address</option><option value="other">Other</option></select></div>
-          <div class="f"><label>Deceased</label><label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;padding-top:8px;"><input type="checkbox" id="deceased_flag" onchange="var w=document.getElementById('deceased_date_wrap'); if(w) w.style.display=this.checked?'':'none'; if(typeof triggerV2Score==='function') triggerV2Score();" style="width:auto;accent-color:var(--yellow);"/> Applicant is deceased</label></div>
-          <div class="f" id="deceased_date_wrap" style="display:none;"><label>Date of Death</label><input type="date" id="deceased_date"/></div>
+          <div class="f"><label>Deceased</label><label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;padding-top:8px;"><input type="checkbox" id="deceased_flag" onchange="var w=document.getElementById('deceased_date_wrap'); if(w) w.style.display=this.checked?'':'none'; if(typeof triggerV2Score==='function') triggerV2Score(); if(typeof persistDeceasedChange==='function') persistDeceasedChange();" style="width:auto;accent-color:var(--yellow);"/> Applicant is deceased</label></div>
+          <div class="f" id="deceased_date_wrap" style="display:none;"><label>Date of Death</label><input type="date" id="deceased_date" onchange="if(typeof persistDeceasedChange==='function') persistDeceasedChange();"/></div>
           <div class="f" data-req="marital"><label>Marital Status <span class="r">*</span></label><select id="marital"><option value="">Select</option><option>Single</option><option>Married</option><option>Common-Law</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
           <div class="f" data-req="classification"><label>Housing Classification <span class="r">*</span></label><select id="classification" onchange="liveSync()"><option value="">Select</option><option>Section 95 — Social Housing</option><option>Section 95 — Rent to Own</option><option>Section 10</option><option>Social Housing</option><option>Non-Social Housing</option><option>Rent to Own</option><option>Band House</option><option>Employee Housing</option><option>Owned</option><option>Rental</option></select></div>
           <div class="f" data-req="phone"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="phone" placeholder="(705)-000-0000" oninput="fmtPhone(this)"/></div>
