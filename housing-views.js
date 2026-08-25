@@ -1818,6 +1818,7 @@ function showLikelyHousedReport(){
       + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
       +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'transfer_request\')">&rarr; Transfer</button>'
       +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'existing_tenant\')">&rarr; File Update</button>'
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" title="They live at this address but it is not their own home — unlink the unit, keep this a New Application, and return them to the waitlist" onclick="_lhMarkNotHoused(\''+sid+'\')">&#128101; Doubled up &mdash; not housed</button>'
       +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeLikelyHoused();window._appFormReturnDrill=\'likely_housed\';if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
       + '</div></td>'
       + '</tr>';
@@ -1994,7 +1995,9 @@ function showReconcileReport(){
   var R = _housingReconcile();
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
   var uAddr = function(u){ return ((u.num||'')+' '+(u.street||'')).trim() || u.id || '—'; };
-  var gap = R.buckets.reno.concat(R.buckets.reserved, R.buckets.condemned, R.buckets.other);   // the "not assigned / not vacant" units
+  // Condemned is an ACCEPTED unit state (its own bucket, own KPI) — it does
+  // not belong in the "gap" of unexplained units.
+  var gap = R.buckets.reno.concat(R.buckets.reserved, R.buckets.other);   // the "not assigned / not vacant" units
   // Break the gap down by its raw status value so the "other / no status" units
   // are explained (e.g. left as 'updated' after an edit, or blank).
   var gapByStatus = {};
@@ -2006,7 +2009,7 @@ function showReconcileReport(){
   var _otherN = R.buckets.other.length;
   var markVacantBtn = _otherN
     ? '<button class="btn btn-primary" style="margin-bottom:10px;" onclick="_reconMarkVacant()">&#8635; Set '+_otherN+' no-status unit'+(_otherN===1?'':'s')+' to Vacant</button>'
-      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These have no tenant and no clear status. Units under renovation, reserved, or condemned are left as-is.</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These have no tenant and no clear status. Units under renovation or reserved are left as-is; condemned units are an accepted state and not listed here.</div>'
     : '';
 
   function tile(label, val, color){
@@ -2024,7 +2027,7 @@ function showReconcileReport(){
     + stateRow('Vacant', R.buckets.vacant)
     + stateRow('Under renovation / repair', R.buckets.reno)
     + stateRow('Reserved (no tenant)', R.buckets.reserved)
-    + stateRow('Condemned', R.buckets.condemned, R.buckets.condemned.length ? 'left as-is' : '')
+    + stateRow('Condemned', R.buckets.condemned, R.buckets.condemned.length ? 'accepted state' : '')
     + stateRow('Other / no status', R.buckets.other, R.buckets.other.length ? 'see below' : '')
     + stateRow('Archived', R.buckets.archived)
     + '<tr style="border-top:2px solid var(--border);"><td style="font-weight:800;">Total units</td><td class="std-cell-right" style="font-weight:800;">'+R.totalUnits+'</td><td></td></tr>'
@@ -2033,8 +2036,7 @@ function showReconcileReport(){
   var gapTbl = gap.length
     ? '<table class="tbl"><thead><tr><th>Unit</th><th>State</th><th>Status field</th></tr></thead><tbody>'
       + gap.map(function(u){
-          var state = (u.status||'').toLowerCase()==='condemned' ? 'Condemned'
-                    : (u.under_renovation || (u.status||'').toLowerCase().indexOf('renovat')!==-1 || (u.status||'').toLowerCase().indexOf('repair')!==-1) ? 'Under renovation'
+          var state = (u.under_renovation || (u.status||'').toLowerCase().indexOf('renovat')!==-1 || (u.status||'').toLowerCase().indexOf('repair')!==-1) ? 'Under renovation'
                     : ((u.status||'').toLowerCase()==='reserved' ? 'Reserved' : 'Other / no status');
           return '<tr class="clickable" onclick="_closeReconcile();window.location.href=\'inventory.html?unit='+esc(String(u.id).replace(/'/g,""))+'\'">'
             + '<td style="font-weight:600;">'+esc(uAddr(u))+'</td><td>'+state+'</td><td class="std-cell-muted">'+esc(u.status||'(none)')+'</td></tr>';
@@ -2131,6 +2133,52 @@ window.showReconcileReport = showReconcileReport;
 
 function _closeReconcile(){ var m = document.getElementById('modalReconcile'); if (m) m.remove(); }
 window._closeReconcile = _closeReconcile;
+
+// Likely-Housed review: "Doubled up — not housed". The applicant lives at the
+// linked address but it is NOT their own home (staying with family), so the
+// unit link on their application is wrong data. Unlinks the application from
+// the unit (unit keeps its tenant NAME + occupied status — the household
+// really lives there), restores the app's pre-assignment status, stamps
+// Living Situation as doubled-up when blank, and returns them to the
+// waitlist / Match as a New Application.
+async function _lhMarkNotHoused(appId){
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var a = apps.find(function(x){ return x && x.id === appId; });
+  if (!a) return;
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
+    return;
+  }
+  var name = ((a.fn||'')+' '+(a.ln||'')).trim() || a.id;
+  var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+  var linked = units.filter(function(u){ return u && !u.archived && u.assignedTo === appId; });
+  var addr = linked.length ? (((linked[0].num||'')+' '+(linked[0].street||'')).trim()) : (a.assignedAddress || 'the linked unit');
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({
+        title: 'Mark ' + name + ' as not housed?',
+        message: name + ' lives at ' + addr + ' but it is not their own home (doubled up). This unlinks their application from the unit — the unit keeps its tenant name and stays occupied — keeps the application a New Application, and returns them to the waitlist and Match.',
+        confirmText: 'Not housed — unlink', cancelText: 'Cancel' })
+    : window.confirm('Mark ' + name + ' as not housed and unlink ' + addr + '?');
+  if (!go) return;
+  // Unit side: drop the application link, keep the household's name/occupancy.
+  linked.forEach(function(u){
+    u.assignedTo = null;
+    if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+  });
+  // Application side: clear the assignment cluster, restore approved status.
+  a.assignedUnit = ''; a.assignedAddress = '';
+  if (a.status === 'assigned' && typeof APP_STATUS !== 'undefined') a.status = APP_STATUS.ED_APPROVED;
+  if (!a.livingSituation) a.livingSituation = 'family_on_reserve';
+  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  if (typeof auditEntry === 'function') auditEntry(a.id, 'app_marked_not_housed',
+    'Marked doubled-up / not housed — unit link to ' + addr + ' removed (Likely-Already-Housed review); stays New Application', role);
+  if (typeof showToast === 'function') showToast(name + ' marked as doubled up — back on the waitlist as a New Application.', {type:'info'});
+  if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showLikelyHousedReport();  // refresh — the row drops off the list
+}
+window._lhMarkNotHoused = _lhMarkNotHoused;
 
 async function _reconClearLink(appId){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
