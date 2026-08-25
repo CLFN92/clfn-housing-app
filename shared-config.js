@@ -336,6 +336,8 @@ window.APP_REQ_FIELDS = [
   { id:'ln',             step:0, label:'Last Name',               defaultRequired: true,  errorLabel:'Last name is required.' },
   { id:'dob',            step:0, label:'Date of Birth',           defaultRequired: true,  errorLabel:'Date of birth is required.' },
   { id:'reserve',        step:0, label:'On Reserve Status',       defaultRequired: true,  errorLabel:'On Reserve status is required.' },
+  { id:'living_situation', step:0, label:'Living Situation',      defaultRequired: true,  errorLabel:'Living situation is required.' },
+  { id:'band',           step:0, label:'Band Number',             defaultRequired: false, errorLabel:'Band number is required.' },
   { id:'marital',        step:0, label:'Marital Status',          defaultRequired: true,  errorLabel:'Marital status is required.' },
   { id:'phone',          step:0, label:'Cell Phone',              defaultRequired: true,  errorLabel:'Cell phone number is required.' },
   { id:'email',          step:0, label:'Email',                   defaultRequired: true,  errorLabel:'Email address is required.' },
@@ -345,6 +347,10 @@ window.APP_REQ_FIELDS = [
   { id:'prov',           step:0, label:'Province',                defaultRequired: true,  errorLabel:'Province is required.' },
   { id:'postal',         step:0, label:'Postal Code',             defaultRequired: true,  errorLabel:'Postal code is required.' },
   { id:'occDate',        step:0, label:'Expected Occupancy Date', defaultRequired: true,  errorLabel:'Expected occupancy date is required.' },
+  // Application Date is editable so migrated/paper applications keep their
+  // original date (waitlist seniority). Blank falls back to today at save —
+  // requiring it forces a conscious entry instead of that silent default.
+  { id:'appDate',        step:0, label:'Application Date',        defaultRequired: false, errorLabel:'Application date is required.' },
   // ─── Step 1: Employment & Income (per row in #incomeList) ────────────────
   { id:'inc_person',    step:1, rowOf:'#incomeList', dataRole:'person',    label:'Person',           defaultRequired: true,  errorLabel:'Income record: person is required.' },
   { id:'inc_type',      step:1, rowOf:'#incomeList', dataRole:'incType',   label:'Income Type',      defaultRequired: false, errorLabel:'Income record: income type is required.' },
@@ -354,6 +360,8 @@ window.APP_REQ_FIELDS = [
   { id:'co_ln',      step:2, label:'Co-Applicant Last Name',      defaultRequired: true,  errorLabel:'Co-applicant last name is required.' },
   { id:'co_dob',     step:2, label:'Co-Applicant Date of Birth',  defaultRequired: true,  errorLabel:'Co-applicant date of birth is required.' },
   { id:'co_reserve', step:2, label:'Co-Applicant Reserve Status', defaultRequired: true,  errorLabel:'Co-applicant reserve status is required.' },
+  { id:'co_band',    step:2, label:'Co-Applicant Band Number',    defaultRequired: false, errorLabel:'Co-applicant band number is required.' },
+  { id:'co_home',    step:2, label:'Co-Applicant Home Phone',     defaultRequired: false, errorLabel:'Co-applicant home phone is required.' },
   { id:'co_cell',    step:2, label:'Co-Applicant Cell Phone',     defaultRequired: true,  errorLabel:'Co-applicant cell phone is required.' },
   { id:'co_email',   step:2, label:'Co-Applicant Email',          defaultRequired: true,  errorLabel:'Co-applicant email is required.' },
   { id:'coOccDate',  step:2, label:'Co-Applicant Occupancy Date', defaultRequired: true,  errorLabel:'Co-applicant occupancy start date is required.' },

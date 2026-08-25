@@ -396,7 +396,7 @@
         <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">Where the applicant lives today. Flags members who are <strong>on reserve with a reserve address but no home of their own</strong> (staying with family / doubled up) so they stand out for scoring and matching.</p>
         <div class="fg c2">
           <div class="f" data-req="reserve"><label>On Reserve Status <span class="r">*</span></label><select id="reserve" onchange="if(typeof _syncOnRezBadge==='function')_syncOnRezBadge();"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
-          <div class="f"><label>Living Situation</label><select id="living_situation" onchange="if(typeof _syncOnRezBadge==='function')_syncOnRezBadge();"><option value="">Select</option><option value="own_home">Living in own home</option><option value="family_on_reserve">Staying with family on reserve (not own home)</option><option value="renting_off_reserve">Renting / living off reserve</option><option value="no_fixed_address">Homeless / no fixed address</option><option value="other">Other</option></select></div>
+          <div class="f" data-req="living_situation"><label>Living Situation <span class="r">*</span></label><select id="living_situation" onchange="if(typeof _syncOnRezBadge==='function')_syncOnRezBadge();"><option value="">Select</option><option value="own_home">Living in own home</option><option value="family_on_reserve">Staying with family on reserve (not own home)</option><option value="renting_off_reserve">Renting / living off reserve</option><option value="no_fixed_address">Homeless / no fixed address</option><option value="other">Other</option></select></div>
         </div>
         <div id="onrez_badge" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--warn-amber-bg);color:var(--warn-amber-text);">&#128101; On reserve &mdash; no home of their own (doubled up)</div>
         <div id="nofixed_badge" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--danger-bg);color:var(--danger);">&#128680; No fixed address / homeless</div>
@@ -407,7 +407,7 @@
           <div class="f" data-req="fn"><label>First Name <span class="r">*</span></label><input type="text" id="fn" placeholder="First name" oninput="liveSync()"/></div>
           <div class="f" data-req="ln"><label>Last Name <span class="r">*</span></label><input type="text" id="ln" placeholder="Last name" oninput="liveSync()"/></div>
           <div class="f" data-req="dob"><label>Date of Birth <span class="r">*</span></label><input type="date" id="dob"/></div>
-          <div class="f"><label>Band Number</label><input type="number" id="band" placeholder="Band number"/></div>
+          <div class="f" data-req="band"><label>Band Number <span class="r hidden">*</span></label><input type="number" id="band" placeholder="Band number"/></div>
           <div class="f"><label>Deceased</label><label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;padding-top:8px;"><input type="checkbox" id="deceased_flag" onchange="var w=document.getElementById('deceased_date_wrap'); if(w) w.style.display=this.checked?'':'none'; if(typeof triggerV2Score==='function') triggerV2Score(); if(typeof persistDeceasedChange==='function') persistDeceasedChange();" style="width:auto;accent-color:var(--yellow);"/> Applicant is deceased</label></div>
           <div class="f" id="deceased_date_wrap" style="display:none;"><label>Date of Death</label><input type="date" id="deceased_date" onchange="if(typeof persistDeceasedChange==='function') persistDeceasedChange();"/></div>
           <div class="f" data-req="marital"><label>Marital Status <span class="r">*</span></label><select id="marital"><option value="">Select</option><option>Single</option><option>Married</option><option>Common-Law</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
@@ -425,7 +425,7 @@
           <div class="f" data-req="prov"><label>Province <span class="r">*</span></label><select id="prov"><option value="">Select</option><option>ON</option><option>QC</option><option>BC</option><option>AB</option><option>MB</option><option>SK</option><option>NS</option><option>NB</option><option>NL</option><option>PE</option><option>NT</option><option>YT</option><option>NU</option></select></div>
           <div class="f" data-req="postal"><label>Postal Code <span class="r">*</span></label><input type="text" id="postal" placeholder="P0A 0A0"/></div>
           <div class="f" data-req="occDate"><label>Expected Occupancy Date <span class="r">*</span></label><input type="date" id="occDate"/></div>
-          <div class="f"><label>Application Date</label><input type="date" id="appDate"/></div>
+          <div class="f" data-req="appDate"><label>Application Date <span class="r hidden">*</span></label><input type="date" id="appDate" title="For applications migrated from the old system, enter the ORIGINAL application date — it drives waitlist seniority. Left blank, today's date is used."/></div>
         </div>
       </div>
       <div class="card">
@@ -535,10 +535,10 @@
             <div class="f" data-req="co_fn"><label>First Name <span class="r">*</span></label><input type="text" id="co_fn"/></div>
             <div class="f" data-req="co_ln"><label>Last Name <span class="r">*</span></label><input type="text" id="co_ln"/></div>
             <div class="f" data-req="co_dob"><label>Date of Birth <span class="r">*</span></label><input type="date" id="co_dob"/></div>
-            <div class="f"><label>Band Number</label><input type="number" id="co_band"/></div>
+            <div class="f" data-req="co_band"><label>Band Number <span class="r hidden">*</span></label><input type="number" id="co_band"/></div>
             <div class="f" data-req="co_reserve"><label>On Reserve Status <span class="r">*</span></label><select id="co_reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
             <div class="f" data-req="co_cell"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="co_cell" oninput="fmtPhone(this)"/></div>
-            <div class="f"><label>Home Phone</label><input type="tel" id="co_home" oninput="fmtPhone(this)"/></div>
+            <div class="f" data-req="co_home"><label>Home Phone <span class="r hidden">*</span></label><input type="tel" id="co_home" oninput="fmtPhone(this)"/></div>
             <div class="f" data-req="co_email"><label>Email <span class="r">*</span></label><input type="email" id="co_email"/></div>
             <div class="f" data-req="coOccDate"><label>Occupancy Start Date <span class="r">*</span></label><input type="date" id="coOccDate"/></div>
           </div>
