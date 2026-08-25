@@ -2123,6 +2123,24 @@ function showReconcileReport(){
       + '</tbody></table>' + (_orN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_orN+'.</div>' : '')
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every on-reserve new application has a living situation on file.</div>';
 
+  // BCR entries missing details — Tenant-Card stubs (blocking is already in
+  // effect for them) waiting for the BCR date/reason to be completed.
+  var bcrIncomplete = (window._bcrRegistry || []).filter(function(b){
+    return b && b.active !== false && (typeof bcrIsIncomplete === 'function' ? bcrIsIncomplete(b) : !b.bcrd_date);
+  });
+  var bcrTbl = bcrIncomplete.length
+    ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These people ARE already blocked from housing — only the BCR paperwork details (date / resolution number) are missing.</div>'
+      + '<table class="tbl"><thead><tr><th>Name</th><th>Reason on file</th><th>BCR date</th><th></th></tr></thead><tbody>'
+      + bcrIncomplete.map(function(b){
+          var sname = String(b.full_name||'').replace(/'/g,"\\'");
+          return '<tr><td style="font-weight:600;">'+esc(b.full_name||'—')+'</td>'
+            + '<td class="std-cell-muted">'+esc(b.reason||'—')+'</td>'
+            + '<td class="std-cell-muted">'+esc(b.bcrd_date||'(missing)')+'</td>'
+            + '<td><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeReconcile();if(typeof openBcrManager===\'function\')openBcrManager(\''+sname+'\');">Complete &rarr;</button></td></tr>';
+        }).join('')
+      + '</tbody></table>'
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every BCR entry has its details on file.</div>';
+
   var noAppTbl = R.occNoApp.length
     ? '<table class="tbl"><thead><tr><th>Unit</th><th>Tenant</th></tr></thead><tbody>'
       + R.occNoApp.slice(0,80).map(function(u){
@@ -2182,6 +2200,8 @@ function showReconcileReport(){
     +   dupTbl
     +   secH('Applications with a stale unit link', R.stale.length, R.stale.length?'#b45309':null)
     +   staleTbl
+    +   secH('BCR entries missing details', bcrIncomplete.length, bcrIncomplete.length?'var(--warn-amber-text)':null)
+    +   bcrTbl
     +   secH('Occupied units with no application', R.occNoApp.length)
     +   noAppTbl
     + '</div>'

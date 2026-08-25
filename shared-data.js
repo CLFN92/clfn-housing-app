@@ -1581,6 +1581,36 @@ async function sbLiftBcr(id) {
 }
 window.sbLiftBcr = sbLiftBcr;
 
+// Complete/update an existing active BCR row (fills in a details-pending
+// stub written by the Tenant Card sync without minting a duplicate).
+async function sbUpdateBcr(id, patch) {
+  var r = await fetch(SUPABASE_URL + '/rest/v1/bcr_registry?id=eq.' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
+    body: JSON.stringify(patch)
+  });
+  if (!r.ok) throw new Error(await r.text());
+  var rows = await r.json();
+  var row = (rows && rows[0]) || null;
+  window._bcrRegistry = (window._bcrRegistry || []).map(function (x) {
+    return x.id === id ? (row || Object.assign({}, x, patch)) : x;
+  });
+  if (typeof auditEntry === 'function') auditEntry(id, 'bcr_updated', 'BCR details completed/updated');
+  return row;
+}
+window.sbUpdateBcr = sbUpdateBcr;
+
+// The marker sbAddBcr stubs carry until staff fill in the real details.
+var BCR_PENDING_REASON = 'Details pending — set from Tenant Card';
+window.BCR_PENDING_REASON = BCR_PENDING_REASON;
+function bcrIsIncomplete(b){
+  // Reason is optional by design — the BCR date (or the pending marker) is
+  // what distinguishes a completed entry from a Tenant-Card stub.
+  if (!b) return false;
+  return !b.bcrd_date || (b.reason || '') === BCR_PENDING_REASON;
+}
+window.bcrIsIncomplete = bcrIsIncomplete;
+
 function _bcrEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];}); }
 
 // Self-contained BCR manager modal — add / lift banished persons. Gated by the
@@ -1618,6 +1648,10 @@ window.openBcrManager = function(prefillName){
     + '</div>'
     + '</div>';
   mo.addEventListener('click', function(e){ if (e.target === mo) mo.remove(); });
+  // Above the TIC overlay (z-index 900) — the manager is opened FROM the
+  // Tenant Card when a tenancy is set to Banished/Harbouring, and .modal-ov's
+  // default 200 left it hidden behind the card.
+  mo.style.zIndex = '1000';
   document.body.appendChild(mo);
   mo.style.display = ''; mo.classList.add('on');
   if (prefillName) { var ni = document.getElementById('bcr_name'); if (ni) ni.value = prefillName; }
@@ -1659,12 +1693,22 @@ function _bcrAddSubmit(){
   var date   = (document.getElementById('bcr_date')   || {}).value || '';
   var reason = (document.getElementById('bcr_reason') || {}).value || '';
   if (!name.trim()) { if (typeof showToast === 'function') showToast('Enter a name.', { type:'error' }); return; }
-  sbAddBcr(name, date, reason, dob).then(function(){
+  // Same name already active on the list (e.g. the details-pending stub the
+  // Tenant Card sync wrote) → complete that row instead of duplicating it.
+  var existing = bcrLookup(name);
+  var op = existing
+    ? sbUpdateBcr(existing.id, {
+        bcrd_date: date || existing.bcrd_date || null,
+        reason: reason || (bcrIsIncomplete(existing) ? null : existing.reason) || null,
+        date_of_birth: dob || existing.date_of_birth || null
+      })
+    : sbAddBcr(name, date, reason, dob);
+  op.then(function(){
     ['bcr_name','bcr_dob','bcr_date','bcr_reason'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
     var hb = document.getElementById('bcr_harbouring'); if (hb) hb.checked = false;
     _bcrRenderList();
-    if (typeof showToast === 'function') showToast('Added to BCR list.', {type:'info'});
-  }).catch(function(e){ if (typeof showToast === 'function') showToast('Add failed: ' + e.message, { type:'error' }); });
+    if (typeof showToast === 'function') showToast(existing ? 'BCR details updated.' : 'Added to BCR list.', {type:'info'});
+  }).catch(function(e){ if (typeof showToast === 'function') showToast((existing ? 'Update' : 'Add') + ' failed: ' + e.message, { type:'error' }); });
 }
 window._bcrAddSubmit = _bcrAddSubmit;
 

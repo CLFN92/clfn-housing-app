@@ -983,6 +983,7 @@
         // is already the save confirmation; a toast per field is noisy when
         // editing several Overview fields in a row.
         if (key === TIC_C.tenancy_status && body[key] === 'banished') _ticSyncBanishedToBcr();
+        if (key === TIC_C.tenancy_status && body[key] === 'harbouring') _ticPromptHarbouring();
         if (key === TIC_C.tenancy_status && body[key] === 'deceased') _ticSyncDeceasedToApplication();
       })
       .catch(function(err){
@@ -1003,13 +1004,45 @@
     var u = _ticState.unit   || {};
     var name = t[TIC_C.full_name] || u.assignedName || '';
     if (!name) return;
-    if (typeof bcrLookup === 'function' && bcrLookup(name)) return; // already on the list
-    if (typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageBcr', window.currentRole)) {
-      if (typeof showToast === 'function') showToast(name + ' is marked Banished — ask a Housing Manager or ED to add them to the BCR list so eligibility checks pick it up.', {type:'error'});
+    if (typeof bcrLookup === 'function' && bcrLookup(name)) {
+      // Already listed — reopen the manager only if their entry is missing
+      // details (BCR date), so it can be completed.
+      var _ex = bcrLookup(name);
+      if (typeof bcrIsIncomplete === 'function' && bcrIsIncomplete(_ex)
+          && typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('manageBcr', window.currentRole)
+          && typeof openBcrManager === 'function') openBcrManager(name);
       return;
     }
-    if (typeof showToast === 'function') showToast('Add ' + name + ' to the BCR (banishment) list to keep eligibility checks in sync.', {type:'info'});
-    if (typeof openBcrManager === 'function') openBcrManager(name);
+    // Write the registry row IMMEDIATELY (marked details-pending) so the
+    // eligibility block takes effect even if the details form is abandoned —
+    // an unfinished form must never leave a banished person housable. The
+    // stub surfaces in Reconcile ("BCR entries missing details") until a
+    // BCR date is filled in.
+    var _pending = (typeof BCR_PENDING_REASON !== 'undefined') ? BCR_PENDING_REASON : 'Details pending — set from Tenant Card';
+    var _added = (typeof sbAddBcr === 'function')
+      ? sbAddBcr(name, '', _pending, '').catch(function(e){ console.warn('[TIC] BCR stub write failed:', e); return null; })
+      : Promise.resolve(null);
+    _added.then(function(){
+      if (typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageBcr', window.currentRole)) {
+        if (typeof showToast === 'function') showToast(name + ' added to the BCR list (eligibility now blocked) — ask a Housing Manager or ED to complete the BCR date and reason.', {type:'info'});
+        return;
+      }
+      if (typeof showToast === 'function') showToast(name + ' added to the BCR list — complete the BCR date and reason.', {type:'info'});
+      if (typeof openBcrManager === 'function') openBcrManager(name);
+    });
+  }
+
+  // Harbouring = housing/sheltering someone who is on the BCR list. The
+  // status itself carries no automatic block; open the manager so staff can
+  // record WHO is being harboured (their name goes on the list, not the
+  // harbouring tenant's).
+  function _ticPromptHarbouring(){
+    if (typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageBcr', window.currentRole)) {
+      if (typeof showToast === 'function') showToast('Status saved. If the person being harboured is not on the BCR list yet, ask a Housing Manager or ED to add them.', {type:'info'});
+      return;
+    }
+    if (typeof showToast === 'function') showToast('Record who is being harboured — add them to the BCR list if they are not on it yet.', {type:'info'});
+    if (typeof openBcrManager === 'function') openBcrManager('');
   }
 
   // Flow a Tenancy Status of "deceased" onto the person's housing application
