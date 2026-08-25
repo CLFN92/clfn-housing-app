@@ -2640,6 +2640,9 @@ window.openEditModal = function(appId) {
 
   // House condition
   tog('hasHouseToggle', app.haveHouse);
+  tog('deceased_flag', app.deceased);
+  set('deceased_date', app.deceasedDate);
+  (function(){ var w = document.getElementById('deceased_date_wrap'); if (w) w.style.display = app.deceased ? '' : 'none'; })();
   var houseBlk = document.getElementById('homeCondBlk');
   if(houseBlk) houseBlk.style.display = app.haveHouse ? 'block' : 'none';
   if(app.haveHouse) set('homeCondition', app.homeCondition);

@@ -908,6 +908,8 @@ function saveApplicationRecord(opts){
     band:        fv('band'),
     reserve:     fsel('reserve'),
     livingSituation: fsel('living_situation'),
+    deceased:     fb('deceased_flag'),
+    deceasedDate: fv('deceased_date'),
     marital:     fsel('marital'),
     phone:       fv('phone'),
     email:       fv('email'),
@@ -1184,6 +1186,7 @@ function popReview(){
     row('Band Number', band!=='—'?band:'') +
     row('Reserve Status', fld('reserve')) +
     row('Living Situation', (typeof livingSituationLabel === 'function' ? livingSituationLabel(fld('living_situation')) : '') || '') +
+    ((document.getElementById('deceased_flag')||{}).checked ? row('Deceased', 'Yes' + (fld('deceased_date') ? ' — ' + fld('deceased_date') : '')) : '') +
     row('Marital Status', fld('marital')) +
     row('Phone', fld('phone')) +
     row('Email', fld('email')) +
@@ -1736,6 +1739,7 @@ function printApplicationPreview() {
       +row('Band Number',          fld('band'))
       +row('On Reserve Status',    fld('reserve'))
       +row('Living Situation',     (typeof livingSituationLabel === 'function' ? livingSituationLabel(fld('living_situation')) : '') || '')
+      +((document.getElementById('deceased_flag')||{}).checked ? row('Deceased', 'Yes' + (fld('deceased_date') ? ' — ' + fld('deceased_date') : '')) : '')
       +row('Marital Status',       fld('marital'))
       +row('Cell Phone',           fld('phone'))
       +row('Email Address',        fld('email'))

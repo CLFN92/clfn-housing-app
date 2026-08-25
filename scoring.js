@@ -1311,6 +1311,14 @@ function _effectiveV2Model() {
 window._effectiveV2Model = _effectiveV2Model;
 
 function scoreApplicationLocally(app) {
+  // Deceased applicants are never scored: the application is kept as a record
+  // but carries no waitlist need — zero score, no tier ranking. (They are
+  // also excluded from Match and blocked from assignment.)
+  if (app && app.deceased) {
+    return { score:0, tier:'Not Scored', isNewApplicant:false, deceased:true,
+      breakdown:{ sectionA:{ total:0, urgent:0, health:0, overcrowding:0, household:0, accessibility:0, waitlist:0 },
+                  sectionB:{ total:0, rent:0, condition:0, conduct:0, income:0 }, arrears:0, edAdjustment:0 } };
+  }
   // Every point value comes from the ED-adjustable model (Settings → Scoring),
   // NOT hardcoded literals. The old version hardcoded all maps — the ED edited
   // weights, got a success toast and audit row, and scoring never changed
@@ -1427,7 +1435,8 @@ function triggerV2Score() {
     tenancyConduct:      (document.getElementById('tenancy_conduct')||{}).value || 'no_history',
     incomeStability:     (document.getElementById('income_stability')||{}).value || 'stable',
     arrearsStatus:       arrStatus,
-    edAdjustment:        (document.getElementById('edAdjustment')||{}).value || '0'
+    edAdjustment:        (document.getElementById('edAdjustment')||{}).value || '0',
+    deceased:            !!(document.getElementById('deceased_flag')||{}).checked
   };
 
   // Store for rubric display labels

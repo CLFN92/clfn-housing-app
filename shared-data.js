@@ -3265,6 +3265,7 @@ window.inviteApplicantToPortal = inviteApplicantToPortal;
 function appAssignabilityStatus(app){
   if(!app) return { ok:false, reason:'Application not found' };
   if(app.archived) return { ok:false, reason:'Application is archived' };
+  if(app.deceased) return { ok:false, reason:'Applicant is deceased — this application cannot be assigned' };
   // Commercial (business/department) applications are assigned to buildings
   // through their own review modal (openCommercialAssign) — they never belong
   // in the residential Match queue or the standard unit-assignment paths.
