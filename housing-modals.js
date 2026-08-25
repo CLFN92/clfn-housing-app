@@ -687,6 +687,15 @@ function saveUnitEdit(){
   var chk=function(id){ var el=document.getElementById(id); return el?el.checked:false; };
   var u=units[idx];
   var prevAssignedTo = u.assignedTo || null;
+  // Snapshot the full assignment cluster: u is the LIVE in-memory unit and is
+  // mutated in place below BEFORE the approval gate runs. When the gate blocks
+  // and returns, these must be rolled back — otherwise the poisoned in-memory
+  // assignedTo made the NEXT save's "assignment changed?" check false, so a
+  // second click sailed straight past the gate (e.g. linking a commercial
+  // application from the unit card by just pressing Save twice).
+  var prevAssignedName = u.assignedName || null;
+  var prevAssignedDate = u.assignedDate || null;
+  var prevStatusVal    = u.status || 'vacant';
   u.street=get('ue_street')||u.street; u.num=get('ue_num')||u.num;
   u.bedrooms=parseInt(get('ue_bedrooms'))||u.bedrooms;
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
@@ -766,7 +775,13 @@ function saveUnitEdit(){
         ? appAssignabilityStatus(linkedApp2)
         : { ok:false, reason:'Approval required before assigning' };
       if(!_as.ok) {
-        showToast('⚠ ' + _as.reason, {type:'info'});
+        // Roll back the in-place assignment mutation so a repeat Save can't
+        // slip past the gate via the "unchanged assignment" fast path.
+        u.assignedTo   = prevAssignedTo;
+        u.assignedName = prevAssignedName;
+        u.assignedDate = prevAssignedDate;
+        u.status       = prevStatusVal;
+        showToast('⚠ ' + _as.reason, {type:'error'});
         return;
       }
       // Record who actually gated the assignment — the saver's real role, not
