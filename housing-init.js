@@ -182,6 +182,15 @@ function closeApplicationForm(){
 }
 
 function newApp(){
+  // The application wizard's DOM (#appLayout) exists only on housing.html.
+  // Called from any other page — the unit card's "Start New Application"
+  // (inventory/tenants/match) or the Add-Tenant modal's link — the reset
+  // below ran against a missing form and visibly did nothing. Hand off to
+  // housing.html's ?view= dispatcher instead (same pattern as showSettings).
+  if (!document.getElementById('appLayout')) {
+    window.location.href = 'housing.html?view=newapp';
+    return;
+  }
   // Reset editing state
   currentAppId = null;
   window._appFormReturnTo = null;
