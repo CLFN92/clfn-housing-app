@@ -2643,13 +2643,22 @@ window.openEditModal = function(appId) {
   set('consent_share_programs', !!app.consentShareCLFN);
   liveSync();
 
-  // Restore application type toggle
+  // Restore application type toggle — all three community radios, so the form
+  // reflects the SAVED type (transfers used to restore as New Housing, which
+  // both confused staff and made persist-on-change unsafe). The restore lock
+  // stops onAppTypeChange's persist-on-change from firing during this
+  // programmatic pass.
   var isFileUpdate = (app.appType === 'existing_tenant');
+  var isTransferTy = (app.appType === 'transfer_request');
   var newRadio = document.getElementById('apptype_new');
   var exRadio  = document.getElementById('apptype_existing');
-  if(newRadio) newRadio.checked = !isFileUpdate;
+  var trRadio  = document.getElementById('apptype_transfer');
+  if(newRadio) newRadio.checked = !isFileUpdate && !isTransferTy;
   if(exRadio)  exRadio.checked  =  isFileUpdate;
-  if(typeof onAppTypeChange === 'function') onAppTypeChange();
+  if(trRadio)  trRadio.checked  =  isTransferTy;
+  window._appTypeRestoring = true;
+  try { if(typeof onAppTypeChange === 'function') onAppTypeChange(); }
+  finally { window._appTypeRestoring = false; }
 
   // House condition
   tog('hasHouseToggle', app.haveHouse);

@@ -464,8 +464,19 @@ function onAppTypeChange() {
   // residential form is left in a valid state behind the modal.
   var commEl = document.getElementById('apptype_commercial');
   if (commEl && commEl.checked) {
-    var newEl = document.getElementById('apptype_new');
-    if (newEl) newEl.checked = true;
+    // Revert to the edited app's SAVED type (or New Housing when creating) so
+    // the residential form behind the modal isn't silently reclassified —
+    // reverting blindly to New Housing would now also persist that change.
+    var _revertTo = 'apptype_new';
+    try {
+      if (typeof currentAppId !== 'undefined' && currentAppId) {
+        var _ca = ((typeof applications !== 'undefined' && applications) || []).find(function(a){ return a && a.id === currentAppId; });
+        if (_ca && _ca.appType === 'existing_tenant') _revertTo = 'apptype_existing';
+        else if (_ca && _ca.appType === 'transfer_request') _revertTo = 'apptype_transfer';
+      }
+    } catch(e){}
+    var _rvEl = document.getElementById(_revertTo);
+    if (_rvEl) _rvEl.checked = true;
     if (typeof openCommercialApp === 'function') openCommercialApp();
     return onAppTypeChange();
   }
@@ -527,6 +538,27 @@ function onAppTypeChange() {
   // File updates + transfers skip Income/References/Pets — sync the wizard
   // progress pills and forward-button labels to the chosen type.
   if(typeof _syncWizardNavFlow === 'function') _syncWizardNavFlow();
+
+  // Persist a type change made while EDITING a saved application immediately.
+  // The wizard only auto-saves on forward step navigation, so staff who
+  // changed the radio (e.g. File Update -> New Housing) and left the page had
+  // the reclassification silently evaporate. Guarded against the programmatic
+  // restore pass (_appTypeRestoring) and never touches commercial apps.
+  try {
+    if (!window._appTypeRestoring && typeof currentAppId !== 'undefined' && currentAppId) {
+      var _apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+      var _cur  = _apps.find(function(a){ return a && a.id === currentAppId; });
+      var _newT = (typeof getAppType === 'function') ? getAppType() : null;
+      if (_cur && _newT && _cur.appType !== 'commercial' && (_cur.appType || 'new_housing') !== _newT) {
+        var _prevT = _cur.appType || 'new_housing';
+        _cur.appType = _newT;
+        if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(_cur);
+        if (typeof auditEntry === 'function') auditEntry(_cur.id, 'app_reclassified', 'Application type changed from ' + _prevT + ' to ' + _newT, window.currentRole || 'staff');
+        var _lbl = _newT === 'existing_tenant' ? 'File Update' : _newT === 'transfer_request' ? 'Transfer Request' : 'New Housing';
+        if (typeof showToast === 'function') showToast('Application type changed to ' + _lbl + ' — saved', {type:'info'});
+      }
+    }
+  } catch(e){ console.warn('[appType] persist-on-change failed:', e); }
 }
 
 // ── Transfer request: search and pre-populate from existing tenant record ──
