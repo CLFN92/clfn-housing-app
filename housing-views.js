@@ -1748,6 +1748,10 @@ function _housingLikelyHousedApps(){
     if(!a || a.archived || a.status==='declined') return;
     var t = a.appType || 'new_housing';
     if(t === 'existing_tenant' || t === 'transfer_request') return;  // already classified
+    // Commercial (business/department) applications occupy buildings BY
+    // DESIGN once assigned — they are never "likely already housed"
+    // residential candidates to reclassify as a transfer or file update.
+    if(t === 'commercial') return;
     // Housed only if the application is LINKED to a real housing unit.
     var addr = '', via = '';
     if (byId[a.id])          { addr = byId[a.id];                       via = 'Unit assigned to this application'; }
