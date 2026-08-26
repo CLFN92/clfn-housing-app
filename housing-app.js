@@ -2337,7 +2337,10 @@ function _rentCalcCardHtml(){
   // Market rent resolves via the shared rule: per-unit override if entered,
   // else the Settings rent-table rate for the unit's bedroom count.
   var emrInfo = (unit && typeof unitMarketRent === 'function') ? unitMarketRent(unit) : null;
-  var emr = emrInfo ? emrInfo.marketRent : (unit ? unit.estimatedMarketRent : null);
+  // The age-adjusted market rent (rounded to the dollar) feeds the discount;
+  // base + factor render as their own rows below.
+  var emr = emrInfo ? (emrInfo.adjustedMarketRent != null ? emrInfo.adjustedMarketRent : emrInfo.marketRent)
+                    : (unit ? unit.estimatedMarketRent : null);
   var emrSrc = emrInfo ? emrInfo.source : (emr != null ? 'manual' : null);
   var prog = (typeof _appAssistProgram === 'function') ? _appAssistProgram() : '';
   var spouse = (typeof _appSpouseIndicator === 'function') ? _appSpouseIndicator() : 0;
@@ -2366,7 +2369,17 @@ function _rentCalcCardHtml(){
       + 'Rates effective ' + esc(c.effectiveDate || 'n/a') + '. ' + esc(c.sourceNote || '') + '</div>';
   } else {
     body += row('Calculation method', 'Standard Market Rent Formula');
-    body += row('Estimated Market Rent', unit ? (_rcMoney(emr) + (emrSrc === 'table' ? ' <span style="font-size:10px;color:var(--muted);">(from rent table)</span>' : '')) : 'no unit assigned yet');
+    var _ai = emrInfo && emrInfo.ageInfo;
+    if(_ai && emrInfo.marketRent != null && emrInfo.adjustedMarketRent !== emrInfo.marketRent){
+      body += row('Base Market Rent', _rcMoney(emrInfo.marketRent) + (emrSrc === 'table' ? ' <span style="font-size:10px;color:var(--muted);">(from rent table)</span>' : ''));
+      body += row('Age Adjustment', '&times; ' + _ai.factor.toFixed(2)
+        + ' <span style="font-size:10px;color:var(--muted);">('
+        + (_ai.source === 'override' ? 'pending major rehab' : _ai.source === 'no_year' ? 'no year on file' : _ai.effectiveAge + ' yrs')
+        + ' · schedule v' + _ai.scheduleVersion + ')</span>');
+      body += row('Adjusted Market Rent', _rcMoney(emr));
+    } else {
+      body += row('Estimated Market Rent', unit ? (_rcMoney(emr) + (emrSrc === 'table' ? ' <span style="font-size:10px;color:var(--muted);">(from rent table)</span>' : '')) : 'no unit assigned yet');
+    }
     body += row('Market Rent Discount', (model ? model.discountPct : '\u2014') + '%');
     body += row('Payable Market Percentage', (Math.round(c.payablePct * 10000) / 100) + '%');
     body += row('Calculated Monthly Rent', c.standardRent != null ? _rcMoney(c.standardRent) : '\u2014 (needs a unit with an Estimated Market Rent)', true);

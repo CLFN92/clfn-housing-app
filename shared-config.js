@@ -205,9 +205,21 @@ window.unitMarketRent = function (unit, model) {
     ? Number(model.market.rates[Math.min(beds, 5)]) : NaN;
   var market = manual != null ? manual : (isNaN(tableRate) ? null : tableRate);
   var payablePct = 1 - (model.discountPct / 100);
+  // Age adjustment (rent-age.js, when loaded): adjusted market rent =
+  // ROUND(table rate x age factor) to the nearest dollar, then the discount
+  // applies. A MANUAL per-unit value is the adjusted rent as entered — the
+  // factor is NOT re-applied on top (the unit-card field holds the adjusted
+  // value, so a typed override already is one). Pages that don't load
+  // rent-age.js keep the unadjusted behaviour (factor 1).
+  var ageInfo = (typeof window.rentAgeInfo === 'function' && unit) ? window.rentAgeInfo(unit) : null;
+  var adjusted = null;
+  if (manual != null) adjusted = manual;
+  else if (market != null) adjusted = ageInfo ? Math.round(market * ageInfo.factor) : market;
   return {
     marketRent: market,
-    estRent: market != null ? window.roundCents(market * payablePct) : null,
+    ageInfo: ageInfo,
+    adjustedMarketRent: adjusted,
+    estRent: adjusted != null ? window.roundCents(adjusted * payablePct) : null,
     payablePct: payablePct,
     source: manual != null ? 'manual' : (market != null ? 'table' : null),
     beds: isNaN(beds) ? null : beds

@@ -232,6 +232,7 @@ function openUnitEditModal(unitId){
   set('ue_bedrooms',u.bedrooms);
   set('ue_building_name', u.buildingName || '');
   set('ue_funder',u.funder); set('ue_phase',u.phase); set('ue_year',u.year);
+  set('ue_major_reno_year', u.majorRenoYear != null ? u.majorRenoYear : '');
   set('ue_dept_number', u.deptNumber);
   set('ue_cmhc_value', u.cmhcValue);
   set('ue_acct_number', u.acctNumber);
@@ -703,6 +704,18 @@ function saveUnitEdit(){
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
   u.buildingName = get('ue_building_name') || null;
   u.funder=get('ue_funder'); u.phase=get('ue_phase'); u.year=get('ue_year');
+  // Major renovation year — resets the effective age for the rent age factor.
+  var mryRaw = get('ue_major_reno_year');
+  if(mryRaw !== '' && mryRaw != null){
+    var mryN = parseInt(mryRaw, 10);
+    if(isNaN(mryN) || mryN < 1800 || mryN > 2200){
+      showToast('Major Renovation Year must be a valid year (e.g. 2015)', {type:'error'});
+      return;
+    }
+    u.majorRenoYear = mryN;
+  } else {
+    u.majorRenoYear = null;
+  }
   u.deptNumber=get('ue_dept_number');
   u.acctNumber=get('ue_acct_number');
   u.hydro_meter_number = get('ue_hydro_meter') || null;
@@ -1969,6 +1982,39 @@ function _ueEmrTableRate(){
   var v = Number(m.market.rates[Math.min(beds, 5)]);
   return isNaN(v) ? null : v;
 }
+// The value the field auto-holds: the ADJUSTED target rent — table rate x age
+// factor (from the live Year Built / Major Renovation Year / rehab override),
+// rounded to the nearest dollar.
+function _ueEmrAutoValue(){
+  var rate = _ueEmrTableRate();
+  if(rate == null) return null;
+  if(typeof rentAgeInfo !== 'function') return rate;
+  var ai = rentAgeInfo(_ueFormUnitForRent());
+  return Math.round(rate * ai.factor);
+}
+// Pseudo-unit from the LIVE form fields + the saved record's override state,
+// so the readout tracks edits before they're saved.
+function _ueFormUnitForRent(){
+  var g = function(id){ return (document.getElementById(id)||{}).value || ''; };
+  var saved = null;
+  if(window._editingUnitId){
+    var all = (typeof getAllUnits === 'function') ? getAllUnits() : (window.housingUnits || []);
+    saved = (all || []).find(function(x){ return x && x.id === window._editingUnitId; }) || null;
+  }
+  var el = document.getElementById('ue_est_market_rent');
+  var manual = (el && el.dataset.auto !== '1' && String(el.value).trim() !== '') ? el.value : null;
+  return {
+    id: window._editingUnitId,
+    bedrooms: g('ue_bedrooms'),
+    estimatedMarketRent: manual,
+    year: g('ue_year'),
+    majorRenoYear: g('ue_major_reno_year'),
+    rehabOverride: saved ? saved.rehabOverride : null,
+    monthlyRent: saved ? saved.monthlyRent : null,
+    status: g('ue_status') || (saved ? saved.status : ''),
+    assignedName: saved ? saved.assignedName : ''
+  };
+}
 function _ueRefreshEmrCalc(){
   var el = document.getElementById('ue_est_market_rent');
   if(!el) return;
@@ -1976,23 +2022,100 @@ function _ueRefreshEmrCalc(){
   if(!out){
     out = document.createElement('div');
     out.id = 'ue_emr_calc';
-    out.style.cssText = 'font-size:11px;color:var(--muted);margin-top:3px;';
+    out.style.cssText = 'font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;';
     if(el.parentNode) el.parentNode.appendChild(out);
   }
-  if(typeof getRentModel !== 'function'){ out.textContent = ''; return; }
-  var m = getRentModel();
-  var pay = 1 - m.discountPct / 100;
-  var v = parseFloat(el.value);
-  var tbl = _ueEmrTableRate();
-  var bits = [];
-  if(!isNaN(v) && v >= 0){
-    var est = Math.round(v * pay * 100) / 100;
-    bits.push('Estimated rent: $' + est.toFixed(2) + '/month (' + (Math.round((100 - m.discountPct) * 100) / 100) + '% payable)');
+  if(typeof getRentModel !== 'function' || typeof unitMarketRent !== 'function'){ out.textContent = ''; return; }
+  // While tracking the table, the FIELD holds the calculated adjusted target
+  // rent (table rate x age factor, dollar-rounded) — sync it on every refresh
+  // so bedroom/year/override changes flow straight into the visible value.
+  if(el.dataset.auto === '1'){
+    var av = _ueEmrAutoValue();
+    el.value = av != null ? String(av) : '';
+    if(av == null) el.dataset.auto = '';
   }
-  if(el.dataset.auto === '1') bits.push('auto from the Settings rent table');
-  else if(tbl != null) bits.push('per-unit override — clear the field to use the table rate ($' + tbl.toFixed(2) + ')');
-  out.textContent = bits.join(' · ');
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
+  var fu = _ueFormUnitForRent();
+  var info = unitMarketRent(fu);
+  var ai = info.ageInfo;
+  var pct = Math.round(info.payablePct * 10000) / 100;
+  var money = function(v){ return '$' + Number(v).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}); };
+  var rows = [];
+  if(el.dataset.auto === '1' && info.marketRent != null){
+    var _fBit = (ai && ai.factor !== 1) ? ' × age factor ' + ai.factor.toFixed(2) : '';
+    rows.push('Auto from the Settings rent table: $' + Number(info.marketRent).toLocaleString() + _fBit + (_fBit ? ' = the value shown' : ''));
+  } else if(info.source === 'manual'){
+    rows.push('Per-unit override — used as-is (age factor not re-applied). Clear the field to recalculate from the table' + (_ueEmrAutoValue() != null ? ' ($' + Number(_ueEmrAutoValue()).toLocaleString() + ')' : '') + '.');
+  }
+  if(ai){
+    if(ai.source === 'override'){
+      rows.push('<span style="color:var(--warn-amber-text);">🔧 Pending major rehab override: factor ' + ai.factor.toFixed(2)
+        + (ai.override && ai.override.reason ? ' — ' + esc(ai.override.reason) : '') + '</span>');
+    } else if(ai.source === 'no_year'){
+      rows.push('<span style="color:var(--warn-amber-text);">⚠ No construction year on file — factor 1.00 (unverified default, not an assessed value)</span>');
+    } else if(el.dataset.auto === '1'){
+      rows.push('Age ' + ai.effectiveAge + ' yrs (' + (ai.usedRenoYear ? 'major reno ' : 'built ') + ai.effectiveYear + ') → factor '
+        + ai.factor.toFixed(2) + (ai.floorApplied ? ' (floor)' : '') + ' · schedule v' + ai.scheduleVersion);
+    }
+  }
+  if(info.estRent != null) rows.push('Estimated rent: <strong>' + money(info.estRent) + '/month</strong> (' + pct + '% payable)');
+  // Grandfathering — the calculated rate only ever applies at turnover.
+  if(fu.assignedName && fu.monthlyRent != null && info.estRent != null && Number(fu.monthlyRent) !== info.estRent){
+    rows.push('<span style="color:var(--muted);">Current tenant grandfathered at ' + money(fu.monthlyRent) + ' — the calculated rate applies at the next turnover.</span>');
+  }
+  out.title = 'Derivation: base market rent (CMHC table by bedrooms, or per-unit override) × age factor (from Year Built / Major Renovation Year via the Settings age schedule), rounded to the nearest dollar, × the payable percentage. Rent changes only when a new tenant moves in.';
+  out.innerHTML = rows.join('<br/>') + _ueRehabOverrideHtml(fu);
 }
+// Pending-major-rehab override control (0.60–0.70, reason required) — the only
+// path below the schedule floor. Persists immediately (audited), same
+// authority as setting the rent amount.
+function _ueRehabOverrideHtml(fu){
+  if(!_canEditUnitRent() || !window._editingUnitId) return '';
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
+  var ovr = fu.rehabOverride;
+  if(ovr && ovr.factor != null){
+    return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueClearRehabOverride()">✕ Clear rehab override</button>';
+  }
+  return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueOpenRehabOverride()">🔧 Pending major rehab…</button>'
+    + '<span id="ue_rehab_form" style="display:none;"> factor <input id="ue_rehab_factor" type="number" min="0.60" max="0.70" step="0.01" value="0.65" style="width:64px;padding:2px 4px;font-size:11px;"/>'
+    + ' reason <input id="ue_rehab_reason" type="text" placeholder="required" style="width:160px;padding:2px 4px;font-size:11px;"/>'
+    + ' <button type="button" class="btn btn-primary" style="padding:2px 8px;font-size:10px;" onclick="_ueSaveRehabOverride()">Save</button></span>';
+}
+function _ueOpenRehabOverride(){
+  var f = document.getElementById('ue_rehab_form');
+  if(f) f.style.display = '';
+}
+function _ueSaveRehabOverride(){
+  if(!_canEditUnitRent()) return;
+  var factor = parseFloat((document.getElementById('ue_rehab_factor')||{}).value);
+  var reason = ((document.getElementById('ue_rehab_reason')||{}).value || '').trim();
+  var lim = window.RENT_AGE_DEFAULTS || { overrideMin: 0.60, overrideMax: 0.70 };
+  if(isNaN(factor) || factor < lim.overrideMin || factor > lim.overrideMax){
+    showToast('Rehab override factor must be between ' + lim.overrideMin.toFixed(2) + ' and ' + lim.overrideMax.toFixed(2), {type:'error'});
+    return;
+  }
+  if(!reason){ showToast('A reason is required for the pending-major-rehab override', {type:'error'}); return; }
+  _ueWriteRehabOverride({ factor: Math.round(factor * 100) / 100, reason: reason,
+    setBy: window.currentRole || 'staff', setAt: new Date().toISOString().split('T')[0] },
+    'Pending-major-rehab rent override set: factor ' + factor.toFixed(2) + ' — ' + reason);
+}
+function _ueClearRehabOverride(){
+  _ueWriteRehabOverride(null, 'Pending-major-rehab rent override cleared');
+}
+function _ueWriteRehabOverride(ovr, auditMsg){
+  var all = (typeof getAllUnits === 'function') ? getAllUnits() : (window.housingUnits || []);
+  var u = (all || []).find(function(x){ return x && x.id === window._editingUnitId; });
+  if(!u){ showToast('Save the unit first, then set the override.', {type:'error'}); return; }
+  u.rehabOverride = ovr;
+  if(typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+  else if(typeof sbSaveUnit === 'function') sbSaveUnit(u);
+  if(typeof auditEntry === 'function') auditEntry(u.id, 'rent_rehab_override', auditMsg, window.currentRole || 'staff');
+  showToast(ovr ? 'Rehab override saved.' : 'Rehab override cleared.', {type:'info'});
+  _ueRefreshEmrCalc();
+}
+window._ueOpenRehabOverride = _ueOpenRehabOverride;
+window._ueSaveRehabOverride = _ueSaveRehabOverride;
+window._ueClearRehabOverride = _ueClearRehabOverride;
 function _ueSetEmrField(u){
   var el = document.getElementById('ue_est_market_rent');
   if(!el) return;
@@ -2001,33 +2124,30 @@ function _ueSetEmrField(u){
     el.value = String(u.estimatedMarketRent);
     el.dataset.auto = '';
   } else {
-    var rate = _ueEmrTableRate();
-    el.value = rate != null ? String(rate) : '';
-    el.dataset.auto = rate != null ? '1' : '';
+    // _ueRefreshEmrCalc (below) fills the calculated adjusted target rent.
+    el.dataset.auto = '1';
   }
   if(!el.dataset.emrWired){
     el.dataset.emrWired = '1';
     el.addEventListener('input', function(){
-      if(String(el.value).trim() === ''){
-        // Cleared = go back to tracking the table.
-        var r = _ueEmrTableRate();
-        if(r != null){ el.value = String(r); el.dataset.auto = '1'; }
-        else el.dataset.auto = '';
-      } else {
-        el.dataset.auto = '';
-      }
+      // Cleared = go back to tracking the table; typed = per-unit override.
+      el.dataset.auto = (String(el.value).trim() === '') ? '1' : '';
       _ueRefreshEmrCalc();
     });
     var bedsEl = document.getElementById('ue_bedrooms');
     if(bedsEl) bedsEl.addEventListener('change', function(){
-      // Re-derive on a size change while tracking the table — also when the
+      // A size change re-derives while tracking the table — also when the
       // field is empty (a unit with no rate yet just had its size set).
-      if(el.dataset.auto === '1' || String(el.value).trim() === ''){
-        var r2 = _ueEmrTableRate();
-        el.value = r2 != null ? String(r2) : '';
-        el.dataset.auto = r2 != null ? '1' : '';
-      }
+      if(String(el.value).trim() === '') el.dataset.auto = '1';
       _ueRefreshEmrCalc();
+    });
+    // Year fields drive the age factor — recalc the field + derivation live.
+    ['ue_year','ue_major_reno_year'].forEach(function(yid){
+      var yEl = document.getElementById(yid);
+      if(yEl && !yEl.dataset.emrWired){
+        yEl.dataset.emrWired = '1';
+        yEl.addEventListener('input', _ueRefreshEmrCalc);
+      }
     });
   }
   _ueRefreshEmrCalc();
@@ -2568,6 +2688,8 @@ function saveAddTenant(){
   if(typeof renderDashTable==='function') renderDashTable();
   if(typeof renderWorklist==='function') renderWorklist();
   showToast('✓ '+tenantName+' assigned to '+units[idx].num+' '+units[idx].street, {type:'info'});
+  // New tenancy = the only moment rent changes (sitting tenants grandfathered).
+  if(typeof offerTurnoverRent === 'function') offerTurnoverRent(units[idx], { context: 'add_tenant' });
 }
 
 

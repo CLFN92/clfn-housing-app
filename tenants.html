@@ -12,6 +12,7 @@
 
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
+<script src="rent-age.js"></script>
 <script src="shared-auth.js"></script>
 <script src="shared-ui.js"></script>
 <script src="approval-authority.js"></script>
@@ -207,6 +208,7 @@
             </div>
             <div class="f"><label>Bathrooms</label><input id="ue_bathrooms" type="text" placeholder="e.g. 1"/></div>
             <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
+            <div class="f"><label>Major Renovation Year</label><input id="ue_major_reno_year" type="number" min="1800" max="2200" placeholder="e.g. 2015" title="A major renovation resets the unit's effective age for the rent age-adjustment — leave blank if none"/></div>
             <div class="f"><label>Monthly Rent (CAD)</label><input id="ue_rent" type="number" min="0" step="any" placeholder="e.g. 750"/></div>
             <div class="f"><label>Estimated Market Rent (CAD)</label><input id="ue_est_market_rent" type="number" min="0" step="any" placeholder="e.g. 1400" title="Auto-filled from the Settings rent table by bedroom count — type a value only to override for this unit; the rent model charges the discounted percentage of this"/></div>
             <div class="f"><label>Type</label>

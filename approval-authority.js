@@ -58,6 +58,8 @@ var APPROVAL_AUTHORITY = (function() {
     assignTiedBand:           ['housing_manager', 'ed'],
     // Who can set / edit a unit's monthly rent amount on the Inventory forms
     assignRentAmount:         ['housing_manager', 'ed'],
+    // Who can edit the age-adjustment band schedule (Settings > Rent Model)
+    editRentAgeFactors:       ['housing_manager', 'ed'],
 
     // ── Application signatures ────────────────────────────────────────────
     // Who can unlock (override) applicant signatures after an app is submitted
@@ -407,6 +409,7 @@ var APPROVAL_AUTHORITY = (function() {
       overrideRent:             'Override calculated monthly rent',
       assignTiedBand:           'Assign within tied score band',
       assignRentAmount:         'Set / edit unit rent amount',
+      editRentAgeFactors:       'Edit rent age-adjustment schedule',
       unlockSignatures:         'Unlock applicant signatures after submission',
       sowEdThreshold:           'Maintenance Request dollar threshold for ED approval ($)',
       approveSowUnderThreshold: 'Approve Maintenance Request under threshold',
@@ -448,7 +451,7 @@ var APPROVAL_AUTHORITY = (function() {
     groups: {
       'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','deleteApplication','unlockSignatures','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
-      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount','overrideRent'],
+      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount','overrideRent','editRentAgeFactors'],
       'Maintenance Request & Renovation': ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor','unlockEmailAttachments'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment','editMatchPriority'],

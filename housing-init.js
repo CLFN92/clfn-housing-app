@@ -1229,18 +1229,24 @@ function confirmAssignment() {
       });
     }
   };
-  // Optional move-in note first (sequential, so it doesn't stack on the
-  // agreement dialog / opening TIC), then the agreement hand-off.
-  if(typeof promptTenantNote === 'function'){
-    promptTenantNote(name, {
-      title: 'Move-in note (optional)',
-      message: 'Add a quick note for ' + name + ' — move-in condition, keys handed over, etc. Leave blank to skip.',
-      placeholder: 'e.g. Keys handed over, unit clean, minor scuff in hallway…',
-      context: 'move_in'
-    }).then(_agreementHandoff);
-  } else {
-    _agreementHandoff();
-  }
+  // Sequential dialogs: turnover rent first (new tenancy = the only moment
+  // rent changes — sitting tenants are grandfathered), then the optional
+  // move-in note, then the agreement hand-off.
+  var _rentOffer = (typeof offerTurnoverRent === 'function')
+    ? function(){ return offerTurnoverRent(u, { context: 'assignment' }); }
+    : function(){ return Promise.resolve(); };
+  _rentOffer().then(function(){
+    if(typeof promptTenantNote === 'function'){
+      promptTenantNote(name, {
+        title: 'Move-in note (optional)',
+        message: 'Add a quick note for ' + name + ' — move-in condition, keys handed over, etc. Leave blank to skip.',
+        placeholder: 'e.g. Keys handed over, unit clean, minor scuff in hallway…',
+        context: 'move_in'
+      }).then(_agreementHandoff);
+    } else {
+      _agreementHandoff();
+    }
+  });
 }
 
 

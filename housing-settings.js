@@ -2081,6 +2081,40 @@ function renderRentModelPanel(){
     + '</div>'
     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">Each unit\'s Estimated Market Rent auto-fills from this table using its bedroom count (5+ bedrooms uses the 5+ rate); entering a value on a unit card overrides the table for that unit only. Estimated rent charged = table rate &times; payable percentage.</div>'
     + '</div>';
+  // Age-adjustment schedule card — versioned (append-only) in housing_settings
+  // key 'rent_age_factors'; gated by its own editRentAgeFactors authority so
+  // the HM can revise bands without a deploy. Historical applied rents keep the
+  // version they were calculated under (stamped at apply time).
+  var ageCard = '';
+  if(typeof getRentAgeSchedule === 'function'){
+    var sched = getRentAgeSchedule();
+    var canAge = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('editRentAgeFactors', role);
+    var aDis = canAge ? '' : ' disabled';
+    var bandRows = '';
+    for(var ab = 0; ab < 5; ab++){
+      var band = sched.bands[ab] || {};
+      var lbl = ab < 4
+        ? 'Up to <input type="number" min="1" max="200" id="rm_age_max' + ab + '" value="' + (band.maxAge != null ? band.maxAge : '') + '"' + aDis + ' style="width:64px;display:inline-block;"/> yrs'
+        : 'Older (36+)';
+      bandRows += '<div class="f"><label>Band ' + (ab + 1) + '</label>'
+        + '<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">' + lbl + '</div>'
+        + '<input type="number" min="0" max="1" step="0.01" id="rm_age_f' + ab + '" value="' + (band.factor != null ? band.factor : '') + '"' + aDis + ' title="Factor applied to base market rent"/></div>';
+    }
+    ageCard = '<div class="card" style="margin-top:14px;">'
+      + '<div class="ctitle">Age adjustment (applies at turnover — sitting tenants grandfathered)</div>'
+      + '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Adjusted market rent = base market rent &times; the factor for the unit\'s effective age (Major Renovation Year when set, else Year Built), rounded to the nearest dollar, before the payable-percentage discount. Currently <strong>schedule v' + sched.version + '</strong>' + (sched.effectiveDate ? ' (effective ' + sched.effectiveDate + ')' : ' (built-in defaults)') + '. Rent only changes when a new tenant moves in.</div>'
+      + '<div class="fg c3">' + bandRows
+      +   '<div class="f"><label>Floor (automatic minimum)</label><input type="number" min="0" max="1" step="0.01" id="rm_age_floor" value="' + sched.floor + '"' + aDis + ' title="The automatic factor never goes below this; only the per-unit pending-major-rehab override (0.60–0.70, reason required) can"/></div>'
+      + '</div>'
+      + '<div class="fg c2" style="margin-top:6px;">'
+      +   '<div class="f"><label>Effective Date (new version)</label><input type="date" id="rm_age_date" value="' + new Date().toISOString().split('T')[0] + '"' + aDis + '/></div>'
+      + '</div>'
+      + (canAge
+          ? '<button class="btn btn-primary" onclick="saveRentAgeSchedule()">Save as New Version (v' + (sched.version + 1) + ')</button>'
+          + '<div style="font-size:11px;color:var(--muted);margin-top:6px;">Saving appends a new version — rents already applied keep the version they were calculated under.</div>'
+          : '<div class="empty-state-ctr">Editing the age schedule requires the "Edit rent age-adjustment schedule" authority (Settings &rarr; Approval Authority &rarr; Unit Assignment).</div>')
+      + '</div>';
+  }
   body.innerHTML =
     '<div class="card">'
     + '<div class="ctitle">Standard rental calculation</div>'
@@ -2096,6 +2130,7 @@ function renderRentModelPanel(){
     + ' Units take their Estimated Market Rent from the baseline table below unless a per-unit override is entered on the unit card.</div>'
     + '</div>'
     + mktCard
+    + ageCard
     + tableCard('ow', m.ow)
     + tableCard('odsp', m.odsp)
     + '<div style="font-size:11px;color:var(--muted);margin:10px 0;">The two tables are separate records: editing one never changes the other. For Ontario Works / ODSP applicants the charged rent is the LOWER of the shelter amount for their benefit unit size and the unit\'s standard discounted rent.</div>'
@@ -2173,3 +2208,48 @@ function saveRentModel(){
   renderRentModelPanel();
 }
 window.saveRentModel = saveRentModel;
+
+// Append a new age-schedule version to housing_settings key 'rent_age_factors'.
+// Append-only: prior versions are never edited, so rents stamped with an older
+// version keep their provenance.
+function saveRentAgeSchedule(){
+  var role = window.currentRole || '';
+  if(typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('editRentAgeFactors', role)){
+    showToast('You are not authorized to edit the rent age-adjustment schedule', {type:'error'});
+    return;
+  }
+  var bands = [];
+  var prevMax = 0;
+  for(var i = 0; i < 5; i++){
+    var f = parseFloat((document.getElementById('rm_age_f' + i)||{}).value);
+    if(isNaN(f) || f <= 0 || f > 1){ showToast('Band ' + (i + 1) + ' factor must be between 0 and 1', {type:'error'}); return; }
+    var maxAge = null;
+    if(i < 4){
+      maxAge = parseInt((document.getElementById('rm_age_max' + i)||{}).value, 10);
+      if(isNaN(maxAge) || maxAge <= prevMax){ showToast('Band age limits must increase (band ' + (i + 1) + ')', {type:'error'}); return; }
+      prevMax = maxAge;
+    }
+    bands.push({ maxAge: maxAge, factor: Math.round(f * 100) / 100 });
+  }
+  var floor = parseFloat((document.getElementById('rm_age_floor')||{}).value);
+  if(isNaN(floor) || floor <= 0 || floor > 1){ showToast('Floor must be between 0 and 1', {type:'error'}); return; }
+  floor = Math.round(floor * 100) / 100;
+  for(var b2 = 0; b2 < bands.length; b2++){
+    if(bands[b2].factor < floor){ showToast('Band ' + (b2 + 1) + ' factor (' + bands[b2].factor + ') is below the floor (' + floor + ') — automatic factors cannot go below the floor. Use the per-unit pending-major-rehab override for deeper reductions.', {type:'error'}); return; }
+  }
+  var effDate = (document.getElementById('rm_age_date')||{}).value || new Date().toISOString().split('T')[0];
+  window._appSettings = window._appSettings || {};
+  var store = window._appSettings.rent_age_factors || {};
+  var versions = Array.isArray(store.versions) ? store.versions.slice() : [];
+  var nextV = versions.reduce(function(mx, v){ return Math.max(mx, (v && v.version) || 0); }, 0) + 1;
+  versions.push({ version: nextV, effectiveDate: effDate, bands: bands, floor: floor,
+                  savedBy: role, savedAt: new Date().toISOString() });
+  var payload = { versions: versions };
+  window._appSettings.rent_age_factors = payload;
+  if(typeof saveSettingWithDraftFallback === 'function') saveSettingWithDraftFallback('rent_age_factors', payload);
+  if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'rent_age_schedule_updated',
+    'Rent age-adjustment schedule v' + nextV + ' saved (effective ' + effDate + ') — bands ' + JSON.stringify(bands) + ', floor ' + floor, role);
+  showToast('Age-adjustment schedule saved as v' + nextV, {type:'info'});
+  renderRentModelPanel();
+}
+window.saveRentAgeSchedule = saveRentAgeSchedule;
