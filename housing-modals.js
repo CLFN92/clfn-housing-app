@@ -1991,14 +1991,8 @@ function _ueRefreshEmrCalc(){
   var el = document.getElementById('ue_est_market_rent');
   if(!el) return;
   var out = document.getElementById('ue_emr_calc');
-  if(!out){
-    out = document.createElement('div');
-    out.id = 'ue_emr_calc';
-    out.style.cssText = 'font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;';
-    if(el.parentNode) el.parentNode.appendChild(out);
-  }
-  if(typeof getRentModel !== 'function' || typeof unitMarketRent !== 'function'){ out.textContent = ''; return; }
-  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
+  if(out) out.remove();   // NOTHING renders under the field — tooltip only.
+  if(typeof getRentModel !== 'function' || typeof unitMarketRent !== 'function') return;
   var fu = _ueFormUnitForRent();
   var info = unitMarketRent(fu);
   var ai = info.ageInfo;
@@ -2008,39 +2002,45 @@ function _ueRefreshEmrCalc(){
   el.readOnly = true;
   el.style.background = 'var(--bg)';
   el.value = info.estRent != null ? String(Math.round(info.estRent * 100) / 100) : '';
-  // Full derivation for the tooltip + details panel.
+  // EVERYTHING — derivation, flags, grandfather note — lives in the tooltip.
   var deriv = [];
   if(info.marketRent != null){
     deriv.push((info.source === 'manual' ? 'Per-unit market override: ' : 'Rent table (' + (info.beds != null ? Math.min(info.beds,5) + (info.beds >= 5 ? '+' : '') + ' bd' : '') + '): ') + money(info.marketRent));
   }
   if(ai && info.source !== 'manual'){
     if(ai.source === 'band') deriv.push('Age ' + ai.effectiveAge + ' yrs (' + (ai.usedRenoYear ? 'major reno ' : 'built ') + ai.effectiveYear + ') → factor ' + ai.factor.toFixed(2) + (ai.floorApplied ? ' (floor)' : '') + ' · schedule v' + ai.scheduleVersion);
-    else if(ai.source === 'override') deriv.push('Pending major rehab override → factor ' + ai.factor.toFixed(2));
-    else deriv.push('No construction year → factor 1.00 (unverified default)');
+    else if(ai.source === 'override') deriv.push('Pending major rehab override → factor ' + ai.factor.toFixed(2) + (ai.override && ai.override.reason ? ' (' + ai.override.reason + ')' : ''));
+    else deriv.push('⚠ No construction year on file → factor 1.00 (unverified default, not an assessed value)');
     if(info.adjustedMarketRent != null && info.adjustedMarketRent !== info.marketRent) deriv.push('Adjusted market rent: $' + Number(info.adjustedMarketRent).toLocaleString() + ' (rounded to the dollar)');
   }
   if(info.estRent != null) deriv.push('× ' + pct + '% payable = ' + money(info.estRent) + '/month');
-  deriv.push('Rent only changes at turnover — sitting tenants are grandfathered.');
-  el.title = deriv.join(' · ');
-  // Inline readout: only the flags that must stay visible + a details toggle.
-  var rows = [];
-  if(ai && ai.source === 'no_year'){
-    rows.push('<span style="color:var(--warn-amber-text);">⚠ No construction year on file — factor 1.00 (unverified default)</span>');
-  }
-  if(ai && ai.source === 'override'){
-    rows.push('<span style="color:var(--warn-amber-text);">🔧 Rehab override ' + ai.factor.toFixed(2) + (ai.override && ai.override.reason ? ' — ' + esc(ai.override.reason) : '') + '</span>');
-  }
-  var detailLines = deriv.slice();
   if(fu.assignedName && fu.monthlyRent != null && info.estRent != null && Number(fu.monthlyRent) !== info.estRent){
-    detailLines.push('Current tenant grandfathered at ' + money(fu.monthlyRent) + ' — the calculated rate applies at the next turnover.');
+    deriv.push('Current tenant grandfathered at ' + money(fu.monthlyRent) + ' — the calculated rate applies at the next turnover.');
+  } else {
+    deriv.push('Rent only changes at turnover — sitting tenants are grandfathered.');
   }
-  var legacyClear = (info.source === 'manual' && _canEditUnitRent())
-    ? '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueClearEmrOverride()">✕ Clear market override</button>'
-    : '';
-  var openNow = !!window._ueEmrDetailsOpen;
-  rows.push('<a href="#" onclick="event.preventDefault();window._ueEmrDetailsOpen=!window._ueEmrDetailsOpen;_ueRefreshEmrCalc();" style="color:var(--muted);text-decoration:underline;">&#9432; How this was calculated</a>'
-    + '<span id="ue_emr_details" style="display:' + (openNow ? 'block' : 'none') + ';margin-top:3px;">' + detailLines.map(esc).join('<br/>') + legacyClear + '</span>');
-  out.innerHTML = rows.join('<br/>') + _ueRehabOverrideHtml(fu);
+  el.title = deriv.join('\n');
+  // The rehab-override / clear-override ACTIONS (buttons can't live in a
+  // tooltip) render under the Major Renovation Year field instead.
+  _ueRenderRehabCtl(fu, info);
+}
+// Action chips under the Major Renovation Year field: the pending-major-rehab
+// override (set/clear) and, when present, clearing a legacy market override.
+function _ueRenderRehabCtl(fu, info){
+  var host = document.getElementById('ue_major_reno_year');
+  if(!host || !host.parentNode) return;
+  var ctl = document.getElementById('ue_rehab_ctl');
+  if(!ctl){
+    ctl = document.createElement('div');
+    ctl.id = 'ue_rehab_ctl';
+    ctl.style.cssText = 'font-size:11px;color:var(--muted);margin-top:3px;line-height:1.6;';
+    host.parentNode.appendChild(ctl);
+  }
+  var html = _ueRehabOverrideHtml(fu).replace(/^<br\/>/, '');
+  if(info && info.source === 'manual' && _canEditUnitRent()){
+    html += '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueClearEmrOverride()" title="This unit has a per-unit market-rent override; clearing returns it to the table + age-factor calculation">✕ Clear market override</button>';
+  }
+  ctl.innerHTML = html;
 }
 // Clears a legacy per-unit market override so the unit goes back to the
 // table + age-factor derivation. Persists + audits immediately.
@@ -2065,7 +2065,7 @@ function _ueRehabOverrideHtml(fu){
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
   var ovr = fu.rehabOverride;
   if(ovr && ovr.factor != null){
-    return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueClearRehabOverride()">✕ Clear rehab override</button>';
+    return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" title="' + esc(ovr.reason || '') + '" onclick="_ueClearRehabOverride()">🔧 Rehab override ' + Number(ovr.factor).toFixed(2) + ' — clear ✕</button>';
   }
   return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueOpenRehabOverride()">🔧 Pending major rehab…</button>'
     + '<span id="ue_rehab_form" style="display:none;"> factor <input id="ue_rehab_factor" type="number" min="0.60" max="0.70" step="0.01" value="0.65" style="width:64px;padding:2px 4px;font-size:11px;"/>'
