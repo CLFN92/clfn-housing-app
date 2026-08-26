@@ -2255,6 +2255,12 @@ function showReconcileReport(){
       + '</tbody></table>' + (_myN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_myN+'.</div>' : '')
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every active unit has a construction year on file.</div>';
 
+  // Backfill button — creates a linked tenant-file application for every
+  // occupied unit missing one (migrated/test data), restoring TIC linkage.
+  var noAppBtn = R.occNoApp.length
+    ? '<button class="btn btn-primary" style="margin-bottom:10px;" onclick="_reconCreateAppsForOccupied()">&#128196; Create tenant file applications for all ' + R.occNoApp.length + '</button>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Creates an <strong>Existing Tenant (file update)</strong> application per unit — linked to the unit and tenant so the Tenant Card works — never scored, never on the waitlist or Match. Each creation is audited.</div>'
+    : '';
   var noAppTbl = R.occNoApp.length
     ? '<table class="tbl"><thead><tr><th>Unit</th><th>Tenant</th></tr></thead><tbody>'
       + R.occNoApp.slice(0,80).map(function(u){
@@ -2321,7 +2327,8 @@ function showReconcileReport(){
     +   bcrTbl
     +   secH('Units missing Year Built (rent age factor unverified)', _myN, _myN?'var(--warn-amber-text)':null)
     +   missingYearTbl
-    +   secH('Occupied units with no application', R.occNoApp.length)
+    +   secH('Occupied units with no application', R.occNoApp.length, R.occNoApp.length?'var(--warn-amber-text)':null)
+    +   noAppBtn
     +   noAppTbl
     + '</div>'
     + '</div>';
@@ -2520,6 +2527,79 @@ window._reconMarkAllDoubledUp = _reconMarkAllDoubledUp;
 
 // Address merge: the assigned unit's address is authoritative — copy it onto
 // the application's street line (and the assignedAddress mirror).
+// Backfill: create a linked tenant-file application for every occupied unit
+// that has none (migrated/test data). Type 'existing_tenant' — the file-update
+// type is never scored, never on the waitlist or Match — status 'assigned',
+// linked both ways (app.assignedUnit + unit.assignedTo) so the TIC resolves,
+// with the tenants row's application_id patched when it can be found.
+async function _reconCreateAppsForOccupied(){
+  if (!_mgmtActionGate()) return;
+  var role = window.currentRole || 'staff';
+  var R = _housingReconcile();
+  var list = R.occNoApp;
+  if (!list.length) return;
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({
+        title: 'Create ' + list.length + ' tenant file application' + (list.length === 1 ? '' : 's') + '?',
+        message: 'Each occupied unit with no application gets an Existing Tenant (file update) application — linked to the unit and tenant so the Tenant Card and workflows resolve. They are never scored, waitlisted, or shown on Match. Every creation is audited.',
+        confirmText: 'Create ' + list.length, cancelText: 'Cancel' })
+    : window.confirm('Create ' + list.length + ' tenant file applications?');
+  if (!go) return;
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : (window.applications = []);
+  var today = new Date().toISOString().split('T')[0];
+  var made = 0;
+  for (var i = 0; i < list.length; i++) {
+    var u = list[i];
+    var name = String(u.assignedName || '').trim();
+    if (!name) continue;
+    var parts = name.split(/\s+/);
+    var addr = ((u.num || '') + ' ' + (u.street || '')).trim();
+    // generateAppId scans applications[] — push BEFORE the next iteration so
+    // ids increment instead of colliding.
+    var id = (typeof generateAppId === 'function') ? generateAppId() : ('APP-BF-' + Date.now() + '-' + i);
+    var app = {
+      id: id,
+      appType: 'existing_tenant',
+      status: 'assigned',
+      fn: parts[0] || '',
+      ln: parts.slice(1).join(' '),
+      street: addr,
+      assignedUnit: u.id,
+      assignedAddress: addr,
+      appDate: (u.assignedDate || today),
+      assignedAt: u.assignedDate || new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      backfilled: true
+    };
+    apps.push(app);
+    _saveAppRecord(app);
+    // Link the unit back to the application (the TIC's first resolution step).
+    u.assignedTo = app.id;
+    if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+    else if (typeof sbSaveUnit === 'function') sbSaveUnit(u);
+    // Patch the trigger-synced tenants row's linkage when resolvable.
+    if (typeof sbResolveTenantId === 'function') {
+      (function(appId, tName){
+        sbResolveTenantId(tName).then(function(tid){
+          if (!tid) return;
+          return fetch(SUPABASE_URL + '/rest/v1/tenants?id=eq.' + encodeURIComponent(tid), {
+            method: 'PATCH',
+            headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+            body: JSON.stringify({ application_id: appId })
+          });
+        }).catch(function(e){ console.warn('[backfill] tenant link failed:', e); });
+      })(app.id, name);
+    }
+    if (typeof auditEntry === 'function') auditEntry(app.id, 'application_created',
+      'Tenant file application backfilled for ' + name + ' at ' + addr + ' (occupied unit had no application)', role);
+    made++;
+  }
+  if (typeof showToast === 'function') showToast(made + ' tenant file application' + (made === 1 ? '' : 's') + ' created and linked.', { type: 'info' });
+  if (typeof _renderLandingKpis === 'function') { try { _renderLandingKpis(); } catch(e){} }
+  showReconcileReport();
+}
+window._reconCreateAppsForOccupied = _reconCreateAppsForOccupied;
+
 function _reconApplyUnitAddress(a, unitAddr, role){
   var prev = a.street || '(blank)';
   a.street = unitAddr;
