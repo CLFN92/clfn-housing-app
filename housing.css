@@ -942,11 +942,21 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   background: var(--bg);
   /* Full width, 16px gutters — lines up with the app header's own padding
      instead of centering at the page max-width. */
-  padding: 0 16px 12px;
+  padding: 8px 16px;
   width: 100%;
   box-sizing: border-box;
+  /* Frozen pane: the stepper lives OUTSIDE .content-area (that container
+     declares overflow-y:scroll, which would trap the sticky against a
+     scrollport that never moves — the WINDOW is the real scroller). It
+     sticks just below the sticky app header (64px) while the form scrolls
+     beneath it. The Back row (#appBackRow) stays inside the content area,
+     below the stepper, and scrolls away normally. */
+  position: sticky;
+  top: 64px;
+  z-index: 45;   /* under the app header (50), over the form */
+  box-shadow: 0 1px 0 var(--border);
 }
-#stepProgressBar .page-back-row { margin-bottom: 12px; }   /* spacer under the app header */
+#appBackRow { margin: 4px 0 12px; }   /* below the frozen stepper, scrolls with the form */
 .spb-card {
   background: var(--surface);
   border: 1px solid var(--border);

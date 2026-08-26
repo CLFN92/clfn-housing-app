@@ -154,6 +154,7 @@ function showApp(){
   setNavActive('tab_app');
   if(_al){ _al.style.display='flex'; _al.style.width='100%'; }
   var spb=document.getElementById('stepProgressBar');if(spb)spb.style.display='block';
+  var _abr=document.getElementById('appBackRow');if(_abr)_abr.style.display='block';
   var ta=document.getElementById('tab_app');if(ta)ta.classList.add('active');
 }
 

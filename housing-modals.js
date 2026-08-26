@@ -243,7 +243,8 @@ function openUnitEditModal(unitId){
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
   _ueSetEmrField(u);                      // auto-fills from the Settings rent table by bedroom count
-  _gateRentInput('ue_est_market_rent');   // same authority as the rent amount (assignRentAmount)
+  // (ue_est_market_rent is read-only derived — no rent-authority gate needed,
+  // and _gateRentInput would clobber its derivation tooltip.)
   _ueSetStatus(u.status||'vacant');
   _ueSetUnderRenovation(!!u.under_renovation);
   set('ue_assignedDate',u.assignedDate);
@@ -730,25 +731,10 @@ function saveUnitEdit(){
     // (e.g. 400 → 399.9999999 when the browser computes step grids) doesn't
     // get persisted.
     u.monthlyRent = (rentRaw === '' || rentRaw == null) ? null : Math.round(Number(rentRaw) * 100) / 100;
-    // Estimated Market Rent — feeds the rent model (standard rent = EMR x
-    // payable percentage). Must be a number >= 0; invalid input blocks the
-    // save rather than silently persisting garbage. A table-derived value
-    // (dataset.auto) stores NULL so the unit keeps tracking the Settings
-    // rent table; only a typed per-unit override persists.
-    var emrEl = document.getElementById('ue_est_market_rent');
-    var emrRaw = get('ue_est_market_rent');
-    if(emrEl && emrEl.dataset.auto === '1'){
-      u.estimatedMarketRent = null;
-    } else if(emrRaw !== '' && emrRaw != null){
-      var emrN = Number(emrRaw);
-      if(isNaN(emrN) || emrN < 0){
-        showToast('Estimated Market Rent must be a dollar amount of zero or greater', {type:'error'});
-        return;
-      }
-      u.estimatedMarketRent = Math.round(emrN * 100) / 100;
-    } else {
-      u.estimatedMarketRent = null;
-    }
+    // Estimated Rent — the field is a read-only DERIVED display (table rate
+    // x age factor x payable %), never written back on save. A legacy
+    // per-unit market override (estimatedMarketRent) is preserved as stored
+    // and only changes via the "Clear market override" details action.
   }
   // Capture the prior status BEFORE the user's pick so we can detect a manual
   // status change. The auto-revert lifecycle (priorStatus, set when a SOW
@@ -1967,31 +1953,17 @@ function _gateRentInput(inputId){
   if(!allowed) el.classList.add('tic-readonly-input'); else el.classList.remove('tic-readonly-input');
 }
 
-// ── Estimated Market Rent auto-derivation (unit card) ────────────────────────
-// The field auto-fills from the Settings rent-model baseline table by the
-// unit's bedroom count (5 = "5 or more"). dataset.auto='1' marks a
-// table-derived value: saveUnitEdit then stores NULL so the unit keeps
-// tracking the table when rates change. Any typed value clears the flag and
-// persists as a per-unit override; clearing the field re-derives from the
-// table. The readout under the field shows the discounted estimated rent.
-function _ueEmrTableRate(){
-  if(typeof getRentModel !== 'function') return null;
-  var m = getRentModel();
-  var beds = parseInt((document.getElementById('ue_bedrooms')||{}).value, 10);
-  if(isNaN(beds) || beds < 1 || !m.market || !m.market.rates) return null;
-  var v = Number(m.market.rates[Math.min(beds, 5)]);
-  return isNaN(v) ? null : v;
-}
-// The value the field auto-holds: the ADJUSTED target rent — table rate x age
-// factor (from the live Year Built / Major Renovation Year / rehab override),
-// rounded to the nearest dollar.
-function _ueEmrAutoValue(){
-  var rate = _ueEmrTableRate();
-  if(rate == null) return null;
-  if(typeof rentAgeInfo !== 'function') return rate;
-  var ai = rentAgeInfo(_ueFormUnitForRent());
-  return Math.round(rate * ai.factor);
-}
+// ── Estimated Rent (unit card, read-only calculated) ─────────────────────────
+// The field DISPLAYS the final calculated estimated rent: table rate (by
+// bedroom count) x age factor, dollar-rounded, x the payable percentage.
+// It is read-only — the number is derived, and recalculates live as the
+// bedrooms / Year Built / Major Renovation Year / rehab override change.
+// The full derivation lives in the "How this was calculated" details toggle
+// (and the field's tooltip); only the no-construction-year flag stays
+// visible inline (spec: the unverified fallback must be visible on the
+// card). A legacy per-unit market-rent override (estimatedMarketRent) is
+// still honoured in the math and can be cleared from the details panel;
+// saveUnitEdit never writes the field back.
 // Pseudo-unit from the LIVE form fields + the saved record's override state,
 // so the readout tracks edits before they're saved.
 function _ueFormUnitForRent(){
@@ -2001,12 +1973,12 @@ function _ueFormUnitForRent(){
     var all = (typeof getAllUnits === 'function') ? getAllUnits() : (window.housingUnits || []);
     saved = (all || []).find(function(x){ return x && x.id === window._editingUnitId; }) || null;
   }
-  var el = document.getElementById('ue_est_market_rent');
-  var manual = (el && el.dataset.auto !== '1' && String(el.value).trim() !== '') ? el.value : null;
   return {
     id: window._editingUnitId,
     bedrooms: g('ue_bedrooms'),
-    estimatedMarketRent: manual,
+    // Legacy per-unit market override comes from the SAVED record (the field
+    // itself now shows the derived estimated rent, never a market override).
+    estimatedMarketRent: saved ? saved.estimatedMarketRent : null,
     year: g('ue_year'),
     majorRenoYear: g('ue_major_reno_year'),
     rehabOverride: saved ? saved.rehabOverride : null,
@@ -2026,46 +1998,65 @@ function _ueRefreshEmrCalc(){
     if(el.parentNode) el.parentNode.appendChild(out);
   }
   if(typeof getRentModel !== 'function' || typeof unitMarketRent !== 'function'){ out.textContent = ''; return; }
-  // While tracking the table, the FIELD holds the calculated adjusted target
-  // rent (table rate x age factor, dollar-rounded) — sync it on every refresh
-  // so bedroom/year/override changes flow straight into the visible value.
-  if(el.dataset.auto === '1'){
-    var av = _ueEmrAutoValue();
-    el.value = av != null ? String(av) : '';
-    if(av == null) el.dataset.auto = '';
-  }
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
   var fu = _ueFormUnitForRent();
   var info = unitMarketRent(fu);
   var ai = info.ageInfo;
   var pct = Math.round(info.payablePct * 10000) / 100;
   var money = function(v){ return '$' + Number(v).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}); };
+  // The FIELD holds the final calculated estimated rent (read-only).
+  el.readOnly = true;
+  el.style.background = 'var(--bg)';
+  el.value = info.estRent != null ? String(Math.round(info.estRent * 100) / 100) : '';
+  // Full derivation for the tooltip + details panel.
+  var deriv = [];
+  if(info.marketRent != null){
+    deriv.push((info.source === 'manual' ? 'Per-unit market override: ' : 'Rent table (' + (info.beds != null ? Math.min(info.beds,5) + (info.beds >= 5 ? '+' : '') + ' bd' : '') + '): ') + money(info.marketRent));
+  }
+  if(ai && info.source !== 'manual'){
+    if(ai.source === 'band') deriv.push('Age ' + ai.effectiveAge + ' yrs (' + (ai.usedRenoYear ? 'major reno ' : 'built ') + ai.effectiveYear + ') → factor ' + ai.factor.toFixed(2) + (ai.floorApplied ? ' (floor)' : '') + ' · schedule v' + ai.scheduleVersion);
+    else if(ai.source === 'override') deriv.push('Pending major rehab override → factor ' + ai.factor.toFixed(2));
+    else deriv.push('No construction year → factor 1.00 (unverified default)');
+    if(info.adjustedMarketRent != null && info.adjustedMarketRent !== info.marketRent) deriv.push('Adjusted market rent: $' + Number(info.adjustedMarketRent).toLocaleString() + ' (rounded to the dollar)');
+  }
+  if(info.estRent != null) deriv.push('× ' + pct + '% payable = ' + money(info.estRent) + '/month');
+  deriv.push('Rent only changes at turnover — sitting tenants are grandfathered.');
+  el.title = deriv.join(' · ');
+  // Inline readout: only the flags that must stay visible + a details toggle.
   var rows = [];
-  if(el.dataset.auto === '1' && info.marketRent != null){
-    var _fBit = (ai && ai.factor !== 1) ? ' × age factor ' + ai.factor.toFixed(2) : '';
-    rows.push('Auto from the Settings rent table: $' + Number(info.marketRent).toLocaleString() + _fBit + (_fBit ? ' = the value shown' : ''));
-  } else if(info.source === 'manual'){
-    rows.push('Per-unit override — used as-is (age factor not re-applied). Clear the field to recalculate from the table' + (_ueEmrAutoValue() != null ? ' ($' + Number(_ueEmrAutoValue()).toLocaleString() + ')' : '') + '.');
+  if(ai && ai.source === 'no_year'){
+    rows.push('<span style="color:var(--warn-amber-text);">⚠ No construction year on file — factor 1.00 (unverified default)</span>');
   }
-  if(ai){
-    if(ai.source === 'override'){
-      rows.push('<span style="color:var(--warn-amber-text);">🔧 Pending major rehab override: factor ' + ai.factor.toFixed(2)
-        + (ai.override && ai.override.reason ? ' — ' + esc(ai.override.reason) : '') + '</span>');
-    } else if(ai.source === 'no_year'){
-      rows.push('<span style="color:var(--warn-amber-text);">⚠ No construction year on file — factor 1.00 (unverified default, not an assessed value)</span>');
-    } else if(el.dataset.auto === '1'){
-      rows.push('Age ' + ai.effectiveAge + ' yrs (' + (ai.usedRenoYear ? 'major reno ' : 'built ') + ai.effectiveYear + ') → factor '
-        + ai.factor.toFixed(2) + (ai.floorApplied ? ' (floor)' : '') + ' · schedule v' + ai.scheduleVersion);
-    }
+  if(ai && ai.source === 'override'){
+    rows.push('<span style="color:var(--warn-amber-text);">🔧 Rehab override ' + ai.factor.toFixed(2) + (ai.override && ai.override.reason ? ' — ' + esc(ai.override.reason) : '') + '</span>');
   }
-  if(info.estRent != null) rows.push('Estimated rent: <strong>' + money(info.estRent) + '/month</strong> (' + pct + '% payable)');
-  // Grandfathering — the calculated rate only ever applies at turnover.
+  var detailLines = deriv.slice();
   if(fu.assignedName && fu.monthlyRent != null && info.estRent != null && Number(fu.monthlyRent) !== info.estRent){
-    rows.push('<span style="color:var(--muted);">Current tenant grandfathered at ' + money(fu.monthlyRent) + ' — the calculated rate applies at the next turnover.</span>');
+    detailLines.push('Current tenant grandfathered at ' + money(fu.monthlyRent) + ' — the calculated rate applies at the next turnover.');
   }
-  out.title = 'Derivation: base market rent (CMHC table by bedrooms, or per-unit override) × age factor (from Year Built / Major Renovation Year via the Settings age schedule), rounded to the nearest dollar, × the payable percentage. Rent changes only when a new tenant moves in.';
+  var legacyClear = (info.source === 'manual' && _canEditUnitRent())
+    ? '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueClearEmrOverride()">✕ Clear market override</button>'
+    : '';
+  var openNow = !!window._ueEmrDetailsOpen;
+  rows.push('<a href="#" onclick="event.preventDefault();window._ueEmrDetailsOpen=!window._ueEmrDetailsOpen;_ueRefreshEmrCalc();" style="color:var(--muted);text-decoration:underline;">&#9432; How this was calculated</a>'
+    + '<span id="ue_emr_details" style="display:' + (openNow ? 'block' : 'none') + ';margin-top:3px;">' + detailLines.map(esc).join('<br/>') + legacyClear + '</span>');
   out.innerHTML = rows.join('<br/>') + _ueRehabOverrideHtml(fu);
 }
+// Clears a legacy per-unit market override so the unit goes back to the
+// table + age-factor derivation. Persists + audits immediately.
+function _ueClearEmrOverride(){
+  if(!_canEditUnitRent()) return;
+  var all = (typeof getAllUnits === 'function') ? getAllUnits() : (window.housingUnits || []);
+  var u = (all || []).find(function(x){ return x && x.id === window._editingUnitId; });
+  if(!u) return;
+  u.estimatedMarketRent = null;
+  if(typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+  else if(typeof sbSaveUnit === 'function') sbSaveUnit(u);
+  if(typeof auditEntry === 'function') auditEntry(u.id, 'rent_est_override_cleared', 'Per-unit market-rent override cleared — unit returns to the table + age-factor calculation', window.currentRole || 'staff');
+  showToast('Market override cleared — using the calculated rate.', {type:'info'});
+  _ueRefreshEmrCalc();
+}
+window._ueClearEmrOverride = _ueClearEmrOverride;
 // Pending-major-rehab override control (0.60–0.70, reason required) — the only
 // path below the schedule floor. Persists immediately (audited), same
 // authority as setting the rent amount.
@@ -2119,29 +2110,11 @@ window._ueClearRehabOverride = _ueClearRehabOverride;
 function _ueSetEmrField(u){
   var el = document.getElementById('ue_est_market_rent');
   if(!el) return;
-  var manual = (u && u.estimatedMarketRent != null && u.estimatedMarketRent !== '');
-  if(manual){
-    el.value = String(u.estimatedMarketRent);
-    el.dataset.auto = '';
-  } else {
-    // _ueRefreshEmrCalc (below) fills the calculated adjusted target rent.
-    el.dataset.auto = '1';
-  }
   if(!el.dataset.emrWired){
     el.dataset.emrWired = '1';
-    el.addEventListener('input', function(){
-      // Cleared = go back to tracking the table; typed = per-unit override.
-      el.dataset.auto = (String(el.value).trim() === '') ? '1' : '';
-      _ueRefreshEmrCalc();
-    });
+    // Bedrooms + year fields drive the calculation — recalc live.
     var bedsEl = document.getElementById('ue_bedrooms');
-    if(bedsEl) bedsEl.addEventListener('change', function(){
-      // A size change re-derives while tracking the table — also when the
-      // field is empty (a unit with no rate yet just had its size set).
-      if(String(el.value).trim() === '') el.dataset.auto = '1';
-      _ueRefreshEmrCalc();
-    });
-    // Year fields drive the age factor — recalc the field + derivation live.
+    if(bedsEl) bedsEl.addEventListener('change', _ueRefreshEmrCalc);
     ['ue_year','ue_major_reno_year'].forEach(function(yid){
       var yEl = document.getElementById(yid);
       if(yEl && !yEl.dataset.emrWired){

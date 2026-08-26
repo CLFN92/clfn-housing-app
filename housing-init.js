@@ -144,6 +144,7 @@ function closeApplicationForm(){
   // Hide the form
   var al = document.getElementById('appLayout'); if(al) al.style.display='none';
   var spb = document.getElementById('stepProgressBar'); if(spb) spb.style.display='none';
+  var abr = document.getElementById('appBackRow'); if(abr) abr.style.display='none';
   var apf = document.getElementById('appProgressFoot'); if(apf) apf.style.display='none';
   var em = document.getElementById('editModal'); if(em) em.classList.remove('on');
 
