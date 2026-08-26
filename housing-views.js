@@ -2078,10 +2078,21 @@ function _housingReconcile(){
     addrMismatch.push({ app: a, unit: unit, unitAddr: unitAddr, appAddr: appAddr || '(blank)' });
   });
 
+  // Units missing Year Built — the rent age factor falls back to 1.00
+  // (unverified) for these, so the adjusted target rent can't be computed
+  // properly. A valid Major Renovation Year also counts (it IS the effective
+  // year). Archived and condemned units are excluded (not rent-bearing).
+  function _validYr(v){ var n = parseInt(v, 10); return !isNaN(n) && n >= 1800 && n <= 2200; }
+  var missingYear = units.filter(function(u){
+    if (!u || u.archived || u.status === 'condemned') return false;
+    if (typeof rentAgeInfo === 'function') return rentAgeInfo(u).source === 'no_year';
+    return !_validYr(u.year) && !_validYr(u.majorRenoYear);
+  });
+
   // Total = ACTIVE units only — archived (demolished/removed) units are
   // history, not stock, so they don't inflate the headline count. They keep
   // their own state-table row for the full accounting.
-  return { totalUnits:(units.length - buckets.archived.length), buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp, onRezUnclassified:onRezUnclassified, addrMismatch:addrMismatch };
+  return { totalUnits:(units.length - buckets.archived.length), buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp, onRezUnclassified:onRezUnclassified, addrMismatch:addrMismatch, missingYear:missingYear };
 }
 
 function showReconcileReport(){
@@ -2229,6 +2240,21 @@ function showReconcileReport(){
       + '</tbody></table>'
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every BCR entry has its details on file.</div>';
 
+  // Units missing Year Built — rent age factor stuck at the unverified 1.00
+  // fallback until a year (or major renovation year) is entered on the card.
+  var _myN = (R.missingYear || []).length;
+  var missingYearTbl = _myN
+    ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These units rent at age factor 1.00 (unverified fallback) — enter Year Built (or a Major Renovation Year) on the unit card and the adjusted target rent recalculates automatically.</div>'
+      + '<table class="tbl"><thead><tr><th>Unit</th><th>Status</th><th>Tenant</th></tr></thead><tbody>'
+      + R.missingYear.slice(0,120).map(function(u){
+          return '<tr class="clickable" onclick="_closeReconcile();window.location.href=\'inventory.html?unit='+esc(String(u.id).replace(/'/g,""))+'\'">'
+            + '<td style="font-weight:600;">'+esc(uAddr(u))+'</td>'
+            + '<td class="std-cell-muted">'+esc(u.status||'—')+'</td>'
+            + '<td class="std-cell-muted">'+esc(u.assignedName||'—')+'</td></tr>';
+        }).join('')
+      + '</tbody></table>' + (_myN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_myN+'.</div>' : '')
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every active unit has a construction year on file.</div>';
+
   var noAppTbl = R.occNoApp.length
     ? '<table class="tbl"><thead><tr><th>Unit</th><th>Tenant</th></tr></thead><tbody>'
       + R.occNoApp.slice(0,80).map(function(u){
@@ -2293,6 +2319,8 @@ function showReconcileReport(){
     +   addrTbl
     +   secH('BCR entries missing details', bcrIncomplete.length, bcrIncomplete.length?'var(--warn-amber-text)':null)
     +   bcrTbl
+    +   secH('Units missing Year Built (rent age factor unverified)', _myN, _myN?'var(--warn-amber-text)':null)
+    +   missingYearTbl
     +   secH('Occupied units with no application', R.occNoApp.length)
     +   noAppTbl
     + '</div>'
