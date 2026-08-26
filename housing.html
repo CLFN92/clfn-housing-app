@@ -202,6 +202,11 @@
         Reconcile Units &amp; Applications
         <span class="qa-meta">Data health check</span>
       </button>
+      <button class="qa-btn" data-qa="archived-apps" id="qa_archived_apps" style="display:none;" title="Deleted (archived) applications — records are preserved and can be restored">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+        Archived Applications
+        <span class="qa-meta" id="qa_archived_apps_meta">&mdash;</span>
+      </button>
       <button class="qa-btn" data-qa="rent-payment" disabled title="Coming soon" data-roles="cfo,finance_l1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         Record Rent Payment
@@ -1596,6 +1601,7 @@
       <button id="tic_act_finance"   type="button" class="btn btn-ghost">Finance Card</button>
       <button id="tic_act_letter"    type="button" class="btn btn-ghost">Generate Letter</button>
       <button id="tic_act_invite"    type="button" class="btn btn-ghost">&#9993;&#65039; Invite to Portal</button>
+      <button id="tic_act_delete_app" type="button" class="btn btn-ghost" style="display:none;color:var(--danger);border-color:var(--danger);">&#128465; Delete Application</button>
       <span class="tic-footer-spacer"></span>
       <button id="tic_act_flag"      type="button" class="btn btn-primary">Flag for Review</button>
     </div>

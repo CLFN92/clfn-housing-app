@@ -1571,6 +1571,18 @@ function _renderLandingKpis(){
     } else { _lhBtn.style.display = 'none'; }
   }
 
+  // Archived-applications quick action — visible only to roles with the
+  // deleteApplication authority (the same one that gates deleting); meta
+  // shows how many archived records exist to restore.
+  var _arBtn = document.getElementById('qa_archived_apps');
+  if (_arBtn) {
+    var _canDel = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole);
+    var _arN = apps.filter(function(a){ return a && a.archived; }).length;
+    _arBtn.style.display = _canDel ? '' : 'none';
+    var _arMeta = document.getElementById('qa_archived_apps_meta');
+    if (_arMeta) _arMeta.textContent = _arN + ' archived';
+  }
+
   // Scroll-collapse: shrink the KPI strip to icon-only once the page scrolls,
   // freeing space on tablet/mobile (shared-ui.js). _initScrollCollapse is
   // itself idempotent, so calling it on every render is safe.
@@ -2318,6 +2330,72 @@ function _saveAppRecord(a){
   if (typeof saveApplicationWithDraftFallback === 'function') { saveApplicationWithDraftFallback(a); return; }
   if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
 }
+
+// ── Archived applications — the restore surface for soft-deleted records ─────
+// Same authority as deleting (deleteApplication). Restore clears the archived
+// flag, stamps restoredAt/restoredBy (archive history is kept), audits, saves.
+function showArchivedApplications(){
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var list = apps.filter(function(a){ return a && a.archived; })
+    .slice().sort(function(x, y){ return String(y.archivedAt || '').localeCompare(String(x.archivedAt || '')); });
+  var canDel = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole);
+  var rows = list.length ? list.slice(0, 150).map(function(a){
+    var sid = (a.id || '').replace(/'/g, "\\'");
+    var name = ((a.fn || '') + ' ' + (a.ln || '')).trim() || a.id;
+    var mergedNote = a.mergedInto ? '<div style="font-size:10px;color:var(--muted);">Merged into ' + esc(a.mergedInto) + '</div>' : '';
+    return '<tr><td style="font-weight:600;">' + esc(name) + mergedNote + '</td>'
+      + '<td class="std-cell-muted">' + esc(a.id || '') + '</td>'
+      + '<td class="std-cell-muted">' + esc((a.appType || 'new_housing').replace(/_/g, ' ')) + '</td>'
+      + '<td class="std-cell-muted">' + esc(a.archivedAt || '\u2014') + (a.archivedBy ? ' \u00b7 ' + esc(a.archivedBy) : '') + '</td>'
+      + '<td>' + (canDel ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" onclick="_restoreArchivedApp(\'' + sid + '\')">&#8635; Restore</button>' : '') + '</td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No archived applications.</td></tr>';
+  var ex = document.getElementById('modalArchivedApps'); if (ex) ex.remove();
+  var mo = document.createElement('div');
+  mo.className = 'modal-ov'; mo.id = 'modalArchivedApps';
+  mo.innerHTML =
+    '<div class="modal" style="max-width:860px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div class="modal-hdr"><div><h2>Archived Applications</h2>'
+    + '<div style="font-size:11px;opacity:.7;margin-top:2px;">Deleted applications are archived, never destroyed \u2014 restore returns one to the active lists.</div></div>'
+    + '<button class="modal-close" onclick="var m=document.getElementById(\'modalArchivedApps\');if(m)m.remove();">&#x2715;</button></div>'
+    + '<div class="modal-body" style="padding:0 16px 16px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;">'
+    + '<table class="tbl"><thead><tr><th>Applicant</th><th>App ID</th><th>Type</th><th>Archived</th><th></th></tr></thead><tbody>'
+    + rows + '</tbody></table>'
+    + (list.length > 150 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 150 of ' + list.length + '.</div>' : '')
+    + '</div></div>';
+  mo.addEventListener('click', function(e){ if (e.target === mo) mo.remove(); });
+  document.body.appendChild(mo);
+  mo.style.display = ''; mo.classList.add('on');
+}
+window.showArchivedApplications = showArchivedApplications;
+
+async function _restoreArchivedApp(appId){
+  if (typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole)) {
+    if (typeof showToast === 'function') showToast('You are not authorized to restore applications.', { type:'error' });
+    return;
+  }
+  var role = window.currentRole || 'staff';
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var a = apps.find(function(x){ return x && x.id === appId; });
+  if (!a || !a.archived) return;
+  var escFn = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
+  var name = ((a.fn || '') + ' ' + (a.ln || '')).trim() || a.id;
+  var msg = 'Restore ' + escFn(name) + '\u2019s application to the active lists?';
+  if (a.mergedInto) msg += ' NOTE: this application was merged into ' + escFn(a.mergedInto) + ' \u2014 restoring it recreates a duplicate for that person.';
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({ title: 'Restore application?', message: msg, confirmText: 'Restore', cancelText: 'Cancel' })
+    : window.confirm('Restore ' + name + '?');
+  if (!go) return;
+  a.archived = false;
+  a.restoredAt = new Date().toISOString().split('T')[0];
+  a.restoredBy = role;
+  _saveAppRecord(a);
+  if (typeof auditEntry === 'function') auditEntry(a.id, 'application_restored', 'Archived application restored to the active lists', role);
+  if (typeof showToast === 'function') showToast(name + '\u2019s application restored.', { type:'info' });
+  if (typeof _renderLandingKpis === 'function') { try { _renderLandingKpis(); } catch(e){} }
+  showArchivedApplications();
+}
+window._restoreArchivedApp = _restoreArchivedApp;
 
 // Likely-Housed review: "Doubled up — not housed". The applicant lives at the
 // linked address but it is NOT their own home (staying with family), so the

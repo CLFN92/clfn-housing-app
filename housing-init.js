@@ -2401,6 +2401,8 @@ function _runQuickAction(action){
     if(typeof showLikelyHousedReport === 'function') showLikelyHousedReport();
   } else if(action === 'reconcile'){
     if(typeof showReconcileReport === 'function') showReconcileReport();
+  } else if(action === 'archived-apps'){
+    if(typeof showArchivedApplications === 'function') showArchivedApplications();
   } else if(action === 'rent-payment'){
     showToast('Coming soon — Finance module.', {type:'info'});
   }

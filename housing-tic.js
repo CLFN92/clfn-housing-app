@@ -2283,6 +2283,15 @@
   function _ticSyncFooter(){
     var btn = _ticEl('tic_act_view_unit');
     if(btn) btn.style.display = _ticAssignedUnitId() ? '' : 'none';
+    // Delete Application — same authority as everywhere else deletion lives
+    // (deleteApplication, Settings > Approval Authority > Housing Application,
+    // default ED). Soft-delete: the record is archived, never destroyed.
+    var del = _ticEl('tic_act_delete_app');
+    if(del){
+      var canDel = (typeof APPROVAL_AUTHORITY !== 'undefined')
+        && APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole);
+      del.style.display = canDel ? '' : 'none';
+    }
   }
 
   // CM5 — commercial-tailored TIC. For a business/department tenant (or a
@@ -2359,6 +2368,59 @@
           return;
         }
         _ticGoToApplication(appId);
+      });
+      return;
+    }
+    if(t.id === 'tic_act_delete_app'){
+      if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole)){
+        if(typeof showToast === 'function') showToast('You are not authorized to delete applications.', {type:'error'});
+        return;
+      }
+      _ticFindApplicationForTenant().then(function(appId){
+        if(!appId){
+          if(typeof showToast === 'function') showToast('No application found for this tenant.', {type:'error'});
+          return;
+        }
+        var tn = _ticState.tenant || {};
+        var name = tn[TIC_C.full_name] || ((_ticState.unit||{}).assignedName) || appId;
+        var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x==null?'':x); };
+        var proceed = function(ok){
+          if(!ok) return;
+          var inMem = (typeof applications !== 'undefined' && applications)
+            ? applications.find(function(a){ return a && a.id === appId; }) : null;
+          if(inMem && typeof archiveApplication === 'function'){
+            // Canonical soft-delete: archive + save + audit + refresh + toast.
+            archiveApplication(appId);
+            _ticSyncFooter();
+            return;
+          }
+          // Applications not loaded on this page — archive the row directly
+          // (same fields archiveApplication stamps).
+          var today = new Date().toISOString().split('T')[0];
+          _ticGet('housing_applications?id=eq.' + encodeURIComponent(appId) + '&select=id,data')
+            .then(function(rows){
+              if(!rows || rows._ticMissing || rows._ticError || !rows[0]){
+                if(typeof showToast === 'function') showToast('Could not load the application to delete it.', {type:'error'});
+                return;
+              }
+              var d = rows[0].data || {};
+              d.archived = true; d.archivedAt = today; d.archivedBy = window.currentRole || 'staff';
+              return _ticWrite('PATCH', 'housing_applications?id=eq.' + encodeURIComponent(appId),
+                { archived: true, data: d })
+                .then(function(){
+                  if(typeof auditEntry === 'function') auditEntry(appId, 'archived', 'Application archived from the Tenant Card', window.currentRole || 'staff');
+                  if(typeof showToast === 'function') showToast('Application archived — the record is preserved in the audit trail.', {type:'info'});
+                });
+            })
+            .catch(function(e){ if(typeof showToast === 'function') showToast('Delete failed: ' + e.message, {type:'error'}); });
+        };
+        if(typeof showConfirm === 'function'){
+          showConfirm({
+            title: 'Delete application?',
+            message: 'Delete <strong>' + esc(name) + '</strong>\u2019s housing application? It is ARCHIVED (hidden from active lists, the waitlist, and Match) \u2014 the record and its documents are preserved in the audit trail and an administrator can restore it.',
+            confirmText: 'Delete', danger: true
+          }).then(proceed);
+        } else { proceed(window.confirm('Delete ' + name + '\u2019s application?')); }
       });
       return;
     }
