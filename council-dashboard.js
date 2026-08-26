@@ -219,6 +219,34 @@
   var PAL = ['#1d4ed8', '#15803d', '#b45309', '#7c3aed', '#0891b2', '#be123c', '#4b5563', '#ca8a04'];
   var STATUS_COLORS = { occupied: '#15803d', vacant: '#1d4ed8', reserved: '#7c3aed', condemned: '#b91c1c', other: '#9ca3af' };
 
+  // Application types by applicant age. Ages over 95 are treated as
+  // placeholder birth dates (migrated records) and excluded, as are missing/
+  // invalid DOBs — both are counted so the report says what it left out.
+  // Commercial applications carry no personal DOB and are excluded outright.
+  function _ageDistribution() {
+    var apps = _apps().filter(_isActiveApp).filter(function (a) {
+      return !a.deceased && _appType(a) !== 'commercial';
+    });
+    var buckets = ['<25', '25-34', '35-44', '45-54', '55-64', '65-79', '80-95'];
+    var types = ['New Housing', 'Transfer / On-Rez', 'File Update'];
+    var grid = {};
+    types.forEach(function (t) { grid[t] = buckets.map(function () { return 0; }); });
+    var noDob = 0, placeholder = 0, counted = 0;
+    apps.forEach(function (a) {
+      var raw = String(a.dob || '').slice(0, 10);
+      var d = raw ? new Date(raw + 'T12:00:00') : null;
+      if (!d || isNaN(d.getTime())) { noDob++; return; }
+      var age = Math.floor((Date.now() - d.getTime()) / 31557600000);
+      if (age > 95 || age < 0) { placeholder++; return; }
+      var bi = age < 25 ? 0 : age < 35 ? 1 : age < 45 ? 2 : age < 55 ? 3 : age < 65 ? 4 : age < 80 ? 5 : 6;
+      var t = _appType(a);
+      var label = t === 'transfer_request' ? types[1] : t === 'existing_tenant' ? types[2] : types[0];
+      grid[label][bi]++;
+      counted++;
+    });
+    return { buckets: buckets, types: types, grid: grid, noDob: noDob, placeholder: placeholder, counted: counted };
+  }
+
   function _mkChart(canvasId, config) {
     var el = document.getElementById(canvasId);
     if (!el || !window.Chart) return;
@@ -278,6 +306,11 @@
       + _chartCard('Unit Occupancy', 'ld_chart_occupancy')
       + _chartCard('Waitlist by Priority', 'ld_chart_tier', 'scored & unplaced')
       + _chartCard('Applications by Type', 'ld_chart_type', 'active')
+      + _chartCard('Application Types by Age', 'ld_chart_agedist', (function () {
+          var ad = _ageDistribution();
+          var excl = ad.noDob + ad.placeholder;
+          return ad.counted + ' applicants' + (excl ? ' · ' + excl + ' excluded (no or placeholder birth date)' : '');
+        })())
       + _chartCard('Renovation $ by Category', 'ld_chart_renocat', 'estimated cost')
       + _chartCard('Renovation Pipeline', 'ld_chart_sow', 'by approval stage')
       + _chartCard('Applications — Last 12 Months', 'ld_chart_trend')
@@ -314,6 +347,18 @@
         data: { labels: typeLabels, datasets: [{ data: typeLabels.map(function (t) { return k.byType[t]; }),
           backgroundColor: typeLabels.map(function (_, i) { return PAL[i % PAL.length]; }), borderWidth: 0 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: commonLegend, cutout: '58%' }
+      });
+
+      // Application types by age (stacked bar, ages capped at 95 — older
+      // birth dates are migration placeholders and sit in the excluded count)
+      var ad = _ageDistribution();
+      _mkChart('ld_chart_agedist', {
+        type: 'bar',
+        data: { labels: ad.buckets, datasets: ad.types.map(function (t, i) {
+          return { label: t, data: ad.grid[t], backgroundColor: PAL[i % PAL.length] };
+        }) },
+        options: { responsive: true, maintainAspectRatio: false, plugins: commonLegend,
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
       });
 
       // Renovation $ by category (horizontal bar, sorted high→low, dollars)
