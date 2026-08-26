@@ -6113,7 +6113,10 @@ function renderRenosView(){
   var units=getAllUnits();
 
   var allReno = units.filter(function(u){
-    return (u.under_renovation || u.status==='condemned') && !u.archived;
+    if(u.archived) return false;
+    // Condemned is terminal — only listed here when a request is on file.
+    if(u.status==='condemned') return !!getSowData(u.id);
+    return !!u.under_renovation;
   });
 
   // Per-render memo — calcRenoScore does a full-inventory find + SOW read per
@@ -8760,7 +8763,12 @@ function ctRemovePerson(idx) {
 
 function exportRenos(format) {
   var units=getAllUnits();
-  var rows=units.filter(function(u){return u.under_renovation||u.status==='condemned';});
+  // Condemned units are only exported when they have a request on file
+  // (matches _getAllRenoUnits / renderRenosView).
+  var rows=units.filter(function(u){
+    if(u.status==='condemned') return !!getSowData(u.id);
+    return !!u.under_renovation;
+  });
   var headers=['Address','Beds','Type','Foundation','Status','Priority Score','Contractor','Maintenance Request Filed','Progress %'];
   var data=rows.map(function(u){
     var rs=calcRenoScore(u.id);
@@ -9268,7 +9276,10 @@ function _getAllRenoUnits() {
   return units.filter(function(u) {
     if(u.archived) return false;
     var hasSow = !!getSowData(u.id);
-    return hasSow || u.under_renovation || u.status==='condemned';
+    // Condemned is a terminal classification, not a renovation state — a
+    // condemned unit only appears here if it actually has a request on file.
+    if(u.status==='condemned') return hasSow;
+    return hasSow || u.under_renovation;
   });
 }
 

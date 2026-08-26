@@ -2130,7 +2130,13 @@ function closeRenoSearch() {
 
 function renoSearchFilter(q) {
   var allUnits = getAllUnits();
-  var renoUnits = allUnits.filter(function(u){ return u.under_renovation||u.status==='condemned'; });
+  // Condemned is a terminal classification — a condemned unit only shows in the
+  // renovation search when it actually has a maintenance request on file
+  // (mirrors _getAllRenoUnits in shared-data.js).
+  var renoUnits = allUnits.filter(function(u){
+    if(u.status==='condemned') return !!((typeof getSowData==='function') && getSowData(u.id));
+    return !!u.under_renovation;
+  });
 
   var filtered = q.trim().length > 0
     ? renoUnits.filter(function(u){ return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase()); })
