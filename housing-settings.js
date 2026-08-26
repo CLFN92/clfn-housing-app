@@ -498,8 +498,8 @@ function onAppTypeChange() {
           var _rv2El = document.getElementById(_rv2);
           if (_rv2El) _rv2El.checked = true;
           if (typeof showToast === 'function') showToast(
-            (((_cur2.fn||'')+' '+(_cur2.ln||'')).trim() || 'This applicant') + ' is assigned to '
-            + (_cur2.assignedAddress || 'a unit') + ' — a current tenant cannot file a New Application. Use Transfer Request (seeking a different unit) or File Update. To mark them as no longer housed, clear the unit link first.',
+            (typeof tenancyHolderMsg === 'function') ? tenancyHolderMsg(_cur2) :
+            ('This applicant is assigned to a unit — use Transfer Request or File Update.'),
             { type:'error' });
           window._appTypeRestoring = true;
           try { return onAppTypeChange(); } finally { window._appTypeRestoring = false; }
@@ -610,11 +610,14 @@ function persistDeceasedChange(){
     if (!!cur.deceased === flag && (cur.deceasedDate || '') === date) return;
     cur.deceased = flag;
     cur.deceasedDate = date;
-    if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(cur);
-    if (typeof auditEntry === 'function') auditEntry(cur.id, flag ? 'app_deceased_set' : 'app_deceased_cleared',
-      flag ? ('Applicant marked deceased' + (date ? ' — ' + date : '')) : 'Deceased status cleared', window.currentRole || 'staff');
+    if (typeof setAppDeceased === 'function') {
+      // Shared setter (shared-data.js): save + audit + KPI refresh. Fields are
+      // already assigned above so the exact form values (incl. a cleared date)
+      // win over the setter's defaults.
+      setAppDeceased(cur, { deceased: flag, date: date,
+        detail: flag ? ('Applicant marked deceased' + (date ? ' — ' + date : '')) : 'Deceased status cleared' });
+    } else if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(cur);
     if (typeof showToast === 'function') showToast(flag ? 'Marked deceased — saved' : 'Deceased status cleared — saved', {type:'info'});
-    if (typeof _renderLandingKpis === 'function') try { _renderLandingKpis(); } catch(e){}
   } catch(e){ console.warn('[deceased] persist failed:', e); }
 }
 window.persistDeceasedChange = persistDeceasedChange;
@@ -630,10 +633,11 @@ function _syncOnRezBadge(){
     var isNewApp = (apt === 'new_housing');
     var onRezNoHouse = reserve === 'On Reserve' && livsit === 'family_on_reserve';
     var noFixed      = livsit === 'no_fixed_address';
-    // New-Application on-reserve screens: prompt while Living Situation is
-    // blank; flag the own-home contradiction (that's a transfer/file update).
-    var prompt   = isNewApp && reserve === 'On Reserve' && !livsit;
-    var conflict = isNewApp && reserve === 'On Reserve' && livsit === 'own_home';
+    // New-Application on-reserve screens — the SHARED rule (onRezNewAppIssue,
+    // shared-config.js) also drives the wizard validation and reconcile.
+    var issue    = (isNewApp && typeof onRezNewAppIssue === 'function') ? onRezNewAppIssue(reserve, livsit) : '';
+    var prompt   = issue === 'prompt';
+    var conflict = issue === 'conflict';
     var b1 = document.getElementById('onrez_badge');
     var b2 = document.getElementById('nofixed_badge');
     var b3 = document.getElementById('onrez_prompt');
@@ -645,6 +649,25 @@ function _syncOnRezBadge(){
   } catch(e){}
 }
 window._syncOnRezBadge = _syncOnRezBadge;
+
+// Build the staff wizard's Living Situation options from the shared
+// LIVING_SITUATIONS registry (shared-config.js) — the static markup was a
+// hand-copy that silently desynced when the registry gained/changed a key
+// (the portal already renders from the registry). Idempotent; keys/labels
+// are internal constants, safe to interpolate.
+function _populateLivingSituationSelect(){
+  try {
+    var sel = document.getElementById('living_situation');
+    var L = window.LIVING_SITUATIONS;
+    if (!sel || !L || !L.length) return;
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">Select</option>' + L.map(function(o){
+      return '<option value="' + o.key + '">' + o.label + '</option>';
+    }).join('');
+    if (cur) sel.value = cur;
+  } catch(e){}
+}
+window._populateLivingSituationSelect = _populateLivingSituationSelect;
 
 // ── Transfer request: search and pre-populate from existing tenant record ──
 function transferTenantSearch(q) {

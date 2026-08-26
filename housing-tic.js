@@ -1018,7 +1018,10 @@
     // an unfinished form must never leave a banished person housable. The
     // stub surfaces in Reconcile ("BCR entries missing details") until a
     // BCR date is filled in.
-    var _pending = (typeof BCR_PENDING_REASON !== 'undefined') ? BCR_PENDING_REASON : 'Details pending — set from Tenant Card';
+    // Single source: shared-data.js's constant (housing-tic always loads after
+    // shared-data) — a drifted literal here would write stubs bcrIsIncomplete
+    // no longer recognizes.
+    var _pending = window.BCR_PENDING_REASON;
     var _added = (typeof sbAddBcr === 'function')
       ? sbAddBcr(name, '', _pending, '').catch(function(e){ console.warn('[TIC] BCR stub write failed:', e); return null; })
       : Promise.resolve(null);
@@ -1083,13 +1086,12 @@
       }
       if (app) {
         if (app.deceased) return;   // already flagged
-        app.deceased = true;
-        if (!app.deceasedDate) app.deceasedDate = today;
-        if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
-        else if (typeof sbSaveApplication === 'function') sbSaveApplication(app).catch(function(){});
-        if (typeof auditEntry === 'function') auditEntry(app.id, 'app_deceased_set', 'Marked deceased from the Tenant Card (Tenancy Status)', role);
+        // Shared setter (shared-data.js): flag + date + save + audit + KPIs.
+        if (typeof setAppDeceased === 'function') {
+          setAppDeceased(app, { deceased: true, date: today, role: role,
+            detail: 'Marked deceased from the Tenant Card (Tenancy Status)' });
+        }
         if (typeof showToast === 'function') showToast('Application for ' + name + ' marked Deceased.', {type:'info'});
-        if (typeof _renderLandingKpis === 'function') try { _renderLandingKpis(); } catch(e){}
         return;
       }
 

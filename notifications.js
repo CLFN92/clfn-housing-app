@@ -3586,9 +3586,20 @@ function _cfgCopyValue(btn) {
 }
 
 // Save the RFQ trigger threshold to housing_settings.
-function saveRfqThreshold() {
+// ED-tier gate for the Settings > Config save handlers (super_user inherits
+// ED authority platform-wide). One definition — six hand-copies drifted
+// before (one had even dropped super_user).
+function _cfgEdGuard(msg){
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change the RFQ threshold', {type:'error'}); return; }
+  if (role !== 'ed' && role !== 'super_user') {
+    showToast(msg || 'Only the Executive Director can change this setting', {type:'error'});
+    return false;
+  }
+  return true;
+}
+
+function saveRfqThreshold() {
+  if (!_cfgEdGuard('Only the Executive Director can change the RFQ threshold')) return;
   var inp = document.getElementById('cfg_rfq_threshold');
   if (!inp) return;
   var val = parseFloat(inp.value);
@@ -3601,8 +3612,7 @@ function saveRfqThreshold() {
 }
 
 function saveToastTimeout() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can change this setting')) return;
   var inp = document.getElementById('cfg_toast_timeout');
   if (!inp) return;
   var val = parseInt(inp.value, 10);
@@ -3617,8 +3627,7 @@ window.saveToastTimeout = saveToastTimeout;
 
 // Applicant portal master switch (external self-serve applications).
 function saveExternalAppsEnabled() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can change this setting')) return;
   var cb = document.getElementById('cfg_external_apps');
   if (!cb) return;
   var on = !!cb.checked;
@@ -3636,8 +3645,7 @@ window.saveExternalAppsEnabled = saveExternalAppsEnabled;
 // band-number verification: registry numbers must be 10 digits starting with
 // this prefix. Blank clears the setting and disables the check.
 function saveNationBandNumber() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can change this setting')) return;
   var inp = document.getElementById('cfg_nation_band');
   if (!inp) return;
   var val = (inp.value || '').trim();
@@ -3651,8 +3659,7 @@ function saveNationBandNumber() {
 window.saveNationBandNumber = saveNationBandNumber;
 
 function saveEldersAgeMin() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change this setting', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can change this setting')) return;
   var inp = document.getElementById('cfg_elders_age_min');
   if (!inp) return;
   var val = parseInt(inp.value, 10);
@@ -3667,8 +3674,7 @@ function saveEldersAgeMin() {
 // Toggle whether the platform operator may open a support session on this
 // nation (OCAP consent switch; read server-side by the support-login function).
 function saveSupportLoginEnabled() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change platform support access', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can change platform support access')) return;
   var inp = document.getElementById('cfg_support_login');
   if (!inp) return;
   var enabled = !!inp.checked;

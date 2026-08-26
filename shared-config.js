@@ -130,6 +130,30 @@ window.livingSituationLabel = function (key) {
   return '';
 };
 
+// ── Application-population predicates (single source) ────────────────────────
+// "Waitlist type" = an application competing for a residential unit: NOT a
+// file update (existing_tenant), NOT a transfer (its own KPI row), NOT
+// commercial (requests buildings, not waitlist spots). This predicate was
+// hand-copied 8 times across the KPI counts, drilldowns, and reconcile before
+// consolidation — change it HERE only.
+window.appIsWaitlistType = function (t) {
+  t = t || 'new_housing';
+  return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial';
+};
+
+// The on-reserve New-Application rule, shared by the wizard validation
+// (blocking), the Residency-card badges (display), and the reconcile
+// doubled-up backlog (cleanup): an On Reserve member filing a New Application
+// must declare a Living Situation ('prompt' when blank), and "own home" there
+// is a contradiction — that member files a Transfer/File Update ('conflict').
+// Returns '' when the combination is fine.
+window.onRezNewAppIssue = function (reserve, livsit) {
+  if ((reserve || '') !== 'On Reserve') return '';
+  if (!livsit) return 'prompt';
+  if (livsit === 'own_home') return 'conflict';
+  return '';
+};
+
 window._mapNationRow = function(r){
   if (!r || !r.subdomain) return null;
   var sub = String(r.subdomain).toLowerCase();

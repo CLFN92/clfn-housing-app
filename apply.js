@@ -34,6 +34,12 @@
   function getAT() { return localStorage.getItem(LS_AT) || ''; }
   function getRT() { return localStorage.getItem(LS_RT) || ''; }
   function setSession(at, rt) { if (at) localStorage.setItem(LS_AT, at); if (rt) localStorage.setItem(LS_RT, rt); }
+  // One place for the client-side registry-number shape check + its generic,
+  // non-disclosing error sentence (two hand-copies before).
+  function _bandInvalidMsg(band) {
+    return /^\d{10}$/.test(band) ? '' : 'That band / membership number could not be verified. Please check the number on your status card, or contact the Housing office.';
+  }
+
   function clearSession() {
     localStorage.removeItem(LS_AT); localStorage.removeItem(LS_RT);
     // The verified registry number is personal data — never leave it behind
@@ -167,7 +173,7 @@
     if (_loginBandRequired) {
       band = ((document.getElementById('lband') || {}).value || '').replace(/[\s-]/g, '');
       // Generic on purpose — never disclose the expected length or prefix.
-      if (!/^\d{10}$/.test(band)) { setMsg('lmsg', 'That band / membership number could not be verified. Please check the number on your status card, or contact the Housing office.', 'err'); return; }
+      var _bandErr = _bandInvalidMsg(band); if (_bandErr) { setMsg('lmsg', _bandErr, 'err'); return; }
     }
     var btn = document.getElementById('lbtn'); btn.disabled = true; btn.textContent = 'Sending…';
     function fail(msg) { setMsg('lmsg', msg || 'Could not send the link. Please try again.', 'err'); btn.disabled = false; btn.textContent = 'Email me a sign-in link'; }
@@ -602,7 +608,7 @@
   function _bandError(p) {
     if (!_bandRequired) return '';
     var band = String(p.band || '').replace(/[\s-]/g, '');
-    if (!/^\d{10}$/.test(band)) return 'That band / membership number could not be verified. Please check the number on your status card, or contact the Housing office.';
+    var _be = _bandInvalidMsg(band); if (_be) return _be;
     p.band = band;
     return '';
   }

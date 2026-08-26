@@ -1820,6 +1820,9 @@ function initHousingPage() {
   // (Step-progress pills carry state dots, not numbers — the old boot-time
   // renumbering pass is gone; goTo() computes states from visible pills.)
 
+  // Wizard selects that render from shared registries.
+  if (typeof _populateLivingSituationSelect === 'function') _populateLivingSituationSelect();
+
   // Update header
   updateHeaderUser(role);
   // Re-render the header nav + role-vis pass now that the resolved role is in.

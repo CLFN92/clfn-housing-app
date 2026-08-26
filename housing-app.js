@@ -224,17 +224,19 @@ function validateStep0() {
       && typeof _appIsTenancyHolder === 'function') {
     var _curTen = ((typeof applications !== 'undefined' && applications) || []).find(function(a){ return a && a.id === currentAppId; });
     if (_curTen && _appIsTenancyHolder(_curTen)) {
-      // showStepErrors renders via innerHTML — escape the record-data address.
-      var _escAddr = (typeof escapeHtml === 'function') ? escapeHtml(_curTen.assignedAddress || 'a unit') : 'a unit';
-      errs.push('This applicant is assigned to ' + _escAddr
-        + ' — a current tenant cannot file a New Application. Change the Application Type to Transfer Request or File Update, or clear the unit link first.');
+      // Shared message builder; forHtml=true because showStepErrors renders
+      // via innerHTML and the address is record data.
+      errs.push((typeof tenancyHolderMsg === 'function') ? tenancyHolderMsg(_curTen, true)
+        : 'This applicant is assigned to a unit — use Transfer Request or File Update.');
     }
   }
-  if (_apt === 'new_housing' && fld('reserve') === 'On Reserve') {
-    var _ls = fld('living_situation');
-    if (!_ls) {
+  if (_apt === 'new_housing' && typeof onRezNewAppIssue === 'function') {
+    // Shared rule (shared-config.js) — also drives the Residency-card badges
+    // and the reconcile doubled-up backlog.
+    var _orIssue = onRezNewAppIssue(fld('reserve'), fld('living_situation'));
+    if (_orIssue === 'prompt') {
       errs.push('On-reserve applicant: select their Living Situation — if they are not in their own home, choose "Staying with family on reserve (doubled up)".');
-    } else if (_ls === 'own_home') {
+    } else if (_orIssue === 'conflict') {
       errs.push('On-reserve applicant in their own home should not be a New Application — change the Application Type to Transfer Request (seeking a different unit) or File Update, or correct the Living Situation.');
     }
   }

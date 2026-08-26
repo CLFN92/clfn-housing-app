@@ -1512,9 +1512,8 @@ function _renderLandingKpis(){
   //   transfer_request → House Requests (existing tenant transfer)
   // Housed = linked to a real unit. Derived live from the units, so unlinking a
   // tenant returns them to the New Applications waitlist automatically.
-  var _housedIds = {};
-  units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds[u.assignedTo] = true; });
-  function _isHoused(a){ return a.status === 'assigned' || !!a.assignedUnit || !!_housedIds[a.id]; }
+  var _housedIdx = (typeof buildHousedIndex === 'function') ? buildHousedIndex(units) : {};
+  function _isHoused(a){ return (typeof appIsHoused === 'function') ? appIsHoused(a, _housedIdx) : (a.status === 'assigned' || !!a.assignedUnit || !!_housedIdx[a.id]); }
   // BCR-listed applicants (banished / evicted for harbouring) are ineligible —
   // out of the type counts entirely; Match still lists them flagged.
   var _bcrBlocked = function(a){ return typeof appIsBcrIneligible === 'function' && appIsBcrIneligible(a); };
@@ -1530,22 +1529,20 @@ function _renderLandingKpis(){
   // New Applications = the real waitlist: seeking-a-unit apps that are NOT
   // housed. Commercial (business/department) applications are excluded — they
   // request buildings, not waitlist spots, and were inflating this count.
-  var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial'; }, true);
+  var newApps       = _activeOfType(appIsWaitlistType, true);
   // Subset annotation: new applications still sitting in DRAFT (started but
   // never submitted) — same population rules as the New Applications row.
   var draftApps = apps.filter(function(a){
     if(!a || a.archived || a.status !== 'draft' || a.deceased) return false;
     if(_bcrBlocked(a) || _isHoused(a)) return false;
-    var t = a.appType || 'new_housing';
-    return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial';
+    return appIsWaitlistType(a.appType);
   }).length;
   // Subset annotation: doubled-up members — on reserve without a home of
   // their own (staying with family). Same population rules as New Applications.
   var doubledApps = apps.filter(function(a){
     if(!a || a.archived || a.status === 'declined' || a.status === 'draft' || a.deceased) return false;
     if(_bcrBlocked(a) || _isHoused(a)) return false;
-    var t = a.appType || 'new_housing';
-    if(t === 'existing_tenant' || t === 'transfer_request' || t === 'commercial') return false;
+    if(!appIsWaitlistType(a.appType)) return false;
     return a.livingSituation === 'family_on_reserve';
   }).length;
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
@@ -1650,9 +1647,24 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open applications.</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'vacant') {
-    title = 'Vacant Units';
-    var rows = units.filter(function(u){ return u && !u.archived && u.status==='vacant'; })
+  } else if (type === 'vacant' || type === 'under_repair' || type === 'condemned') {
+    // One unit-table branch for the Vacant card and its two breakdown rows.
+    // Filters MIRROR the KPI predicates in _renderLandingKpis exactly.
+    var _unitCfg = {
+      vacant:       { title:'Vacant Units', empty:'No vacant units.',
+                      pred:function(u){ return u.status==='vacant'; } },
+      under_repair: { title:'Units Under Repair / Renovation (vacant stock)', empty:'No unoccupied units under repair.',
+                      pred:function(u){
+                        if(u.assignedTo || u.assignedName) return false;
+                        var st=(u.status||'').toLowerCase();
+                        if(st==='condemned' || st==='vacant') return false;
+                        return u.under_renovation || st.indexOf('renovat')!==-1 || st.indexOf('repair')!==-1;
+                      } },
+      condemned:    { title:'Condemned Units', empty:'No condemned units.',
+                      pred:function(u){ return (u.status||'').toLowerCase()==='condemned'; } }
+    }[type];
+    title = _unitCfg.title;
+    var rows = units.filter(function(u){ return u && !u.archived && _unitCfg.pred(u); })
       .slice().sort(function(a,b){ return ((a.street||'')+(a.num||'')).localeCompare((b.street||'')+(b.num||'')); });
     exportHeaders = ['Address','Bedrooms','Type','Classification','Accessible','Elders Unit'];
     exportColWidths = [28,10,16,20,12,12];
@@ -1672,23 +1684,22 @@ function showHousingKpiDrilldown(type) {
             +'<td class="std-cell-muted">'+escapeHtml(_fmtUnitType(u.type)||'—')+'</td>'
             +'<td class="std-cell-muted">'+escapeHtml(u.classification||'—')+'</td>'
             +'</tr>';
-        }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')
+        }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">'+_unitCfg.empty+'</td></tr>')
       + '</tbody></table>';
 
   } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps' || type === 'deceased_apps' || type === 'doubled_apps') {
     var _typeCfg = {
-      new_apps:       { title:'New Applications',                          pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No active new applications.' },
-      draft_apps:     { title:'New Applications — In Draft',               pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No draft applications.' },
-      doubled_apps:   { title:'New Applications — Doubled Up (on reserve)', pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request' && t!=='commercial'; }, empty:'No doubled-up applicants on file.' },
+      new_apps:       { title:'New Applications',                          pred:appIsWaitlistType, empty:'No active new applications.' },
+      draft_apps:     { title:'New Applications — In Draft',               pred:appIsWaitlistType, empty:'No draft applications.' },
+      doubled_apps:   { title:'New Applications — Doubled Up (on reserve)', pred:appIsWaitlistType, empty:'No doubled-up applicants on file.' },
       file_updates:   { title:'File Updates — Existing Tenant',            pred:function(t){ return t==='existing_tenant'; },   empty:'No active file updates.' },
       house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' },
       deceased_apps:  { title:'Applications — Deceased',                   pred:function(){ return true; },                     empty:'No deceased-flagged applications.' }
     }[type];
     title = _typeCfg.title;
     // New Applications drilldown excludes housed (linked) apps, matching the KPI.
-    var _housedIds2 = {};
-    units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds2[u.assignedTo] = true; });
-    var _isHoused2 = function(a){ return a.status === 'assigned' || !!a.assignedUnit || !!_housedIds2[a.id]; };
+    var _housedIdx2 = (typeof buildHousedIndex === 'function') ? buildHousedIndex(units) : {};
+    var _isHoused2 = function(a){ return (typeof appIsHoused === 'function') ? appIsHoused(a, _housedIdx2) : (a.status === 'assigned' || !!a.assignedUnit || !!_housedIdx2[a.id]); };
     var rows = apps.filter(function(a){
       if (!a || a.archived) return false;
       // Deceased apps live only in their own group; every other group excludes them.
@@ -1814,11 +1825,7 @@ function _housingLikelyHousedApps(){
   // Map each unit that is LINKED to an application (unit.assignedTo === app.id).
   // Linkage is the only reliable "has a house" signal; a name match is not used —
   // if an application is not linked to a unit we treat it as no house.
-  var byId = {};
-  units.forEach(function(u){
-    if(!u || u.archived || !u.assignedTo) return;
-    byId[u.assignedTo] = ((u.num||'') + ' ' + (u.street||'')).trim();
-  });
+  var byId = (typeof buildHousedIndex === 'function') ? buildHousedIndex(units) : {};
   var out = [];
   apps.forEach(function(a){
     if(!a || a.archived || a.status==='declined') return;
@@ -1830,7 +1837,7 @@ function _housingLikelyHousedApps(){
     if(t === 'commercial') return;
     // Housed only if the application is LINKED to a real housing unit.
     var addr = '', via = '';
-    if (byId[a.id])          { addr = byId[a.id];                       via = 'Unit assigned to this application'; }
+    if (byId[a.id])          { addr = (byId[a.id] === true ? 'Assigned unit' : byId[a.id]); via = 'Unit assigned to this application'; }
     else if (a.assignedUnit) { addr = a.assignedAddress || 'Assigned unit'; via = 'Application linked to a unit'; }
     // Status says Assigned but nothing backs it: the New Applications count
     // treats these as housed, so without this leg they were invisible to BOTH
@@ -1916,11 +1923,8 @@ async function _reclassifyApp(appId, newType){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
   var idx = apps.findIndex(function(a){ return a && a.id === appId; });
   if (idx < 0) return;
+  if (!_mgmtActionGate()) return;
   var role = window.currentRole || 'staff';
-  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
-    if (typeof showToast === 'function') showToast('Only management can reclassify applications.', { type:'error' });
-    return;
-  }
   var a = apps[idx];
   var typeLbl = (newType === 'transfer_request') ? 'Existing House Request (transfer)' : 'File Update (existing tenant)';
   var name = ((a.fn||'')+' '+(a.ln||'')).trim() || a.id;
@@ -1930,8 +1934,7 @@ async function _reclassifyApp(appId, newType){
   if (!go) return;
   var prev = a.appType || 'new_housing';
   a.appType = newType;
-  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
-  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  _saveAppRecord(a);
   if (typeof auditEntry === 'function') auditEntry(a.id, 'app_reclassified', 'Application type changed from ' + prev + ' to ' + newType + ' (Likely-Already-Housed review)', role);
   if (typeof showToast === 'function') showToast(name + ' reclassified to ' + typeLbl + '.', {type:'info'});
   if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
@@ -1941,11 +1944,8 @@ window._reclassifyApp = _reclassifyApp;
 
 // Bulk: set every listed housed application to File Update (existing tenant).
 async function _reclassifyAllHoused(){
+  if (!_mgmtActionGate()) return;
   var role = window.currentRole || 'staff';
-  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
-    if (typeof showToast === 'function') showToast('Only management can reclassify applications.', { type:'error' });
-    return;
-  }
   var list = _housingLikelyHousedApps();
   if (!list.length) { if (typeof showToast === 'function') showToast('Nothing to reclassify.', {type:'info'}); return; }
   var go = (typeof showConfirm === 'function')
@@ -1958,8 +1958,7 @@ async function _reclassifyAllHoused(){
     var prev = a.appType || 'new_housing';
     if (prev === 'existing_tenant') return;
     a.appType = 'existing_tenant';
-    if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
-    else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+    _saveAppRecord(a);
     if (typeof auditEntry === 'function') auditEntry(a.id, 'app_reclassified', 'Application type changed from ' + prev + ' to existing_tenant (bulk Likely-Already-Housed cleanup)', role);
     done++;
   });
@@ -2033,16 +2032,13 @@ function _housingReconcile(){
   // (or an own-home contradiction) — the doubled-up cleanup backlog. These
   // predate the Living Situation field; new intakes can't reach this state
   // (the on-reserve validation blocks them).
-  var _housedIds3 = {};
-  units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds3[u.assignedTo] = true; });
+  var _housedIdx3 = (typeof buildHousedIndex === 'function') ? buildHousedIndex(units) : {};
   var onRezUnclassified = activeApps.filter(function(a){
     if(a.deceased || a.status === 'draft') return false;
-    var t = a.appType || 'new_housing';
-    if(t === 'existing_tenant' || t === 'transfer_request' || t === 'commercial') return false;
-    if(a.status === 'assigned' || a.assignedUnit || _housedIds3[a.id]) return false;   // housed — Likely-Housed handles those
-    if((a.reserve || '') !== 'On Reserve') return false;
-    var ls = a.livingSituation || '';
-    return ls === '' || ls === 'own_home';
+    if(!appIsWaitlistType(a.appType)) return false;
+    if(appIsHoused(a, _housedIdx3)) return false;   // housed — Likely-Housed handles those
+    // Same shared rule as the wizard validation + Residency-card badges.
+    return typeof onRezNewAppIssue === 'function' && onRezNewAppIssue(a.reserve, a.livingSituation || '') !== '';
   }).sort(function(x,y){ return (y.score||0)-(x.score||0); });
 
   // Total = ACTIVE units only — archived (demolished/removed) units are
@@ -2255,6 +2251,23 @@ window.showReconcileReport = showReconcileReport;
 function _closeReconcile(){ var m = document.getElementById('modalReconcile'); if (m) m.remove(); }
 window._closeReconcile = _closeReconcile;
 
+// ── Shared bits for the review/reconcile actions ─────────────────────────────
+// Management gate (7 hand-copies before consolidation) — toasts and returns
+// false when the current role can't run cleanup actions.
+function _mgmtActionGate(){
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
+    return false;
+  }
+  return true;
+}
+// Draft-fallback-or-direct application save (8 hand-copies before).
+function _saveAppRecord(a){
+  if (typeof saveApplicationWithDraftFallback === 'function') { saveApplicationWithDraftFallback(a); return; }
+  if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+}
+
 // Likely-Housed review: "Doubled up — not housed". The applicant lives at the
 // linked address but it is NOT their own home (staying with family), so the
 // unit link on their application is wrong data. Unlinks the application from
@@ -2266,11 +2279,8 @@ async function _lhMarkNotHoused(appId){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
   var a = apps.find(function(x){ return x && x.id === appId; });
   if (!a) return;
+  if (!_mgmtActionGate()) return;
   var role = window.currentRole || 'staff';
-  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
-    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
-    return;
-  }
   var name = ((a.fn||'')+' '+(a.ln||'')).trim() || a.id;
   var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
   var linked = units.filter(function(u){ return u && !u.archived && u.assignedTo === appId; });
@@ -2298,11 +2308,9 @@ async function _lhMarkNotHoused(appId){
     if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
   });
   // Application side: clear the assignment cluster, restore approved status.
-  a.assignedUnit = ''; a.assignedAddress = '';
-  if (a.status === 'assigned' && typeof APP_STATUS !== 'undefined') a.status = APP_STATUS.ED_APPROVED;
+  clearAppUnitLink(a);
   if (!a.livingSituation) a.livingSituation = 'family_on_reserve';
-  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
-  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  _saveAppRecord(a);
   if (typeof auditEntry === 'function') auditEntry(a.id, 'app_marked_not_housed',
     'Marked doubled-up / not housed — unit link to ' + addr + ' removed (Likely-Already-Housed review); stays New Application', role);
   if (typeof showToast === 'function') showToast(name + ' marked as doubled up — back on the waitlist as a New Application.', {type:'info'});
@@ -2316,8 +2324,7 @@ window._lhMarkNotHoused = _lhMarkNotHoused;
 // management-only, audited, and refresh the report + KPIs.
 function _reconStampDoubledUp(a, role){
   a.livingSituation = 'family_on_reserve';
-  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
-  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  _saveAppRecord(a);
   if (typeof auditEntry === 'function') auditEntry(a.id, 'app_marked_doubled_up',
     'Living Situation set to staying-with-family (doubled up) via reconciliation', role);
 }
@@ -2325,11 +2332,8 @@ async function _reconMarkDoubledUp(appId){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
   var a = apps.find(function(x){ return x && x.id === appId; });
   if (!a) return;
+  if (!_mgmtActionGate()) return;
   var role = window.currentRole || 'staff';
-  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
-    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
-    return;
-  }
   _reconStampDoubledUp(a, role);
   if (typeof showToast === 'function') showToast(((a.fn||'')+' '+(a.ln||'')).trim() + ' marked Doubled Up.', {type:'info'});
   if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
@@ -2337,11 +2341,8 @@ async function _reconMarkDoubledUp(appId){
 }
 window._reconMarkDoubledUp = _reconMarkDoubledUp;
 async function _reconMarkAllDoubledUp(){
+  if (!_mgmtActionGate()) return;
   var role = window.currentRole || 'staff';
-  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
-    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
-    return;
-  }
   var R = _housingReconcile();
   // Bulk skips the own-home contradictions — those need a person to reclassify.
   var list = R.onRezUnclassified.filter(function(a){ return !a.livingSituation; });
@@ -2364,20 +2365,15 @@ async function _reconClearLink(appId){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
   var a = apps.find(function(x){ return x && x.id === appId; });
   if (!a) return;
+  if (!_mgmtActionGate()) return;
   var role = window.currentRole || 'staff';
-  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
-    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
-    return;
-  }
   var name = ((a.fn||'')+' '+(a.ln||'')).trim() || a.id;
   var go = (typeof showConfirm === 'function')
     ? await showConfirm({ title:'Clear unit link?', message:'Clear the stale unit link on ' + name + '’s application and return it to the active list?', confirmText:'Clear link', cancelText:'Cancel' })
     : window.confirm('Clear unit link for ' + name + '?');
   if (!go) return;
-  a.assignedUnit = ''; a.assignedAddress = '';
-  if (a.status === 'assigned' && typeof APP_STATUS !== 'undefined') a.status = APP_STATUS.ED_APPROVED;
-  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
-  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  clearAppUnitLink(a);
+  _saveAppRecord(a);
   if (typeof auditEntry === 'function') auditEntry(a.id, 'status_change', 'Stale unit link cleared via reconciliation', role);
   if (typeof showToast === 'function') showToast('Unit link cleared for ' + name + '.', {type:'info'});
   if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
@@ -2388,11 +2384,8 @@ window._reconClearLink = _reconClearLink;
 // Bulk: set the "other / no status" units (no tenant, unrecognized status) to
 // Vacant so they become available for assignment. Renovation/reserved untouched.
 async function _reconMarkVacant(){
+  if (!_mgmtActionGate()) return;
   var role = window.currentRole || 'staff';
-  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
-    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
-    return;
-  }
   var targets = _housingReconcile().buckets.other;
   if (!targets.length) { if (typeof showToast === 'function') showToast('Nothing to update.', {type:'info'}); return; }
   var go = (typeof showConfirm === 'function')
@@ -2493,12 +2486,10 @@ async function _reconDoMerge(){
     if((canon.score==null || canon.score===0) && d.score) canon.score=d.score;
     d.archived=true; d.mergedInto=canonicalId;
     d.declineReason=(d.declineReason ? d.declineReason+'; ' : '')+'Merged into '+canonicalId;
-    if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(d);
-    else if(typeof sbSaveApplication === 'function') sbSaveApplication(d).catch(function(){});
+    _saveAppRecord(d);
     if(typeof auditEntry === 'function') auditEntry(d.id, 'application_merged', 'Merged into '+canonicalId+' via reconciliation', role);
   });
-  if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(canon);
-  else if(typeof sbSaveApplication === 'function') sbSaveApplication(canon).catch(function(){});
+  _saveAppRecord(canon);
   if(typeof auditEntry === 'function') auditEntry(canon.id, 'application_merged', 'Absorbed '+dups.length+' duplicate application(s) via reconciliation', role);
   if(typeof showToast === 'function') showToast('Merged '+dups.length+' duplicate'+(dups.length===1?'':'s')+' into '+cname+'.', {type:'info'});
   var m=document.getElementById('modalReconMerge'); if(m) m.remove();

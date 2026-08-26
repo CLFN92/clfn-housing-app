@@ -3356,18 +3356,77 @@ window.inviteApplicantToPortal = inviteApplicantToPortal;
 // Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit
 // tenant gate, and the Add-Tenant modal so the four can no longer drift with
 // different checks and different error messages.
-// Is this applicant a CURRENT TENANT — i.e. does a real unit assignment back
-// them? True when the application carries an assignment (status/assignedUnit)
-// or a non-archived unit's assignedTo points at it. Used by the hard rule
-// that a current tenant can never be typed as a New Application (they file a
-// Transfer Request or File Update instead).
-function _appIsTenancyHolder(app){
+// ── "Is this applicant housed?" — single source ──────────────────────────────
+// The rule: an application is HOUSED when it carries an assignment
+// (status==='assigned' or assignedUnit set) OR a non-archived unit's
+// assignedTo points at it. Six near-identical copies of this existed across
+// the KPI counts, drilldowns, reconcile, and likely-housed review before
+// consolidation — build the index once per render and test through it.
+function buildHousedIndex(units){
+  var idx = {};
+  (units || (typeof housingUnits !== 'undefined' && housingUnits) || window.housingUnits || [])
+    .forEach(function(u){
+      if (u && !u.archived && u.assignedTo) idx[u.assignedTo] = ((u.num||'')+' '+(u.street||'')).trim() || true;
+    });
+  return idx;
+}
+function appIsHoused(app, idx){
   if (!app) return false;
-  if (app.status === 'assigned' || app.assignedUnit) return true;
-  var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : (window.housingUnits || []);
-  return units.some(function(u){ return u && !u.archived && u.assignedTo === app.id; });
+  if (app.status === 'assigned' || !!app.assignedUnit) return true;
+  return !!(idx || buildHousedIndex())[app.id];
+}
+window.buildHousedIndex = buildHousedIndex;
+window.appIsHoused = appIsHoused;
+
+// Is this applicant a CURRENT TENANT — i.e. does a real unit assignment back
+// them? Same rule as appIsHoused (kept as a named alias for the hard rule
+// that a current tenant can never be typed as a New Application).
+function _appIsTenancyHolder(app){
+  return appIsHoused(app);
 }
 window._appIsTenancyHolder = _appIsTenancyHolder;
+
+// The hard-rule message, shared by the radio guard (housing-settings.js) and
+// the validateStep0 backstop (housing-app.js). `forHtml` escapes the
+// record-data address for innerHTML surfaces.
+function tenancyHolderMsg(app, forHtml){
+  var addr = (app && app.assignedAddress) || 'a unit';
+  if (forHtml && typeof escapeHtml === 'function') addr = escapeHtml(addr);
+  var name = app ? (((app.fn||'')+' '+(app.ln||'')).trim() || 'This applicant') : 'This applicant';
+  return name + ' is assigned to ' + addr
+    + ' — a current tenant cannot file a New Application. Use Transfer Request (seeking a different unit) or File Update, or clear the unit link first.';
+}
+window.tenancyHolderMsg = tenancyHolderMsg;
+
+// Mark an application deceased / not-deceased: assignment + save + audit +
+// KPI refresh in one place (three hand-copies existed: the wizard checkbox,
+// and the Tenant Card sync's two paths). Toast wording stays with callers.
+function setAppDeceased(app, opts){
+  opts = opts || {};
+  if (!app) return;
+  var flag = opts.deceased !== false;
+  app.deceased = flag;
+  if (flag) { if (opts.date || !app.deceasedDate) app.deceasedDate = opts.date || app.deceasedDate || new Date().toISOString().slice(0,10); }
+  else if (opts.clearDate) { app.deceasedDate = ''; }
+  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
+  else if (typeof sbSaveApplication === 'function') sbSaveApplication(app).catch(function(){});
+  if (typeof auditEntry === 'function') auditEntry(app.id,
+    flag ? 'app_deceased_set' : 'app_deceased_cleared',
+    opts.detail || (flag ? ('Applicant marked deceased' + (app.deceasedDate ? ' — ' + app.deceasedDate : '')) : 'Deceased status cleared'),
+    opts.role || window.currentRole || 'staff');
+  if (typeof _renderLandingKpis === 'function') { try { _renderLandingKpis(); } catch(e){} }
+}
+window.setAppDeceased = setAppDeceased;
+
+// Clear the assignment cluster off an application and restore the approved
+// status (shared by the not-housed action and the reconcile stale-link
+// cleaner). Caller saves + audits.
+function clearAppUnitLink(a){
+  if (!a) return;
+  a.assignedUnit = ''; a.assignedAddress = '';
+  if (a.status === 'assigned' && typeof APP_STATUS !== 'undefined') a.status = APP_STATUS.ED_APPROVED;
+}
+window.clearAppUnitLink = clearAppUnitLink;
 
 function appAssignabilityStatus(app, unit){
   if(!app) return { ok:false, reason:'Application not found' };
