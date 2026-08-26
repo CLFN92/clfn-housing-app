@@ -310,6 +310,7 @@ var SETTINGS_SECTION_GROUPS = {
   sec_config:              'admin',
   sec_maint_qr:            'admin',
   sec_app_scoring:         'app',
+  sec_rent_model:          'app',
   sec_required_fields:     'app',
   sec_unit_match:          'app',
   sec_reno_score:          'app',
@@ -345,7 +346,7 @@ function showSettingsGroup(groupId) {
 }
 
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_notifications','sec_terms','sec_contracts','sec_config','sec_maint_qr','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_notifications','sec_terms','sec_contracts','sec_config','sec_maint_qr','sec_audit','sec_occupancy','sec_rent_model'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -2031,3 +2032,93 @@ function printAllMaintenanceQr(){
 }
 window.printAllMaintenanceQr = printAllMaintenanceQr;
 
+
+
+// ── Rent Model settings panel (Settings > App Settings > Rent Model) ─────────
+// Editable: market-rent discount %, and the OW / ODSP shelter-allowance
+// tables (separate records — changing one never changes the other), each with
+// an effective date and source note. Persisted to housing_settings key
+// 'rent_model'; getRentModel() merges it over RENT_MODEL_DEFAULTS.
+function renderRentModelPanel(){
+  var body = document.getElementById('rent_model_body');
+  if(!body) return;
+  var role = window.currentRole || 'housing_employee_l1';
+  var canEdit = (role === 'ed' || role === 'super_user');
+  var m = (typeof getRentModel === 'function') ? getRentModel() : window.RENT_MODEL_DEFAULTS;
+  var dis = canEdit ? '' : ' disabled';
+  function money(v){ return (v==null||isNaN(v)) ? '' : String(v); }
+  function tableCard(key, t){
+    var rows = '';
+    for(var i=1;i<=6;i++){
+      rows += '<div class="f"><label>Benefit unit size ' + (i===6?'6 or more':i) + '</label>'
+        + '<input type="number" min="0" step="0.01" id="rm_' + key + '_r' + i + '" value="' + money(t.rates[i]) + '"' + dis + '/></div>';
+    }
+    return '<div class="card" style="margin-top:14px;">'
+      + '<div class="ctitle">' + t.label + ' — monthly shelter allowance</div>'
+      + '<div class="fg c3">' + rows + '</div>'
+      + '<div class="fg c2" style="margin-top:6px;">'
+      +   '<div class="f"><label>Effective Date</label><input type="date" id="rm_' + key + '_date" value="' + (t.effectiveDate||'') + '"' + dis + '/></div>'
+      +   '<div class="f"><label>Source note</label><input type="text" id="rm_' + key + '_note" value="' + String(t.sourceNote||'').replace(/"/g,'&quot;') + '"' + dis + '/></div>'
+      + '</div></div>';
+  }
+  var ex = (typeof computeRentCalc === 'function')
+    ? computeRentCalc({ incomeType:'', estimatedMarketRent:1400, model:m }) : null;
+  body.innerHTML =
+    '<div class="card">'
+    + '<div class="ctitle">Standard rental calculation</div>'
+    + '<div class="fg c2">'
+    +   '<div class="f"><label>Market Rent Discount (%)</label>'
+    +     '<input type="number" min="0" max="100" step="0.01" id="rm_discount" value="' + m.discountPct + '"' + dis + '/>'
+    +     '<div id="rm_discount_err" style="display:none;font-size:11px;color:var(--danger);margin-top:3px;">Enter a percentage between 0 and 100.</div></div>'
+    +   '<div class="f"><label>Payable market percentage (derived)</label>'
+    +     '<input type="text" id="rm_payable" readonly style="background:var(--bg);" value="' + (100 - m.discountPct) + '%"/></div>'
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">Monthly rent = the unit\'s Estimated Market Rent &times; payable percentage. '
+    + (ex && ex.standardRent != null ? 'Example: $1,400.00 market rent &rarr; <strong>$' + ex.standardRent.toFixed(2) + '</strong>/month.' : '')
+    + ' Each unit\'s Estimated Market Rent is set on its unit card (Inventory).</div>'
+    + '</div>'
+    + tableCard('ow', m.ow)
+    + tableCard('odsp', m.odsp)
+    + '<div style="font-size:11px;color:var(--muted);margin:10px 0;">The two tables are separate records: editing one never changes the other. For Ontario Works / ODSP applicants the charged rent is the LOWER of the shelter amount for their benefit unit size and the unit\'s standard discounted rent.</div>'
+    + (canEdit ? '<button class="btn btn-primary" onclick="saveRentModel()">Save Rent Model</button>'
+               : '<div class="empty-state-ctr">Only the Executive Director can edit the rent model.</div>');
+  var d = document.getElementById('rm_discount');
+  if(d) d.addEventListener('input', function(){
+    var v = parseFloat(d.value);
+    var bad = isNaN(v) || v < 0 || v > 100;
+    var err = document.getElementById('rm_discount_err');
+    if(err) err.style.display = bad ? '' : 'none';
+    var p = document.getElementById('rm_payable');
+    if(p && !bad) p.value = (Math.round((100 - v) * 100) / 100) + '%';
+  });
+}
+window.renderRentModelPanel = renderRentModelPanel;
+
+function saveRentModel(){
+  var role = window.currentRole || '';
+  if(role !== 'ed' && role !== 'super_user'){ showToast('Only the Executive Director can change the rent model', {type:'error'}); return; }
+  var disc = parseFloat((document.getElementById('rm_discount')||{}).value);
+  if(isNaN(disc) || disc < 0 || disc > 100){ showToast('Market Rent Discount must be between 0 and 100', {type:'error'}); return; }
+  function tbl(key){
+    var rates = {};
+    for(var i=1;i<=6;i++){
+      var v = parseFloat((document.getElementById('rm_'+key+'_r'+i)||{}).value);
+      if(isNaN(v) || v < 0){ throw new Error((key==='ow'?'Ontario Works':'ODSP') + ' size-' + i + ' amount must be zero or greater'); }
+      rates[i] = Math.round(v * 100) / 100;
+    }
+    return { rates: rates,
+             effectiveDate: (document.getElementById('rm_'+key+'_date')||{}).value || '',
+             sourceNote: (document.getElementById('rm_'+key+'_note')||{}).value || '' };
+  }
+  var model;
+  try { model = { discountPct: Math.round(disc * 100) / 100, ow: tbl('ow'), odsp: tbl('odsp') }; }
+  catch(e){ showToast(e.message, {type:'error'}); return; }
+  window._appSettings = window._appSettings || {};
+  window._appSettings.rent_model = model;
+  if(typeof saveSettingWithDraftFallback === 'function') saveSettingWithDraftFallback('rent_model', model);
+  if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'rent_model_updated',
+    'Rent model saved — discount ' + model.discountPct + '%, OW/ODSP shelter tables updated', role);
+  showToast('Rent model saved', {type:'info'});
+  renderRentModelPanel();
+}
+window.saveRentModel = saveRentModel;

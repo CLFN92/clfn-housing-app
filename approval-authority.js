@@ -52,6 +52,8 @@ var APPROVAL_AUTHORITY = (function() {
     assignUnit:               ['housing_manager', 'ed'],
     // Who can override the top match recommendation
     overrideMatch:            ['ed'],
+    // Who can override a CALCULATED monthly rent (documented reason required)
+    overrideRent:             ['ed'],
     // Who can assign within the tied score band (notes required)
     assignTiedBand:           ['housing_manager', 'ed'],
     // Who can set / edit a unit's monthly rent amount on the Inventory forms
@@ -402,6 +404,7 @@ var APPROVAL_AUTHORITY = (function() {
       approveFileUpdate:        'Approve file update',
       assignUnit:               'Assign unit to applicant',
       overrideMatch:            'Override top match recommendation',
+      overrideRent:             'Override calculated monthly rent',
       assignTiedBand:           'Assign within tied score band',
       assignRentAmount:         'Set / edit unit rent amount',
       unlockSignatures:         'Unlock applicant signatures after submission',
@@ -445,7 +448,7 @@ var APPROVAL_AUTHORITY = (function() {
     groups: {
       'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','deleteApplication','unlockSignatures','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
-      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
+      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount','overrideRent'],
       'Maintenance Request & Renovation': ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor','unlockEmailAttachments'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment','editMatchPriority'],

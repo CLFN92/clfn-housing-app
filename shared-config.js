@@ -130,6 +130,98 @@ window.livingSituationLabel = function (key) {
   return '';
 };
 
+// ── Rent calculation model (single source — do NOT copy these formulas) ──────
+// Two pathways: standard market-rent discount, or the shelter-allowance table
+// for Ontario Works / ODSP applicants. Editable in Settings > App Settings >
+// Rent Model (housing_settings key 'rent_model', merged over these defaults).
+// OW and ODSP tables are SEPARATE records — initialized identically because
+// the business requirement is to use the supplied OW table for both, but an
+// admin can change either without touching the other.
+window.RENT_MODEL_DEFAULTS = {
+  // "35" means the tenant pays 65% of estimated market rent. The payable
+  // percentage is ALWAYS derived from this — never hard-coded.
+  discountPct: 35,
+  ow: {
+    label: 'Ontario Works',
+    rates: { 1: 390, 2: 642, 3: 697, 4: 756, 5: 815, 6: 844 },   // 6 = "6 or more"
+    effectiveDate: '2018-10-01',
+    sourceNote: 'Initial rates entered from supplied Ontario Works shelter allowance table, effective October 2018.'
+  },
+  odsp: {
+    label: 'ODSP',
+    rates: { 1: 390, 2: 642, 3: 697, 4: 756, 5: 815, 6: 844 },
+    effectiveDate: '2018-10-01',
+    sourceNote: 'Initial rates entered from supplied Ontario Works shelter allowance table, effective October 2018.'
+  }
+};
+
+// Saved model merged over the defaults (a model saved before a field existed
+// still gets it — same pattern as match_priority_model).
+window.getRentModel = function () {
+  var d = window.RENT_MODEL_DEFAULTS, s = ((window._appSettings || {}).rent_model) || {};
+  function tbl(key) {
+    var sd = d[key], ss = s[key] || {};
+    var rates = {};
+    for (var i = 1; i <= 6; i++) {
+      var v = ss.rates && ss.rates[i] != null ? Number(ss.rates[i]) : sd.rates[i];
+      rates[i] = (isNaN(v) || v < 0) ? sd.rates[i] : v;
+    }
+    return { label: sd.label, rates: rates,
+             effectiveDate: ss.effectiveDate || sd.effectiveDate,
+             sourceNote: (ss.sourceNote != null ? ss.sourceNote : sd.sourceNote) };
+  }
+  var disc = s.discountPct != null ? Number(s.discountPct) : d.discountPct;
+  if (isNaN(disc) || disc < 0 || disc > 100) disc = d.discountPct;
+  return { discountPct: disc, ow: tbl('ow'), odsp: tbl('odsp') };
+};
+
+// Currency-safe rounding to cents.
+window.roundCents = function (x) { return Math.round((Number(x) + Number.EPSILON) * 100) / 100; };
+
+// The ONE rent calculation. opts:
+//   incomeType          'OW' | 'ODSP' | anything else (stable internal values)
+//   spouse              0|1  (spouse / common-law partner indicator)
+//   dependents          whole number >= 0
+//   estimatedMarketRent number or null (null = no unit chosen yet)
+//   model               optional (defaults to getRentModel())
+// Returns every intermediate so displays never re-derive:
+//   { method:'standard'|'shelter', program, payablePct, standardRentRaw,
+//     standardRent, benefitUnitSize, shelterAmount, finalRent, capApplied,
+//     effectiveDate, sourceNote }
+window.computeRentCalc = function (opts) {
+  opts = opts || {};
+  var model = opts.model || window.getRentModel();
+  var payablePct = 1 - (model.discountPct / 100);
+  var emr = (opts.estimatedMarketRent == null || opts.estimatedMarketRent === '')
+    ? null : Number(opts.estimatedMarketRent);
+  if (emr != null && (isNaN(emr) || emr < 0)) emr = null;
+  var stdRaw = emr != null ? emr * payablePct : null;         // unrounded, for calculation integrity
+  var std    = stdRaw != null ? window.roundCents(stdRaw) : null;
+  var t = String(opts.incomeType || '');
+  var isOW = t === 'OW', isODSP = t === 'ODSP';
+  if (!isOW && !isODSP) {
+    return { method: 'standard', program: '', payablePct: payablePct,
+             standardRentRaw: stdRaw, standardRent: std,
+             benefitUnitSize: null, shelterAmount: null,
+             finalRent: std, capApplied: false, effectiveDate: '', sourceNote: '' };
+  }
+  var table = isOW ? model.ow : model.odsp;
+  var spouse = opts.spouse ? 1 : 0;
+  var deps = Math.max(0, Math.floor(Number(opts.dependents) || 0));
+  // Benefit unit size = applicant + spouse + dependents (NOT dependents alone).
+  var size = 1 + spouse + deps;
+  var shelter = window.roundCents(table.rates[Math.min(size, 6)]);   // 6 = "6 or more"
+  // Charge the LOWER of the shelter amount and the unit's standard discounted
+  // rent (an authorized override can document an exception). With no unit
+  // chosen yet the shelter amount stands alone.
+  var fin = std != null ? Math.min(shelter, std) : shelter;
+  return { method: 'shelter', program: table.label, payablePct: payablePct,
+           standardRentRaw: stdRaw, standardRent: std,
+           benefitUnitSize: size, shelterAmount: shelter,
+           finalRent: window.roundCents(fin), capApplied: (std != null && std < shelter),
+           effectiveDate: table.effectiveDate, sourceNote: table.sourceNote };
+};
+
 // ── Application-population predicates (single source) ────────────────────────
 // "Waitlist type" = an application competing for a residential unit: NOT a
 // file update (existing_tenant), NOT a transfer (its own KPI row), NOT

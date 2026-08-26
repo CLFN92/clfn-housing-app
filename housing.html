@@ -534,6 +534,21 @@
         </div>
         <div id="incomeList"></div>
       </div>
+      <!-- Ontario Works / ODSP shelter-allowance panel — shown only when the
+           APPLICANT's income type is OW or ODSP. Spouse + dependents are
+           read-only views of the single sources of truth (Marital Status on
+           Step 0 and the Household Members step) so nothing is asked twice. -->
+      <div class="card" id="assistPanel" style="display:none;border:2px solid var(--yellow);">
+        <div class="ctitle" id="assist_title">Shelter Allowance</div>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">Rent for this program is set by the shelter-allowance table for the benefit unit size (applicant + spouse/common-law partner + dependents), capped at the unit's standard discounted rent.</p>
+        <div class="fg c2">
+          <div class="f"><label>Spouse / common-law partner?</label><input id="assist_spouse" type="text" readonly style="background:var(--bg);" title="From Marital Status on the Applicant step — change it there"/></div>
+          <div class="f"><label>Number of Dependents</label><input id="assist_deps" type="text" readonly style="background:var(--bg);" title="Counted from the Household Members step — add or remove members there"/></div>
+          <div class="f"><label>Benefit Unit Size</label><input id="assist_size" type="text" readonly style="background:var(--bg);"/></div>
+          <div class="f"><label>Maximum Monthly Shelter Amount</label><input id="assist_shelter" type="text" readonly style="background:var(--bg);font-weight:700;"/></div>
+        </div>
+        <div id="assist_note" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+      </div>
       <div class="fnav"><button class="btn btn-ghost" onclick="goTo(0)">← Back</button><button class="btn btn-primary" onclick="goTo(2)">Next: Co-Applicant →</button></div>
     </div>
 
@@ -1101,6 +1116,7 @@
   <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="tab-btn">&#128296; Reno Priority</button>
   <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="tab-btn">&#128176; Reno Budget</button>
   <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="tab-btn">&#127960; Occupancy</button>
+  <button onclick="showSettingsSection('sec_rent_model');renderRentModelPanel();" id="stab_rent_model" class="tab-btn">&#128181; Rent Model</button>
 </div>
 
 <!-- USERS -->
@@ -1458,6 +1474,14 @@
 </div>
 
 <!-- OCCUPANCY -->
+<div id="sec_rent_model" class="settings-section">
+  <div class="card">
+    <div class="modal-hdr compact"><div><div class="modal-hdr-title">&#128181; Rent Calculation Model</div>
+      <div style="font-size:11px;opacity:.7;margin-top:2px;">Standard market-rent discount + Ontario Works / ODSP shelter-allowance tables. The application picks the pathway from the applicant's income type.</div></div></div>
+    <div class="sec-pad" id="rent_model_body"></div>
+  </div>
+</div>
+
 <div id="sec_occupancy" class="settings-section">
   <div class="card card-flush-gold">
     <div class="modal-hdr">

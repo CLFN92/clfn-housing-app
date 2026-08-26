@@ -241,6 +241,8 @@ function openUnitEditModal(unitId){
   set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
+  set('ue_est_market_rent', (u.estimatedMarketRent != null ? u.estimatedMarketRent : ''));
+  _gateRentInput('ue_est_market_rent');   // same authority as the rent amount (assignRentAmount)
   _ueSetStatus(u.status||'vacant');
   _ueSetUnderRenovation(!!u.under_renovation);
   set('ue_assignedDate',u.assignedDate);
@@ -715,6 +717,20 @@ function saveUnitEdit(){
     // (e.g. 400 → 399.9999999 when the browser computes step grids) doesn't
     // get persisted.
     u.monthlyRent = (rentRaw === '' || rentRaw == null) ? null : Math.round(Number(rentRaw) * 100) / 100;
+    // Estimated Market Rent — feeds the rent model (standard rent = EMR x
+    // payable percentage). Must be a number >= 0; invalid input blocks the
+    // save rather than silently persisting garbage.
+    var emrRaw = get('ue_est_market_rent');
+    if(emrRaw !== '' && emrRaw != null){
+      var emrN = Number(emrRaw);
+      if(isNaN(emrN) || emrN < 0){
+        showToast('Estimated Market Rent must be a dollar amount of zero or greater', {type:'error'});
+        return;
+      }
+      u.estimatedMarketRent = Math.round(emrN * 100) / 100;
+    } else {
+      u.estimatedMarketRent = null;
+    }
   }
   // Capture the prior status BEFORE the user's pick so we can detect a manual
   // status change. The auto-revert lifecycle (priorStatus, set when a SOW

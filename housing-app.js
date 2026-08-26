@@ -420,6 +420,9 @@ function goTo(s){
 
   cur=s;
   window.scrollTo(0,0);
+  // Shelter-allowance panel reflects income rows + marital + household —
+  // recompute whenever the Employment & Income step is entered.
+  if(s === 1 && typeof _updateAssistPanel === 'function') _updateAssistPanel();
   // Init DocLibrary when user reaches step 6 (Documents)
   if(s === 6) _initStep6DocLib();
   // Restore toggle states for new step
@@ -549,6 +552,7 @@ function addIncome(){
     +'<option value="EI">EI (Employment Insurance)</option>'
     +'<option value="Pension">Pension</option>'
     +'<option value="Other">Other</option>'
+    +'<option value="No Income">No Income</option>'
     +'</select></div>'
     +'<div class="f"><label data-lbl="empStatus">Employment Status</label>'
     +'<select data-role="empStatus" disabled style="opacity:.5">'
@@ -605,6 +609,7 @@ function addIncome(){
 }
 
 function onIncomePersonChange(sel) {
+  if(typeof _updateAssistPanel === 'function') setTimeout(_updateAssistPanel, 0);
   var row = sel.closest('.rrow');
   var hasPerson = sel.value !== '';
   var typeSel   = row.querySelector('[data-role="incType"]');
@@ -620,6 +625,7 @@ function onIncomePersonChange(sel) {
 
 function onIncomeTypeChange(sel) {
   if(!sel) return;
+  if(typeof _updateAssistPanel === 'function') setTimeout(_updateAssistPanel, 0);
   var row  = sel.closest('.rrow');
   if(!row) return;
   var type = sel.value;
@@ -735,7 +741,70 @@ function addPet(){
   list.appendChild(div);
   if (typeof applyRequiredFields === 'function') applyRequiredFields();
 }
-function rmRow(btn){const row=btn.closest('.rrow');if(row)row.remove();}
+// ── Rent-model derivations (single sources of truth — never asked twice) ─────
+// Assistance program: the APPLICANT's income rows, stable values 'OW'/'ODSP'.
+function _appAssistProgram(){
+  var prog = '';
+  document.querySelectorAll('#incomeList .rrow').forEach(function(row){
+    if(prog) return;
+    var p = (row.querySelector('[data-role="person"]')||{}).value;
+    var t = (row.querySelector('[data-role="incType"]')||{}).value;
+    if(p === 'Applicant' && (t === 'OW' || t === 'ODSP')) prog = t;
+  });
+  return prog;
+}
+// Spouse indicator: Marital Status (Married / Common-Law) or a household
+// member recorded as Spouse — the existing fields, not a duplicate question.
+function _appSpouseIndicator(){
+  var m = (document.getElementById('marital')||{}).value || '';
+  if(m === 'Married' || m === 'Common-Law') return 1;
+  var hasSpouse = false;
+  document.querySelectorAll('#habList .rrow').forEach(function(row){
+    if(((row.querySelector('[data-role="habRel"]')||{}).value) === 'Spouse') hasSpouse = true;
+  });
+  return hasSpouse ? 1 : 0;
+}
+// Dependents: counted from the Household Members step (relationship Child, or
+// any non-spouse member under 18 by DOB). Changed only through that step.
+function _appDependentsCount(){
+  var n = 0;
+  document.querySelectorAll('#habList .rrow').forEach(function(row){
+    var rel = (row.querySelector('[data-role="habRel"]')||{}).value || '';
+    if(rel === 'Spouse') return;
+    var dob = (row.querySelector('[data-role="habDob"]')||{}).value || '';
+    var minor = false;
+    if(dob){ var age = (Date.now() - new Date(dob).getTime()) / 31557600000; minor = age >= 0 && age < 18; }
+    if(rel === 'Child' || minor) n++;
+  });
+  return n;
+}
+// Shelter-allowance panel on the Employment & Income step — visible only when
+// the applicant's income type is OW/ODSP; read-only views + the configured
+// maximum shelter amount from the applicable rate table.
+function _updateAssistPanel(){
+  var panel = document.getElementById('assistPanel'); if(!panel) return;
+  var prog = _appAssistProgram();
+  if(!prog){ panel.style.display = 'none'; return; }
+  if(typeof computeRentCalc !== 'function'){ panel.style.display = 'none'; return; }
+  var spouse = _appSpouseIndicator(), deps = _appDependentsCount();
+  var calc = computeRentCalc({ incomeType: prog, spouse: spouse, dependents: deps, estimatedMarketRent: null });
+  panel.style.display = '';
+  var set = function(id, v){ var e = document.getElementById(id); if(e) e.value = v; };
+  var t = document.getElementById('assist_title');
+  if(t) t.textContent = 'Shelter Allowance — ' + calc.program;
+  set('assist_spouse', spouse ? 'Yes' : 'No');
+  set('assist_deps', String(deps));
+  set('assist_size', String(calc.benefitUnitSize));
+  set('assist_shelter', '$' + calc.shelterAmount.toFixed(2));
+  var note = document.getElementById('assist_note');
+  if(note) note.textContent = 'Rates effective ' + (calc.effectiveDate || 'n/a') + '. ' + (calc.sourceNote || '');
+}
+window._updateAssistPanel = _updateAssistPanel;
+
+function rmRow(btn){
+  const row=btn.closest('.rrow');if(row)row.remove();
+  if(typeof _updateAssistPanel === 'function') _updateAssistPanel();
+}
 
 // ── File upload ──
 
@@ -974,6 +1043,19 @@ function saveApplicationRecord(opts){
     livingSituation: fsel('living_situation'),
     deceased:     fb('deceased_flag'),
     deceasedDate: fv('deceased_date'),
+    // Shelter-allowance snapshot. Active only while the applicant's income
+    // type is OW/ODSP; switching away RETAINS the last values marked inactive
+    // (never silently deleted) and excludes them from the calculation.
+    rentAssist: (function(){
+      var p = (typeof _appAssistProgram === 'function') ? _appAssistProgram() : '';
+      if(p){
+        var sp = _appSpouseIndicator(), dp = _appDependentsCount();
+        return { program: p, spouse: sp, dependents: dp, benefitUnitSize: 1 + sp + dp, active: true };
+      }
+      var _pv = (typeof currentAppId !== 'undefined' && currentAppId && typeof applications !== 'undefined')
+        ? (applications.find(function(a){ return a && a.id === currentAppId; }) || {}).rentAssist : null;
+      return _pv ? Object.assign({}, _pv, { active: false }) : null;
+    })(),
     marital:     fsel('marital'),
     phone:       fv('phone'),
     email:       fv('email'),
@@ -1358,7 +1440,7 @@ function popReview(){
   , '📎');
 
   // ── Close ────────────────────────────────────────────────────────────────
-  rc.innerHTML = html;
+  rc.innerHTML = html + ((typeof _rentCalcCardHtml === 'function') ? _rentCalcCardHtml() : '');
   // Render the approval flow diagram
   renderApprovalFlow();
 }
@@ -2239,3 +2321,104 @@ window._navMap = {
 };
 
 
+
+
+// ── Rent Calculation review card (single engine: computeRentCalc) ────────────
+function _rcMoney(v){ return v == null ? '\u2014' : '$' + Number(v).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function _rentCalcCardHtml(){
+  if(typeof computeRentCalc !== 'function') return '';
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
+  var app = (typeof currentAppId !== 'undefined' && currentAppId && typeof applications !== 'undefined')
+    ? applications.find(function(a){ return a && a.id === currentAppId; }) : null;
+  var unit = null;
+  if(app && app.assignedUnit && typeof housingUnits !== 'undefined'){
+    unit = (housingUnits || []).find(function(u){ return u && u.id === app.assignedUnit; }) || null;
+  }
+  var emr = unit ? unit.estimatedMarketRent : null;
+  var prog = (typeof _appAssistProgram === 'function') ? _appAssistProgram() : '';
+  var spouse = (typeof _appSpouseIndicator === 'function') ? _appSpouseIndicator() : 0;
+  var deps = (typeof _appDependentsCount === 'function') ? _appDependentsCount() : 0;
+  var model = (typeof getRentModel === 'function') ? getRentModel() : null;
+  var c = computeRentCalc({ incomeType: prog, spouse: spouse, dependents: deps, estimatedMarketRent: emr, model: model });
+  function row(k, v, strong){
+    return '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">'
+      + '<span style="color:var(--muted);">' + k + '</span><span style="font-weight:' + (strong ? '800' : '600') + ';">' + v + '</span></div>';
+  }
+  var body = '';
+  if(c.method === 'shelter'){
+    body += row('Calculation method', 'Shelter Allowance');
+    body += row('Assistance Program', esc(c.program));
+    body += row('Applicant Count', '1');
+    body += row('Spouse/Common-Law Count', String(spouse));
+    body += row('Number of Dependents', String(deps));
+    body += row('Benefit Unit Size', String(c.benefitUnitSize));
+    body += row('Maximum Monthly Shelter Amount', _rcMoney(c.shelterAmount));
+    body += row('Standard Discounted Unit Rent', unit ? _rcMoney(c.standardRent) : 'no unit assigned yet');
+    body += row('Final Calculated Monthly Rent', _rcMoney(c.finalRent), true);
+    body += '<div style="font-size:11px;color:var(--muted);margin-top:6px;">'
+      + (c.capApplied
+          ? 'The unit\u2019s standard discounted rent is LOWER than the shelter amount, so the lower amount is charged. '
+          : (unit ? 'The shelter amount is at or below the unit\u2019s standard rent, so the shelter amount is charged. ' : ''))
+      + 'Rates effective ' + esc(c.effectiveDate || 'n/a') + '. ' + esc(c.sourceNote || '') + '</div>';
+  } else {
+    body += row('Calculation method', 'Standard Market Rent Formula');
+    body += row('Estimated Market Rent', unit ? _rcMoney(emr) : 'no unit assigned yet');
+    body += row('Market Rent Discount', (model ? model.discountPct : '\u2014') + '%');
+    body += row('Payable Market Percentage', (Math.round(c.payablePct * 10000) / 100) + '%');
+    body += row('Calculated Monthly Rent', c.standardRent != null ? _rcMoney(c.standardRent) : '\u2014 (needs a unit with an Estimated Market Rent)', true);
+  }
+  // Documented override (authorized roles only — integrates the calculated
+  // amount without deleting it; both stay visible).
+  var ovr = app && app.rentOverride;
+  var canOvr = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('overrideRent', window.currentRole);
+  var ovrHtml = '';
+  if(ovr && ovr.amount != null){
+    ovrHtml = '<div style="margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber-text);font-size:12px;">'
+      + '<strong>Override in effect: ' + _rcMoney(ovr.amount) + '/month.</strong> Reason: ' + esc(ovr.reason || '\u2014')
+      + ' \u2014 set by ' + esc(ovr.by || '') + (ovr.at ? ' on ' + esc(String(ovr.at).slice(0,10)) : '') + '.'
+      + (canOvr ? ' <button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px;margin-left:6px;" onclick="_clearRentOverride()">Clear</button>' : '')
+      + '</div>';
+  } else if(canOvr && app){
+    ovrHtml = '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">'
+      + '<div class="f" style="margin:0;"><label style="font-size:11px;">Override amount ($/month)</label><input id="rent_ovr_amt" type="number" min="0" step="0.01" style="max-width:140px;"/></div>'
+      + '<div class="f" style="flex:1;min-width:180px;margin:0;"><label style="font-size:11px;">Override reason (required)</label><input id="rent_ovr_reason" type="text"/></div>'
+      + '<button type="button" class="btn btn-ghost" onclick="_applyRentOverride()">Apply Override</button>'
+      + '</div>';
+  }
+  return '<div class="card" style="margin-top:14px;">'
+    + '<div class="ctitle">Rent Calculation</div>' + body + ovrHtml + '</div>';
+}
+function _applyRentOverride(){
+  if(typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('overrideRent', window.currentRole)){
+    showToast('Not permitted', {type:'error'}); return;
+  }
+  var app = (typeof currentAppId !== 'undefined' && currentAppId && typeof applications !== 'undefined')
+    ? applications.find(function(a){ return a && a.id === currentAppId; }) : null;
+  if(!app){ showToast('Save the application first', {type:'error'}); return; }
+  var amt = parseFloat((document.getElementById('rent_ovr_amt')||{}).value);
+  var reason = ((document.getElementById('rent_ovr_reason')||{}).value || '').trim();
+  if(isNaN(amt) || amt < 0){ showToast('Enter an override amount of zero or greater', {type:'error'}); return; }
+  if(!reason){ showToast('An override reason is required (it is recorded)', {type:'error'}); return; }
+  app.rentOverride = { amount: Math.round(amt * 100) / 100, reason: reason,
+    by: (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '', at: new Date().toISOString() };
+  if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
+  if(typeof auditEntry === 'function') auditEntry(app.id, 'rent_override_set',
+    'Monthly rent override ' + app.rentOverride.amount.toFixed(2) + ' \u2014 ' + reason, window.currentRole || 'staff');
+  showToast('Rent override applied', {type:'info'});
+  if(typeof popReview === 'function') popReview();
+}
+window._applyRentOverride = _applyRentOverride;
+function _clearRentOverride(){
+  if(typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('overrideRent', window.currentRole)){
+    showToast('Not permitted', {type:'error'}); return;
+  }
+  var app = (typeof currentAppId !== 'undefined' && currentAppId && typeof applications !== 'undefined')
+    ? applications.find(function(a){ return a && a.id === currentAppId; }) : null;
+  if(!app || !app.rentOverride) return;
+  app.rentOverride = null;
+  if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
+  if(typeof auditEntry === 'function') auditEntry(app.id, 'rent_override_cleared', 'Monthly rent override removed', window.currentRole || 'staff');
+  showToast('Rent override cleared', {type:'info'});
+  if(typeof popReview === 'function') popReview();
+}
+window._clearRentOverride = _clearRentOverride;
