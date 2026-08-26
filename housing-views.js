@@ -1478,6 +1478,10 @@ function _renderLandingKpis(){
 
   var openApps = apps.filter(function(a){
     if(!a || a.archived) return false;
+    // Deceased and BCR-ineligible applicants live outside the pipeline counts
+    // (same rule as every Applications-by-Type row).
+    if(a.deceased) return false;
+    if(typeof appIsBcrIneligible === 'function' && appIsBcrIneligible(a)) return false;
     return a.status === STATUS.SUBMITTED
         || a.status === STATUS.FILE_UPDATE
         || a.status === STATUS.MGR_APPROVED;
@@ -1495,7 +1499,10 @@ function _renderLandingKpis(){
     if(!u || u.archived) return false;
     if(u.assignedTo || u.assignedName) return false;   // occupied units being repaired aren't vacant stock
     var st = (u.status||'').toLowerCase();
-    if(st === 'condemned') return false;
+    // A vacant-STATUS unit with the under-renovation pill is counted in the
+    // headline (it's assignable) — counting it here too double-counted it and
+    // disagreed with the reconcile buckets, which test vacant first.
+    if(st === 'condemned' || st === 'vacant') return false;
     return u.under_renovation || st.indexOf('renovat') !== -1 || st.indexOf('repair') !== -1;
   }).length;
 
@@ -1619,7 +1626,8 @@ function showHousingKpiDrilldown(type) {
   if (type === 'open') {
     title = 'Open Applications';
     var rows = apps.filter(function(a){
-      if (!a || a.archived) return false;
+      if (!a || a.archived || a.deceased) return false;
+      if (typeof appIsBcrIneligible === 'function' && appIsBcrIneligible(a)) return false;
       return a.status==='submitted' || a.status==='file_update' || a.status==='mgr_approved';
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
     exportHeaders = ['Applicant','App ID','Status','Tier','Score','Days Waiting'];
@@ -1824,6 +1832,10 @@ function _housingLikelyHousedApps(){
     var addr = '', via = '';
     if (byId[a.id])          { addr = byId[a.id];                       via = 'Unit assigned to this application'; }
     else if (a.assignedUnit) { addr = a.assignedAddress || 'Assigned unit'; via = 'Application linked to a unit'; }
+    // Status says Assigned but nothing backs it: the New Applications count
+    // treats these as housed, so without this leg they were invisible to BOTH
+    // lists. Surface them here for cleanup (not-housed / reclassify).
+    else if (a.status === 'assigned') { addr = a.assignedAddress || '(no unit on file)'; via = 'Status is Assigned but no unit is linked'; }
     if(!addr) return;                                 // not linked to a unit -> not housed
     out.push({ app:a, addr:addr, via:via });
   });
@@ -2149,11 +2161,14 @@ function showReconcileReport(){
     ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These people ARE already blocked from housing — only the BCR paperwork details (date / resolution number) are missing.</div>'
       + '<table class="tbl"><thead><tr><th>Name</th><th>Reason on file</th><th>BCR date</th><th></th></tr></thead><tbody>'
       + bcrIncomplete.map(function(b){
-          var sname = String(b.full_name||'').replace(/'/g,"\\'");
+          // Name goes in a data-attribute (HTML-escaped) and is read back via
+          // dataset by the delegated click handler below — never interpolated
+          // into an onclick string, where quotes in a real name break out of
+          // the attribute (applicant-typed names reach this table).
           return '<tr><td style="font-weight:600;">'+esc(b.full_name||'—')+'</td>'
             + '<td class="std-cell-muted">'+esc(b.reason||'—')+'</td>'
             + '<td class="std-cell-muted">'+esc(b.bcrd_date||'(missing)')+'</td>'
-            + '<td><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeReconcile();if(typeof openBcrManager===\'function\')openBcrManager(\''+sname+'\');">Complete &rarr;</button></td></tr>';
+            + '<td><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" data-bcr-complete="'+esc(b.full_name||'')+'">Complete &rarr;</button></td></tr>';
         }).join('')
       + '</tbody></table>'
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every BCR entry has its details on file.</div>';
@@ -2223,7 +2238,15 @@ function showReconcileReport(){
     +   noAppTbl
     + '</div>'
     + '</div>';
-  mo.addEventListener('click', function(e){ if (e.target === mo) _closeReconcile(); });
+  mo.addEventListener('click', function(e){
+    if (e.target === mo) { _closeReconcile(); return; }
+    var btn = e.target.closest && e.target.closest('[data-bcr-complete]');
+    if (btn) {
+      var nm = btn.getAttribute('data-bcr-complete') || '';
+      _closeReconcile();
+      if (typeof openBcrManager === 'function') openBcrManager(nm);
+    }
+  });
   document.body.appendChild(mo);
   mo.style.display = ''; mo.classList.add('on');
 }
@@ -2255,12 +2278,16 @@ async function _lhMarkNotHoused(appId){
   // Message reflects what will actually change: a unit genuinely pointing at
   // this application gets unlinked (keeping its tenant name); an app-side-only
   // stale link (migrated data — no unit points back) is just cleared.
+  // showConfirm renders title/message as HTML — name/addr are record data
+  // (portal applicants type their own names) and MUST be escaped.
+  var escFn = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s == null ? '' : s); };
+  var eName = escFn(name), eAddr = escFn(addr);
   var msg = linked.length
-    ? (name + ' lives at ' + addr + ' but it is not their own home (doubled up). This unlinks their application from the unit — the unit keeps its tenant name and stays occupied — keeps the application a New Application, and returns them to the waitlist and Match.')
-    : (name + ' is not the tenant of record on any unit — their application just carries an old link to ' + addr + ' from the previous system. This clears that stale link, keeps the application a New Application, and returns them to the waitlist and Match. No unit record is changed.');
+    ? (eName + ' lives at ' + eAddr + ' but it is not their own home (doubled up). This unlinks their application from the unit — the unit keeps its tenant name and stays occupied — keeps the application a New Application, and returns them to the waitlist and Match.')
+    : (eName + ' is not the tenant of record on any unit — their application just carries an old link to ' + eAddr + ' from the previous system. This clears that stale link, keeps the application a New Application, and returns them to the waitlist and Match. No unit record is changed.');
   var go = (typeof showConfirm === 'function')
     ? await showConfirm({
-        title: 'Mark ' + name + ' as not housed?',
+        title: 'Mark ' + eName + ' as not housed?',
         message: msg,
         confirmText: 'Not housed — unlink', cancelText: 'Cancel' })
     : window.confirm('Mark ' + name + ' as not housed and clear the link to ' + addr + '?');

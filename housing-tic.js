@@ -1022,8 +1022,21 @@
     var _added = (typeof sbAddBcr === 'function')
       ? sbAddBcr(name, '', _pending, '').catch(function(e){ console.warn('[TIC] BCR stub write failed:', e); return null; })
       : Promise.resolve(null);
-    _added.then(function(){
-      if (typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageBcr', window.currentRole)) {
+    _added.then(function(row){
+      var canManage = !(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageBcr', window.currentRole));
+      // The write FAILED (offline, RLS denial, …) — never claim the block is
+      // in place when it isn't. Tell staff plainly and, when authorized, open
+      // the manager so they can add the entry by hand.
+      if (!row) {
+        if (typeof showToast === 'function') showToast(
+          'Could not add ' + name + ' to the BCR list — eligibility is NOT blocked yet. '
+          + (canManage ? 'Add them in the form now, or retry from the BCR list later.'
+                       : 'Ask a Housing Manager or ED to add them so eligibility checks pick it up.'),
+          {type:'error'});
+        if (canManage && typeof openBcrManager === 'function') openBcrManager(name);
+        return;
+      }
+      if (!canManage) {
         if (typeof showToast === 'function') showToast(name + ' added to the BCR list (eligibility now blocked) — ask a Housing Manager or ED to complete the BCR date and reason.', {type:'info'});
         return;
       }

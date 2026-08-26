@@ -1562,6 +1562,29 @@ async function sbAddBcr(fullName, bcrdDate, reason, dateOfBirth) {
     reason: reason || null, date_of_birth: dateOfBirth || null, active: true, created_by: actor
   };
   if (!body.full_name) throw new Error('A name is required.');
+  // Server-side dedupe: the in-memory registry can be stale (tab open all
+  // morning; two staff at once; the Tenant-Card stub written seconds ago from
+  // another device). A duplicate ACTIVE row is dangerous — Lift then only
+  // deactivates one and the ban appears un-liftable. Check the server first
+  // and UPDATE the existing row instead of inserting a twin.
+  try {
+    var chk = await fetch(SUPABASE_URL + '/rest/v1/bcr_registry?full_name=ilike.'
+      + encodeURIComponent(body.full_name.replace(/[%_\\]/g, '\\$&')) + '&active=eq.true&select=*',
+      { headers: HOUSING_HEADERS });
+    if (chk.ok) {
+      var dups = await chk.json();
+      if (dups && dups.length) {
+        var ex = dups[0];
+        // Refresh the cache with what the server actually has.
+        window._bcrRegistry = (window._bcrRegistry || []).filter(function(x){ return x.id !== ex.id; }).concat([ex]);
+        return sbUpdateBcr(ex.id, {
+          bcrd_date: body.bcrd_date || ex.bcrd_date || null,
+          reason: body.reason || ex.reason || null,
+          date_of_birth: body.date_of_birth || ex.date_of_birth || null
+        });
+      }
+    }
+  } catch (e) { /* offline — fall through to the plain insert */ }
   var r = await fetch(SUPABASE_URL + '/rest/v1/bcr_registry', {
     method: 'POST',
     headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
@@ -1579,14 +1602,26 @@ window.sbAddBcr = sbAddBcr;
 
 async function sbLiftBcr(id) {
   var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
-  var r = await fetch(SUPABASE_URL + '/rest/v1/bcr_registry?id=eq.' + encodeURIComponent(id), {
+  var patch = { active: false, lifted_at: new Date().toISOString(), lifted_by: actor };
+  // Lift by NAME, not just id: historical duplicates (from before server-side
+  // dedupe) would otherwise keep the person blocked after a "lift". Fall back
+  // to the id-only lift when the name can't be resolved.
+  var row = (window._bcrRegistry || []).find(function (x) { return x.id === id; });
+  var name = row && (row.full_name || '').trim();
+  var url = name
+    ? SUPABASE_URL + '/rest/v1/bcr_registry?full_name=ilike.' + encodeURIComponent(name.replace(/[%_\\]/g, '\\$&')) + '&active=eq.true'
+    : SUPABASE_URL + '/rest/v1/bcr_registry?id=eq.' + encodeURIComponent(id);
+  var r = await fetch(url, {
     method: 'PATCH',
     headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-    body: JSON.stringify({ active: false, lifted_at: new Date().toISOString(), lifted_by: actor })
+    body: JSON.stringify(patch)
   });
   if (!r.ok) throw new Error(await r.text());
-  window._bcrRegistry = (window._bcrRegistry || []).filter(function (x) { return x.id !== id; });
-  if (typeof auditEntry === 'function') auditEntry(id, 'bcr_lifted', 'BCR lifted');
+  var lname = (name || '').toLowerCase();
+  window._bcrRegistry = (window._bcrRegistry || []).filter(function (x) {
+    return x.id !== id && (!lname || ((x.full_name || '').trim().toLowerCase() !== lname));
+  });
+  if (typeof auditEntry === 'function') auditEntry(id, 'bcr_lifted', 'BCR lifted' + (name ? ' for ' + name + ' (all active entries)' : ''));
   return true;
 }
 window.sbLiftBcr = sbLiftBcr;
@@ -3381,13 +3416,39 @@ function sbTypeCommercialTenantForAssignment(app, unit){
       current_unit_id: unit.id
     };
     if(!isNaN(rent)) fields.monthly_rent = rent;
-    setTimeout(function(){
-      fetch(SUPABASE_URL + '/rest/v1/tenants?full_name=eq.' + encodeURIComponent(org) + '&merged_into=is.null', {
+    // The tenants row is created by the DB trigger when the unit save lands —
+    // an unknown delay (slow cell, degraded-mode queue). Poll for the row
+    // instead of a fixed timer, and SCOPE the match to THIS unit so a
+    // department housed in two buildings doesn't get its other tenancy's
+    // unit link repointed. Prefer return=representation so a 0-row match
+    // (trigger not fired yet) is detectable and retried.
+    // Match the row for THIS unit — or a not-yet-linked row (the trigger may
+    // not stamp current_unit_id). Rows linked to OTHER units are never touched.
+    var _filter = '/rest/v1/tenants?full_name=eq.' + encodeURIComponent(org)
+                + '&merged_into=is.null'
+                + '&or=(current_unit_id.eq.' + encodeURIComponent(unit.id) + ',current_unit_id.is.null)';
+    var _attempt = 0;
+    var _tryPatch = function(){
+      _attempt++;
+      fetch(SUPABASE_URL + _filter, {
         method: 'PATCH',
-        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
         body: JSON.stringify(fields)
-      }).catch(function(e){ console.warn('[commercial] tenant type patch failed:', e); });
-    }, 700);
+      }).then(function(r){ return r.ok ? r.json() : []; })
+        .then(function(rows){
+          if(rows && rows.length) return;                       // typed — done
+          if(_attempt < 6){ setTimeout(_tryPatch, 1500); return; }  // trigger not fired yet
+          console.warn('[commercial] tenant row for "' + org + '" on ' + unit.id + ' never appeared — typing skipped.');
+          if(typeof showToast === 'function') showToast(
+            'Could not type the commercial tenant record for ' + org + ' — open their Tenant Card and check the type/rent fields.',
+            {type:'error'});
+        })
+        .catch(function(e){
+          if(_attempt < 6){ setTimeout(_tryPatch, 1500); return; }
+          console.warn('[commercial] tenant type patch failed:', e);
+        });
+    };
+    setTimeout(_tryPatch, 700);
   } catch(e){ console.warn('[commercial] tenant typing threw:', e); }
 }
 window.sbTypeCommercialTenantForAssignment = sbTypeCommercialTenantForAssignment;
@@ -8659,15 +8720,54 @@ function saveBudgetData(data){
 // sbSaveUnit) so the save-queue's _rejectIfFalse adapter can normalize HTTP
 // errors into retryable failures. updated_at is stamped at SEND time (not
 // enqueue time) so a queued retry carries a fresh timestamp.
+//
+// STALE-REPLAY GUARD: one housing_sow row holds a unit's ENTIRE Maintenance
+// Request list, so a queued save replayed days later (field device that never
+// got signal back) would silently erase every change other staff made to that
+// unit in between. Each payload carries the moment it was captured
+// (_snapshotAt, stamped by saveSowData); before writing we read the server
+// row's updated_at — if the server changed AFTER our snapshot, the write is
+// DROPPED with a persistent warning instead of clobbering. Returning true in
+// that case is deliberate: the queue entry must clear (a retry can never
+// succeed — the payload is permanently stale).
 function sbSaveSowRow(entity){
-  return fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ unit_id: entity.unit_id, data: entity.data, updated_at: new Date().toISOString() })
-  }).then(function(r){
-    if(!r.ok) console.warn('SOW save failed: HTTP '+r.status);
-    return r.ok;
-  });
+  var _doWrite = function(){
+    return fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
+      method: 'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
+      body: JSON.stringify({ unit_id: entity.unit_id, data: entity.data, updated_at: new Date().toISOString() })
+    }).then(function(r){
+      if(!r.ok) console.warn('SOW save failed: HTTP '+r.status);
+      return r.ok;
+    });
+  };
+  if(!entity._snapshotAt) return _doWrite();   // legacy queue entries: old behavior
+  return fetch(SUPABASE_URL+'/rest/v1/housing_sow?unit_id=eq.'+encodeURIComponent(entity.unit_id)+'&select=updated_at',
+    { headers: HOUSING_HEADERS })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .catch(function(){ return null; })
+    .then(function(rows){
+      // Can't check (offline / error) → write path decides via normal retry.
+      if(rows === null) return _doWrite();
+      var serverTs = rows && rows[0] && rows[0].updated_at;
+      if(serverTs && new Date(serverTs).getTime() > new Date(entity._snapshotAt).getTime()){
+        console.warn('[SOW] stale queued save for unit '+entity.unit_id+' dropped — server row changed after this snapshot ('+entity._snapshotAt+').');
+        if(typeof showToast === 'function') showToast(
+          'A Maintenance Request save for unit '+entity.unit_id+' was NOT applied — the unit was updated by someone else after your copy was made. Open the unit\'s requests, check them, and re-apply your change.',
+          {type:'error'});
+        if(typeof auditEntry === 'function') auditEntry('SOW:'+entity.unit_id, 'sow_save_conflict',
+          'Queued Maintenance Request save dropped — server row newer than the queued snapshot', window.currentRole || 'staff');
+        // Pull the fresh server copy into the local cache so the screen
+        // stops showing the stale list.
+        fetch(SUPABASE_URL+'/rest/v1/housing_sow?unit_id=eq.'+encodeURIComponent(entity.unit_id)+'&select=data',
+          { headers: HOUSING_HEADERS })
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(fr){ if(fr && fr[0] && window._sowCache) window._sowCache[entity.unit_id] = fr[0].data; })
+          .catch(function(){});
+        return true;   // clear the queue entry — this payload must never retry
+      }
+      return _doWrite();
+    });
 }
 
 function saveSowData(unitId, data){
@@ -8679,10 +8779,14 @@ function saveSowData(unitId, data){
   // row is a merge-duplicates upsert keyed by unit_id, so queued retries are
   // idempotent and last-write-wins — same semantics as the direct POST this
   // replaced. Falls back to the raw writer if the queue layer isn't loaded.
+  // _snapshotAt records WHEN this copy of the unit's request list was
+  // captured — the stale-replay guard in sbSaveSowRow compares it against the
+  // server row so a delayed queue flush can't clobber newer changes.
+  var payload = { unit_id: unitId, data: data, _snapshotAt: new Date().toISOString() };
   if(typeof saveWithDraftFallback === 'function'){
-    return saveWithDraftFallback('sow', unitId, { unit_id: unitId, data: data });
+    return saveWithDraftFallback('sow', unitId, payload);
   }
-  return sbSaveSowRow({ unit_id: unitId, data: data })
+  return sbSaveSowRow(payload)
     .catch(function(e){ console.warn('SOW save failed:', e); return false; });
 }
 

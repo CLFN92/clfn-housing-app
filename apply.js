@@ -34,7 +34,13 @@
   function getAT() { return localStorage.getItem(LS_AT) || ''; }
   function getRT() { return localStorage.getItem(LS_RT) || ''; }
   function setSession(at, rt) { if (at) localStorage.setItem(LS_AT, at); if (rt) localStorage.setItem(LS_RT, rt); }
-  function clearSession() { localStorage.removeItem(LS_AT); localStorage.removeItem(LS_RT); }
+  function clearSession() {
+    localStorage.removeItem(LS_AT); localStorage.removeItem(LS_RT);
+    // The verified registry number is personal data — never leave it behind
+    // for the NEXT person on a shared device (band office kiosk, family
+    // computer), where it would silently prefill their application.
+    try { localStorage.removeItem('clfn_apply_band'); } catch (e) {}
+  }
 
   function authHeaders() { return { 'apikey': ANON, 'Authorization': 'Bearer ' + getAT(), 'Content-Type': 'application/json' }; }
 

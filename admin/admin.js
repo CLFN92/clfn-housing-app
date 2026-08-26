@@ -1921,6 +1921,15 @@
     var d = (type === 'percent') ? base * value / 100 : value;
     return Math.round(Math.min(d, Math.max(base, 0)) * 100) / 100;
   }
+  // Carried-forward lines are already-tax-inclusive prior balances: the
+  // recurring-billing rule (recurring-invoices edge fn) never discounts or
+  // re-taxes them, and the admin paths below must agree. Both writers stamp
+  // this exact description prefix.
+  function _isCarriedLine(l){ return /^Balance carried forward/i.test(String((l && l.description) || '')); }
+  function _carriedSubtotal(lines){
+    return Math.round((lines || []).filter(_isCarriedLine)
+      .reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
+  }
   function _collectInvLines(){
     var out = [];
     Array.prototype.forEach.call(document.querySelectorAll('#cn-inv-lines .inv-line'), function(row){
@@ -2070,7 +2079,12 @@
     // post-discount amount (the discount is what the nation actually owed).
     var base = (inv.line_items || []).filter(function(l){ return !l.interest; });
     var baseSubtotal = Math.round(base.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
-    var discount = _calcDiscount(baseSubtotal, inv.discount_type, Number(inv.discount_value) || 0);
+    // Discount anchors to the PERIOD FEE only — never the carried-forward
+    // balance (same rule as the recurring-invoices generator; recomputing it
+    // over the carried line silently inflated the stored discount).
+    var carriedSub = _carriedSubtotal(base);
+    var feeSub = Math.round((baseSubtotal - carriedSub) * 100) / 100;
+    var discount = _calcDiscount(feeSub, inv.discount_type, Number(inv.discount_value) || 0);
     var principal = Math.round((baseSubtotal - discount) * 100) / 100;
     var months = days / 30;
     var interest = Math.round(principal * INTEREST_MONTHLY * months * 100) / 100;
@@ -2080,10 +2094,11 @@
     var lines = base.concat([line]);
     var subtotal = Math.round(lines.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
     var taxRate = Number(inv.tax_rate) || 0;
-    // Discount stays anchored to the non-interest base; tax on the discounted amount.
-    var taxable = Math.round((subtotal - discount) * 100) / 100;
+    // Tax on the discounted fee + interest only — the carried balance is
+    // already tax-inclusive and must never be re-taxed.
+    var taxable = Math.round((subtotal - carriedSub - discount) * 100) / 100;
     var tax = Math.round(taxable * taxRate) / 100;
-    var total = Math.round((taxable + tax) * 100) / 100;
+    var total = Math.round((subtotal - discount + tax) * 100) / 100;
     var _patch = { line_items: lines, subtotal: subtotal, tax: tax, total: total, updated_at: new Date().toISOString() };
     if (discount > 0) _patch.discount = discount;
     var pr = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), _patch, 'return=minimal');
@@ -2106,11 +2121,15 @@
     var discLabel = ((document.getElementById('cn-inv-disc-label') || {}).value || '').trim();
     if (discType === 'percent' && discValue > 100){ setMsg('cn-inv-msg', 'Percent discount cannot exceed 100%.'); return; }
     var subtotal = Math.round(lines.reduce(function(a, l){ return a + (l.qty * l.unit_price); }, 0) * 100) / 100;
-    // Discount comes off the subtotal; tax is charged on the discounted base.
-    var discount = _calcDiscount(subtotal, discType, discValue);
-    var taxable = Math.round((subtotal - discount) * 100) / 100;
+    // Discount + tax come off the CURRENT charges only. A carried-forward
+    // balance (added via "+ Carry forward") is an already-tax-inclusive prior
+    // total — discounting or re-taxing it double-counts (recurring-billing rule).
+    var carriedSub2 = _carriedSubtotal(lines);
+    var feeSub2 = Math.round((subtotal - carriedSub2) * 100) / 100;
+    var discount = _calcDiscount(feeSub2, discType, discValue);
+    var taxable = Math.round((feeSub2 - discount) * 100) / 100;
     var tax = Math.round(taxable * taxRate) / 100;
-    var total = Math.round((taxable + tax) * 100) / 100;
+    var total = Math.round((subtotal - discount + tax) * 100) / 100;
     setMsg('cn-inv-msg', 'Creating...', 'ok');
     ensureJsPdf(async function(){
       try {

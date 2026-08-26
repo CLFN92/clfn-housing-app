@@ -224,7 +224,9 @@ function validateStep0() {
       && typeof _appIsTenancyHolder === 'function') {
     var _curTen = ((typeof applications !== 'undefined' && applications) || []).find(function(a){ return a && a.id === currentAppId; });
     if (_curTen && _appIsTenancyHolder(_curTen)) {
-      errs.push('This applicant is assigned to ' + (_curTen.assignedAddress || 'a unit')
+      // showStepErrors renders via innerHTML — escape the record-data address.
+      var _escAddr = (typeof escapeHtml === 'function') ? escapeHtml(_curTen.assignedAddress || 'a unit') : 'a unit';
+      errs.push('This applicant is assigned to ' + _escAddr
         + ' — a current tenant cannot file a New Application. Change the Application Type to Transfer Request or File Update, or clear the unit link first.');
     }
   }

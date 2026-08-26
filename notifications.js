@@ -3668,7 +3668,7 @@ function saveEldersAgeMin() {
 // nation (OCAP consent switch; read server-side by the support-login function).
 function saveSupportLoginEnabled() {
   var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change platform support access', {type:'error'}); return; }
+  if (role !== 'ed' && role !== 'super_user') { showToast('Only the Executive Director can change platform support access', {type:'error'}); return; }
   var inp = document.getElementById('cfg_support_login');
   if (!inp) return;
   var enabled = !!inp.checked;

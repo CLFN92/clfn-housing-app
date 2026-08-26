@@ -331,11 +331,10 @@
 </div>
 
 <div class="layout" id="appLayout" style="display:none;flex-direction:column;">
-  <!-- Context bar — shows applicant name + editing badge when editing an existing app -->
-  <div id="appLayout_ctx_bar" style="display:none;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);align-items:center;gap:10px;">
-    <span id="appLayout_title" style="font-size:13px;font-weight:700;color:var(--text);"></span>
-    <span id="appLayout_subtitle" class="txt-muted-sm"></span>
-  </div>
+  <!-- Applicant context (name + Editing badge) lives in the stepper strip above
+       (#appLayout_ctx_bar inside #stepProgressBar) — the old in-layout copy was
+       removed: duplicate IDs made getElementById land on the stepper copy and
+       left this one as permanently-empty dead markup. -->
   <main class="main">
 
     <!-- STEP 0: APPLICANT INFO -->
