@@ -1763,7 +1763,23 @@ async function loadHousingData() {
     if(stR.ok){var stD=await stR.json(); window._appSettings={};
       stD.forEach(function(r){window._appSettings[r.key]=r.value;});
       if(typeof _flattenLegacyAppSettings === 'function') _flattenLegacyAppSettings();
-      if(window._appSettings['scoring_model_v2']) window.liveV2ScoreModel=window._appSettings['scoring_model_v2'];
+      if(window._appSettings['scoring_model_v2']) {
+        window.liveV2ScoreModel = window._appSettings['scoring_model_v2'];
+        // Fill in criteria added to the defaults AFTER this model was saved
+        // (e.g. urgent_need.temporary_shelter) so new categories score their
+        // default points instead of silently falling back to zero. Only
+        // absent keys are filled — saved values are never overridden.
+        try {
+          var _dm = window.DEFAULT_V2_SCORE_MODEL || {};
+          Object.keys(_dm).forEach(function(sec){
+            if(typeof _dm[sec] !== 'object' || _dm[sec] === null) return;
+            window.liveV2ScoreModel[sec] = window.liveV2ScoreModel[sec] || {};
+            Object.keys(_dm[sec]).forEach(function(k){
+              if(window.liveV2ScoreModel[sec][k] === undefined) window.liveV2ScoreModel[sec][k] = _dm[sec][k];
+            });
+          });
+        } catch(e){}
+      }
       // Also hydrate liveScoreModel (V1 array format) used by buildV2FormSelects dropdowns
       var _sm = window._appSettings['scoring_model_v2'] || window._appSettings['scoring_model'];
       if(_sm && Array.isArray(_sm) && _sm.length) window.liveScoreModel = _sm;

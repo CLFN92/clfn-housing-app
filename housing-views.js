@@ -54,6 +54,7 @@ function _roomBedLabel(u) {
 function _livingSituationBadge(a) {
   var ls = a && a.livingSituation;
   if (ls === 'family_on_reserve') return '<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:var(--dark);padding:1px 7px;border-radius:4px;white-space:nowrap;">👥 Doubled up · on reserve</span>';
+  if (ls === 'temporary_shelter') return '<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:var(--dark);padding:1px 7px;border-radius:4px;white-space:nowrap;">\u26fa Temporary shelter</span>';
   if (ls === 'no_fixed_address')  return '<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 7px;border-radius:4px;white-space:nowrap;">No fixed address</span>';
   return '';
 }
@@ -1591,6 +1592,7 @@ function showHousingKpiDrilldown(type) {
   function STATUS_LBL(a){ return formatAppStatusLabel(a.status, {variant:'kpi'}) || a.status || ''; }
   var URGENT_LABELS = {
     'homeless':'Homeless','domestic_violence':'Domestic Violence','fire_disaster':'Fire / Disaster',
+    'temporary_shelter':'Temporary Shelter',
     'homeless_eviction':'Homeless / Eviction','eviction_risk':'Eviction Risk','separation':'Separation',
     'none':'','':''
   };

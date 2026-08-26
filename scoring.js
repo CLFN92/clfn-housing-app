@@ -187,6 +187,7 @@ function renderV2ScoringEditor() {
 
   html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:10px 0 6px;">Urgent Need / Displacement</div>';
   html += optRow('Homeless / No Fixed Address', pts(m.urgent_need.homeless, 'urgent_need', 'homeless'));
+  html += optRow('Temporary Shelter', pts(m.urgent_need.temporary_shelter, 'urgent_need', 'temporary_shelter'));
   html += optRow('Domestic Violence / Intimate Partner Abuse', pts(m.urgent_need.domestic_violence, 'urgent_need', 'domestic_violence'));
   html += optRow('Fire, Flood or Disaster', pts(m.urgent_need.fire_disaster, 'urgent_need', 'fire_disaster'));
   html += optRow('Homelessness / Imminent Eviction', pts(m.urgent_need.homeless_eviction, 'urgent_need', 'homeless_eviction'));
@@ -1089,6 +1090,11 @@ function buildV2FormSelects() {
         val = r.id === 'un1' ? 'none' : r.id === 'un2' ? 'overcrowded' : r.id === 'un3' ? 'eviction' : r.id === 'un4' ? 'emergency' : r.id === 'un5' ? 'homeless' : 'none';
         return '<option value="'+val+'">'+ r.label + (pts > 0 ? ' (+'+pts+' pts)' : ' ('+pts+' pts)') +'</option>';
       }).join('');
+      // Categories that exist only in the V2 model (no legacy un* row) —
+      // appended so the rebuild doesn't wipe them from the select.
+      var _tsPts = ((window.liveV2ScoreModel || {}).urgent_need || {}).temporary_shelter;
+      if (_tsPts === undefined) _tsPts = (window.DEFAULT_V2_SCORE_MODEL.urgent_need || {}).temporary_shelter || 0;
+      unSel.innerHTML += '<option value="temporary_shelter">Temporary Shelter (+' + _tsPts + ' pts)</option>';
       if(curVal) unSel.value = curVal;
     }
   }
@@ -1336,8 +1342,9 @@ function scoreApplicationLocally(app) {
   // explicit urgent-need category was set, a no-fixed-address applicant scores
   // the model's own "homeless" points. Never overrides a staff-set category.
   var _effUrgentNeed = app.urgentNeed;
-  if ((!_effUrgentNeed || _effUrgentNeed === 'none') && app.livingSituation === 'no_fixed_address') {
-    _effUrgentNeed = 'homeless';
+  if (!_effUrgentNeed || _effUrgentNeed === 'none') {
+    if (app.livingSituation === 'no_fixed_address') _effUrgentNeed = 'homeless';
+    else if (app.livingSituation === 'temporary_shelter') _effUrgentNeed = 'temporary_shelter';
   }
   var urgentPts = pts('urgent_need', _effUrgentNeed || 'none', 'none');
   var healthPts = pts('health_risk', app.healthRisk || 'none', 'none');
@@ -2181,8 +2188,8 @@ if (typeof DEFAULT_SCORING_MODEL === 'undefined') {
 // ── DEFAULT_V2_SCORE_MODEL — full default point values ────────────────────────
 window.DEFAULT_V2_SCORE_MODEL = {
   urgent_need: {
-    homeless: 25, domestic_violence: 25, fire_disaster: 25, homeless_eviction: 20,
-    eviction_risk: 15, separation: 10, none: 0
+    homeless: 25, domestic_violence: 25, fire_disaster: 25, temporary_shelter: 22,
+    homeless_eviction: 20, eviction_risk: 15, separation: 10, none: 0
   },
   health_risk: {
     severe: 20, moderate: 12, minor: 6, none: 0

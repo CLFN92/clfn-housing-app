@@ -121,6 +121,7 @@ window.LIVING_SITUATIONS = [
   { key: 'own_home',            label: 'Living in own home' },
   { key: 'family_on_reserve',   label: 'Staying with family on reserve (not own home)' },
   { key: 'renting_off_reserve', label: 'Renting / living off reserve' },
+  { key: 'temporary_shelter',   label: 'Temporary shelter' },
   { key: 'no_fixed_address',    label: 'Homeless / no fixed address' },
   { key: 'other',               label: 'Other' }
 ];

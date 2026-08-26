@@ -206,7 +206,7 @@ function aiSendMessage() {
         assignedUnit: a.assignedUnit, assignedAddress: a.assignedAddress,
         submittedAt: a.submittedAt,
         reserve: a.reserve,
-        living_situation: a.livingSituation || undefined,   // own_home | family_on_reserve (doubled up) | renting_off_reserve | no_fixed_address | other
+        living_situation: a.livingSituation || undefined,   // own_home | family_on_reserve (doubled up) | renting_off_reserve | temporary_shelter | no_fixed_address | other
         deceased: a.deceased || undefined,
         bcr_ineligible: (typeof appIsBcrIneligible === 'function' && appIsBcrIneligible(a)) || undefined,
       };

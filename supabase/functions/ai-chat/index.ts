@@ -69,7 +69,7 @@ const TABLES: Record<string, TableDef> = {
   },
   housing_applications: {
     roles: MGMT,
-    cols: 'id, status, score, tier, app_type, urgent_need, health_risk, assigned_unit_id, assigned_address, submitted_at, created_by_email, archived. Applicant name and household details live in a `data` jsonb (filter on these top-level columns; names are also in the loaded context). app_type is one of: new_housing (applicant seeking a new unit; scored and ranked), existing_tenant (a file update only -- NOT scored, never on Match), transfer_request (a current CLFN tenant who already has a house on reserve applying for a DIFFERENT unit; scored and ranked; this is the "On Rez" / transfer case shown on the Match page), commercial (a business or department requesting a commercial/admin/band building -- short form, never scored or waitlisted, assignable ONLY to those building types). The data jsonb also carries: livingSituation (own_home | family_on_reserve = staying with family on reserve i.e. DOUBLED UP | renting_off_reserve | no_fixed_address | other), deceased (boolean) + deceasedDate, and reserve. A deceased application is kept as a record but is zero-scored, never on Match, unassignable, and excluded from every application count.',
+    cols: 'id, status, score, tier, app_type, urgent_need, health_risk, assigned_unit_id, assigned_address, submitted_at, created_by_email, archived. Applicant name and household details live in a `data` jsonb (filter on these top-level columns; names are also in the loaded context). app_type is one of: new_housing (applicant seeking a new unit; scored and ranked), existing_tenant (a file update only -- NOT scored, never on Match), transfer_request (a current CLFN tenant who already has a house on reserve applying for a DIFFERENT unit; scored and ranked; this is the "On Rez" / transfer case shown on the Match page), commercial (a business or department requesting a commercial/admin/band building -- short form, never scored or waitlisted, assignable ONLY to those building types). The data jsonb also carries: livingSituation (own_home | family_on_reserve = staying with family on reserve i.e. DOUBLED UP | renting_off_reserve | temporary_shelter | no_fixed_address | other), deceased (boolean) + deceasedDate, and reserve. A deceased application is kept as a record but is zero-scored, never on Match, unassignable, and excluded from every application count.',
   },
   tenants: {
     roles: ALL,
@@ -602,7 +602,8 @@ Applicant statuses and eligibility (added 2026-08):
   - Living Situation (application data jsonb, livingSituation): own_home,
     family_on_reserve (= staying with family on reserve, i.e. DOUBLED UP -- on
     reserve with a reserve address but no home of their own), renting_off_reserve,
-    no_fixed_address (homeless), other. The Residency & Housing Status card at
+    temporary_shelter (living in a temporary shelter -- scores its own
+    urgent-need points), no_fixed_address (homeless), other. The Residency & Housing Status card at
     the top of the application wizard captures it; for a New Application from an
     On Reserve member it is mandatory, and "own home" there is rejected (an
     on-reserve member in their own home files a Transfer Request or File Update,
