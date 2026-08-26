@@ -24,6 +24,9 @@ window.RENT_AGE_DEFAULTS = {
   floor: 0.75,
   overrideMin: 0.60,
   overrideMax: 0.70,
+  // The factor applied to units flagged "pending major rehab" — configured
+  // HERE (Settings > Rent Model, 0.60-0.70), never typed per unit.
+  rehabFactor: 0.65,
   // maxAge null = "and up" (the last band).
   bands: [
     { maxAge: 5,    factor: 1.00 },
@@ -48,11 +51,13 @@ window.getRentAgeSchedule = function () {
     if (v.effectiveDate && v.effectiveDate > today) continue;
     if (!best || (v.version || 0) > (best.version || 0)) best = v;
   }
-  if (!best) return { version: 0, effectiveDate: '', bands: d.bands, floor: d.floor, source: 'default' };
+  if (!best) return { version: 0, effectiveDate: '', bands: d.bands, floor: d.floor, rehabFactor: d.rehabFactor, source: 'default' };
   var floor = Number(best.floor);
   if (isNaN(floor) || floor <= 0 || floor > 1) floor = d.floor;
+  var rehab = Number(best.rehabFactor);
+  if (isNaN(rehab) || rehab < d.overrideMin || rehab > d.overrideMax) rehab = d.rehabFactor;
   return { version: best.version || 1, effectiveDate: best.effectiveDate || '',
-           bands: best.bands, floor: floor, source: 'saved' };
+           bands: best.bands, floor: floor, rehabFactor: rehab, source: 'saved' };
 };
 
 // The ONE factor resolution for a unit. Returns:
@@ -61,16 +66,17 @@ window.getRentAgeSchedule = function () {
 window.rentAgeInfo = function (unit, sched) {
   sched = sched || window.getRentAgeSchedule();
   var d = window.RENT_AGE_DEFAULTS;
-  // Per-unit "pending major rehab" override — the only path below the floor.
+  // Per-unit "pending major rehab" FLAG — the only path below the floor. The
+  // factor itself is NOT stored per unit: it always resolves from the
+  // schedule's configured rehabFactor (Settings, 0.60-0.70), so units can't
+  // carry hand-typed factors. (Early records stored {factor} — the flag is
+  // honoured, the stored factor is ignored in favour of the schedule.)
   var ovr = unit && unit.rehabOverride;
-  if (ovr && ovr.factor != null) {
-    var f = Number(ovr.factor);
-    if (!isNaN(f)) {
-      f = Math.min(d.overrideMax, Math.max(d.overrideMin, f));
-      return { factor: f, source: 'override', effectiveYear: null, usedRenoYear: false,
-               effectiveAge: null, scheduleVersion: sched.version, floorApplied: false,
-               override: { factor: f, reason: ovr.reason || '', setBy: ovr.setBy || '', setAt: ovr.setAt || '' } };
-    }
+  if (ovr && (ovr.pending || ovr.factor != null)) {
+    var f = Math.min(d.overrideMax, Math.max(d.overrideMin, Number(sched.rehabFactor) || d.rehabFactor));
+    return { factor: f, source: 'override', effectiveYear: null, usedRenoYear: false,
+             effectiveAge: null, scheduleVersion: sched.version, floorApplied: false,
+             override: { factor: f, reason: ovr.reason || '', setBy: ovr.setBy || '', setAt: ovr.setAt || '' } };
   }
   var yearBuilt = parseInt(unit && unit.year, 10);
   var renoYear  = parseInt(unit && unit.majorRenoYear, 10);

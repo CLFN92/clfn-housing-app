@@ -2107,10 +2107,15 @@ function renderRentModelPanel(){
         +   '<input type="number" min="0" max="1" step="0.01" id="rm_age_f' + ab + '" value="' + (band.factor != null ? band.factor : '') + '"' + aDis + ' ' + _ageNum + ' title="Factor applied to base market rent"/></span>'
         + '</div>';
     }
-    bandRows += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;font-size:12px;color:var(--muted);">'
+    bandRows += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);">'
       + '<span style="font-weight:700;color:var(--text);">Floor</span> automatic minimum'
       + '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;">factor '
-      +   '<input type="number" min="0" max="1" step="0.01" id="rm_age_floor" value="' + sched.floor + '"' + aDis + ' ' + _ageNum + ' title="The automatic factor never goes below this; only the per-unit pending-major-rehab override (0.60–0.70, reason required) can"/></span>'
+      +   '<input type="number" min="0" max="1" step="0.01" id="rm_age_floor" value="' + sched.floor + '"' + aDis + ' ' + _ageNum + ' title="The automatic factor never goes below this; only the pending-major-rehab flag (factor below) can"/></span>'
+      + '</div>';
+    bandRows += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;font-size:12px;color:var(--muted);">'
+      + '<span style="font-weight:700;color:var(--text);">Pending rehab</span> flagged units (0.60–0.70)'
+      + '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;">factor '
+      +   '<input type="number" min="0.60" max="0.70" step="0.01" id="rm_age_rehab" value="' + (sched.rehabFactor != null ? sched.rehabFactor : 0.65) + '"' + aDis + ' title="Auto-applied to every unit flagged Pending Major Rehab on its card — the factor is configured here, never typed per unit"/></span>'
       + '</div>';
     ageCard = '<div class="card" style="margin-top:14px;">'
       + '<div class="ctitle">Age adjustment (applies at turnover — sitting tenants grandfathered)</div>'
@@ -2247,12 +2252,19 @@ function saveRentAgeSchedule(){
   for(var b2 = 0; b2 < bands.length; b2++){
     if(bands[b2].factor < floor){ showToast('Band ' + (b2 + 1) + ' factor (' + bands[b2].factor + ') is below the floor (' + floor + ') — automatic factors cannot go below the floor. Use the per-unit pending-major-rehab override for deeper reductions.', {type:'error'}); return; }
   }
+  var rehab = parseFloat((document.getElementById('rm_age_rehab')||{}).value);
+  var lim = window.RENT_AGE_DEFAULTS || { overrideMin: 0.60, overrideMax: 0.70 };
+  if(isNaN(rehab) || rehab < lim.overrideMin || rehab > lim.overrideMax){
+    showToast('Pending-rehab factor must be between ' + lim.overrideMin.toFixed(2) + ' and ' + lim.overrideMax.toFixed(2), {type:'error'});
+    return;
+  }
+  rehab = Math.round(rehab * 100) / 100;
   var effDate = (document.getElementById('rm_age_date')||{}).value || new Date().toISOString().split('T')[0];
   window._appSettings = window._appSettings || {};
   var store = window._appSettings.rent_age_factors || {};
   var versions = Array.isArray(store.versions) ? store.versions.slice() : [];
   var nextV = versions.reduce(function(mx, v){ return Math.max(mx, (v && v.version) || 0); }, 0) + 1;
-  versions.push({ version: nextV, effectiveDate: effDate, bands: bands, floor: floor,
+  versions.push({ version: nextV, effectiveDate: effDate, bands: bands, floor: floor, rehabFactor: rehab,
                   savedBy: role, savedAt: new Date().toISOString() });
   var payload = { versions: versions };
   window._appSettings.rent_age_factors = payload;
