@@ -6,7 +6,12 @@
 // the person's access ends.
 //
 // POST { email, redirect_to, brand:{ nation_name, brand_color, contact_line },
-//        mode: 'email' (default) | 'link' }
+//        mode: 'email' (default) | 'link',
+//        type: 'magiclink' (default) | 'recovery' }
+// type 'recovery': generate a PASSWORD RESET link instead (same branded
+//   pipeline) - replaces the /auth/v1/recover flow, which depends on the
+//   Supabase auth mailer this project does not use. Recovery does NOT require
+//   the target to be magic-link enabled (password accounts are the audience).
 // mode 'email': generate the link and email it through the branded pipeline.
 // mode 'link' : generate the link and RETURN it to the (verified admin) caller
 //               so they can copy/paste it into their own email or message.
@@ -72,6 +77,7 @@ serve(async (req) => {
     const email = String(body.email || '').toLowerCase().trim()
     const redirectTo = String(body.redirect_to || '')
     const brand = (body.brand || {}) as Record<string, string>
+    const linkType = String(body.type || '') === 'recovery' ? 'recovery' : 'magiclink'
     if (!email) return json({ error: 'email is required' }, 400)
 
     // --- Target staff must be active + magic-link enabled ---
@@ -81,18 +87,32 @@ serve(async (req) => {
     if (!rows || !rows.length) return json({ error: 'No staff record for that email.' }, 404)
     const t = rows[0] as Record<string, unknown>
     if (!t.is_active) return json({ error: 'That account is inactive.' }, 400)
-    if (t.magic_link !== true) return json({ error: 'That account is not enabled for magic-link sign-in.' }, 400)
+    if (linkType === 'magiclink' && t.magic_link !== true) return json({ error: 'That account is not enabled for magic-link sign-in.' }, 400)
 
     // --- Generate the magic link (does NOT send a Supabase email) ---
     const gen = await admin.auth.admin.generateLink({
-      type: 'magiclink',
+      type: linkType,
       email,
       options: redirectTo ? { redirectTo } : {},
     })
     const actionLink = (gen && gen.data && (gen.data as any).properties && (gen.data as any).properties.action_link) || ''
     if (gen.error || !actionLink) {
-      return json({ error: 'Could not generate a sign-in link.', detail: gen.error ? gen.error.message : 'no action_link' }, 502)
+      return json({ error: linkType === 'recovery' ? 'Could not generate a reset link.' : 'Could not generate a sign-in link.',
+                    detail: gen.error ? gen.error.message : 'no action_link' }, 502)
     }
+
+    // Server-side audit for EVERY issued link (email and copy mode alike) -
+    // written with the service role so a caller hitting the function directly
+    // cannot skip it.
+    try {
+      await admin.from('housing_audit_log').insert({
+        entity_type: 'auth', entity_id: email,
+        action: linkType === 'recovery' ? 'password_reset_issued' : 'magic_link_issued',
+        detail: (linkType === 'recovery' ? 'Password reset link' : 'Magic sign-in link')
+          + ' issued for ' + email + ' (' + (String(body.mode || '') === 'link' ? 'copy mode' : 'emailed') + ')',
+        actor: callerEmail,
+      })
+    } catch (_e) { /* audit is best-effort, never blocks the send */ }
 
     // --- Copy mode: hand the link back to the verified admin instead of
     //     emailing it. Same authorization + same target-account gates as the
@@ -104,13 +124,17 @@ serve(async (req) => {
     // --- Compose the branded inner body (send-notification wraps it in the
     //     nation-branded shell: header bar + footer contact line) ---
     const nationName = esc(brand.nation_name || 'Housing')
+    const isRecovery = linkType === 'recovery'
     const btnColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(brand.brand_color || '').trim()) ? String(brand.brand_color).trim() : '#eab308'
     const expiryStr = fmtDate(t.access_expires_at)
     const inner =
-      '<p style="font-size:14px;line-height:1.65;color:#374151;margin:0 0 20px;">Click below to sign in to the ' + nationName +
-      ' Housing system. This link is single-use and expires shortly - open it on the device you want to sign in on.</p>' +
+      '<p style="font-size:14px;line-height:1.65;color:#374151;margin:0 0 20px;">' +
+      (isRecovery
+        ? 'Click below to choose a new password for the ' + nationName + ' Housing system. This link is single-use and expires shortly.'
+        : 'Click below to sign in to the ' + nationName + ' Housing system. This link is single-use and expires shortly - open it on the device you want to sign in on.') +
+      '</p>' +
       '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:' + btnColor + ';">' +
-      '<a href="' + esc(actionLink) + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:#111827;text-decoration:none;border-radius:8px;">Sign in</a>' +
+      '<a href="' + esc(actionLink) + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:#111827;text-decoration:none;border-radius:8px;">' + (isRecovery ? 'Reset password' : 'Sign in') + '</a>' +
       '</td></tr></table>' +
       (expiryStr
         ? '<p style="font-size:13px;line-height:1.6;color:#374151;margin:22px 0 0;"><strong>Your access is valid until ' + esc(expiryStr) +
@@ -123,13 +147,13 @@ serve(async (req) => {
     const payload = {
       to: email,
       to_name: (t.name as string) || '',
-      subject: 'Sign in to ' + (brand.nation_name || 'your') + ' Housing',
+      subject: (isRecovery ? 'Reset your password - ' : 'Sign in to ') + (brand.nation_name || 'your') + ' Housing',
       bodyHtml: inner,
       nation_name: brand.nation_name || '',
       brand_color: brand.brand_color || '',
       contact_line: brand.contact_line || '',
       email_provider: 'graph',
-      event: 'magic_link_signin',
+      event: isRecovery ? 'password_reset_email' : 'magic_link_signin',
       entity_type: 'auth',
       entity_id: email,
     }

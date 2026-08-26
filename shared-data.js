@@ -4219,6 +4219,48 @@ async function sendStaffPasswordReset(email, btn){
   if(btn){btn.disabled=true; btn.textContent='Sending…';}
   try {
     var redirectTo = window.location.origin + '/index.html';
+    // Preferred path: the send-magic-link Edge Function with type 'recovery'
+    // generates the reset link and emails it through the nation's BRANDED
+    // pipeline (housing mailbox) — the old /auth/v1/recover endpoint depends
+    // on the Supabase auth mailer, which this project doesn't configure, so
+    // sends were failing with an unexplained "could not be sent".
+    var _nc = window.NATION_CONFIG || {};
+    var _contact = [];
+    if(_nc.phone) _contact.push(_nc.phone);
+    var _em2 = _nc.email || _nc.housing_email; if(_em2) _contact.push(_em2);
+    var token = (window.HOUSING_SESSION && HOUSING_SESSION.accessToken) || '';
+    var fnDown = false;
+    try {
+      var fr = await fetch(SUPABASE_URL + '/functions/v1/send-magic-link', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body:    JSON.stringify({
+          type: 'recovery',
+          email: email,
+          redirect_to: redirectTo,
+          brand: {
+            nation_name:  _nc.display_name || _nc.short || '',
+            brand_color:  (typeof _resolveBrandColorHex === 'function' ? _resolveBrandColorHex() : (_nc.primary_color || '')),
+            contact_line: _contact.join('  |  ')
+          }
+        })
+      });
+      if (fr.status === 404) { fnDown = true; }   // function not deployed yet — legacy fallback
+      else {
+        var fd = await fr.json().catch(function(){ return {}; });
+        if (fr.ok && fd.ok) {
+          showToast('Reset link sent to '+email, {type:'info'});
+          auditEntry('SETTINGS','settings_user_send_reset','Password reset sent to '+email,window.currentRole||'ed');
+          return;
+        }
+        showToast('Could not send reset — ' + (fd.error || ('HTTP ' + fr.status)) + (fd.detail ? ' (' + fd.detail + ')' : ''), {type:'error'});
+        return;
+      }
+    } catch(_fe){ fnDown = true; }   // function unreachable — legacy fallback
+
+    // Legacy fallback: Supabase's own recover mailer. Surface the REAL reason
+    // on failure (SMTP not configured, redirect URL not allowlisted, ...)
+    // instead of a generic message.
     var r = await fetch(SUPABASE_URL + '/auth/v1/recover', {
       method:  'POST',
       headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
@@ -4227,7 +4269,8 @@ async function sendStaffPasswordReset(email, btn){
     if(r.status === 429){
       showToast('Too many reset attempts — try again in a few minutes', {type:'error'});
     } else if(!r.ok){
-      showToast('Could not send reset — try again', {type:'error'});
+      var eb = await r.json().catch(function(){ return {}; });
+      showToast('Could not send reset — ' + (eb.msg || eb.message || eb.error_description || ('HTTP ' + r.status)), {type:'error'});
     } else {
       showToast('Reset link sent to '+email, {type:'info'});
       auditEntry('SETTINGS','settings_user_send_reset','Password reset sent to '+email,window.currentRole||'ed');
