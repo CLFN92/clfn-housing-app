@@ -3690,6 +3690,27 @@
   }
 
   // ── PDF generator ─────────────────────────────────────────────────────
+  // Sets the linked application's street address to the assigned unit's
+  // address (unit wins). Fired when the occupancy agreement is generated;
+  // no-op when they already match, no unit/application is linked, or the
+  // application is commercial (business address stays).
+  function _ticSyncTenantAddressToUnit(){
+    var app  = _ticState.application;
+    var unit = _ticState.unit;
+    if(!app || !unit) return;
+    if((app.appType || app.app_type) === 'commercial') return;
+    var addr = ((unit.num||'') + ' ' + (unit.street||'')).trim();
+    if(!addr || (app.street||'').trim() === addr) return;
+    var prev = app.street || '(blank)';
+    app.street = addr;
+    app.assignedAddress = addr;
+    _ticPersistApplication()
+      .then(function(){
+        _ticAudit('app_address_merged', 'Address set to assigned unit: "' + prev + '" → "' + addr + '" (occupancy agreement generated; unit wins)');
+      })
+      .catch(function(e){ console.warn('[lease] address persist failed:', e); });
+  }
+
   async function _ticGenerateLeasePdf() {
     // Hard gate — don't generate with a core term (fixed-term end date)
     // literally missing from the document.
@@ -3706,6 +3727,11 @@
     if (typeof showToast === 'function') showToast('Saving changes and generating PDF...', {type:'info'});
 
     try { await _ticLeaseSaveChanges(); } catch(e) { console.warn('[lease] save-back failed:', e); }
+    // The agreement makes the tenancy official — the tenant's street address
+    // follows the unit (unit wins; street line only, same convention as the
+    // assignment write-back + reconcile merge). Covers tenancies assigned
+    // before the automatic write-back existed.
+    try { _ticSyncTenantAddressToUnit(); } catch(e) { console.warn('[lease] address sync failed:', e); }
 
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
     var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };

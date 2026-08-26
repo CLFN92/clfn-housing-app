@@ -3526,6 +3526,18 @@ function writeTenancyToApplication(unit){
   var changed = false;
   if(app.assignedUnit !== unit.id){        app.assignedUnit    = unit.id; changed = true; }
   if(app.assignedAddress !== addr){         app.assignedAddress = addr;    changed = true; }
+  // The tenant now LIVES at the unit — their street address follows the
+  // assignment (unit wins, same convention as the reconcile address merge:
+  // street line only, city/province/postal left as entered). Commercial
+  // applications keep their business address.
+  if(addr && (app.appType || app.app_type) !== 'commercial' && (app.street||'').trim() !== addr){
+    var _prevStreet = app.street || '(blank)';
+    app.street = addr;
+    changed = true;
+    if(typeof auditEntry === 'function') auditEntry(app.id, 'app_address_merged',
+      'Address set to assigned unit: "' + _prevStreet + '" → "' + addr + '" (unit assignment; unit wins)',
+      window.currentRole || 'staff');
+  }
   if(app.status !== 'assigned'){
     app.status     = 'assigned';
     app.assignedAt = app.assignedAt || unit.assignedDate || new Date().toISOString();
