@@ -164,6 +164,13 @@
     var age = new Date(diff).getUTCFullYear() - 1970;
     return age >= 0 ? String(age) + ' yrs' : '';
   }
+  function _ticAgeNum(dob){
+    if(!dob) return null;
+    var d = new Date(dob);
+    if(isNaN(d.getTime())) return null;
+    var age = new Date(Date.now() - d.getTime()).getUTCFullYear() - 1970;
+    return age >= 0 ? age : null;
+  }
   function _ticPet(species){
     var s = (species||'').toLowerCase();
     if(s.indexOf('dog')   >= 0) return '🐕';
@@ -1149,6 +1156,11 @@
     }
     // Income Type change → toggle Employer field visibility (no save fires).
     if(inp.id === 'tic_inc_type'){ _ticIncApplyDynamic(); return; }
+    // Occupant income sources (form-field tic_hab_inc saves via hab-save, not here).
+    var quickPerson = inp.getAttribute('data-tic-inc-quick');
+    if(quickPerson){ _ticQuickIncomeSave(quickPerson, inp.value); return; }
+    var habIncIdx = inp.getAttribute('data-tic-hab-inc');
+    if(habIncIdx != null){ _ticHabIncomeSave(habIncIdx, inp.value); return; }
     var row = inp.closest && inp.closest('.tic-row');
     if(!row) return;
     if(inp.getAttribute('data-tic-ov-input')      === '1') { _ticOverviewSave(row);     return; }
@@ -1332,8 +1344,21 @@
       return;
     }
 
-    // Co-applicant block
+    // Household OW/ODSP shelter-rent card — recipients + calculated total.
+    html += _ticHouseholdRentCardHtml();
+
+    // Primary applicant — income source quick-set (writes into app.incomes so
+    // the Employment & Income section on Overview stays the single record).
     html += '<div class="tic-section">';
+    html +=   '<div class="tic-section-h">Primary Applicant</div>';
+    html +=   '<div class="tic-row tic-row-edit">'
+         +     '<div class="tic-row-lbl">' + _ticEsc(((app.fn||'') + ' ' + (app.ln||'')).trim() || 'Applicant') + ' — Income Source</div>'
+         +     '<div class="tic-row-val">' + _ticIncomeSelectHtml('data-tic-inc-quick="Applicant"', _ticPersonIncomeType('Applicant')) + '</div>'
+         +   '</div>';
+    html += '</div>';
+
+    // Co-applicant block
+    html += '<div class="tic-section tic-section-spaced">';
     html +=   '<div class="tic-section-h">Co-Applicant</div>';
     var hasCo = !!app.hasCoApp;
     html +=   '<div class="tic-row tic-row-edit" data-tic-occ-key="hasCoApp">'
@@ -1353,6 +1378,10 @@
             +   _ticOccCoRow('Band Number',    'band',    co.band)
             +   _ticOccCoRow('Cell Phone',     'cell',    co.cell,    'tel')
             +   _ticOccCoRow('Email',          'email',   co.email,   'email');
+      html +=   '<div class="tic-row tic-row-edit">'
+           +     '<div class="tic-row-lbl">Income Source</div>'
+           +     '<div class="tic-row-val">' + _ticIncomeSelectHtml('data-tic-inc-quick="Co-Applicant"', _ticPersonIncomeType('Co-Applicant')) + '</div>'
+           +   '</div>';
     }
     html += '</div>';
 
@@ -1365,15 +1394,21 @@
       html += '<div class="tic-empty">No additional household members on the application.</div>';
     } else {
       html += '<table class="tic-table"><thead><tr>'
-           + '<th>Name</th><th>Relationship</th><th>DOB</th><th>Age</th><th></th>'
+           + '<th>Name</th><th>Relationship</th><th>DOB</th><th>Age</th><th>Income (18+)</th><th></th>'
            + '</tr></thead><tbody>';
       hab.forEach(function(h, idx){
         if(!h || (!h.fn && !h.ln)) return;
+        // Income source only for adults — 18+ by DOB, or DOB unknown (staff
+        // can still record it; the rent calc only counts confirmed adults or
+        // members explicitly marked with a source).
+        var ageN = _ticAgeNum(h.dob);
+        var showInc = (ageN == null) || ageN >= 18;
         html += '<tr data-tic-hab-idx="' + idx + '">'
              +   '<td>' + _ticEsc(_ticAppFullName(h) || '—') + '</td>'
              +   '<td>' + _ticEsc(h.relationship || '—') + '</td>'
              +   '<td>' + _ticEsc(_ticFmtDate(h.dob)) + '</td>'
              +   '<td>' + _ticEsc(_ticAge(h.dob)) + '</td>'
+             +   '<td>' + (showInc ? _ticIncomeSelectHtml('data-tic-hab-inc="' + idx + '"', h.incomeSource || '') : '<span style="color:var(--muted);">—</span>') + '</td>'
              +   '<td class="tic-row-actions">'
              +     '<button type="button" class="btn btn-ghost" data-tic-action="hab-edit">Edit</button>'
              +     '<button type="button" class="btn btn-ghost" data-tic-action="hab-delete">Delete</button>'
@@ -1389,6 +1424,7 @@
          +     '<div class="tic-field"><label class="tic-field-lbl">Last Name *</label><input class="tic-input" id="tic_hab_ln" type="text"/></div>'
          +     '<div class="tic-field"><label class="tic-field-lbl">Date of Birth</label><input class="tic-input" id="tic_hab_dob" type="date"/></div>'
          +     '<div class="tic-field"><label class="tic-field-lbl">Relationship</label><select class="tic-input" id="tic_hab_rel"><option value="">Select</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Other</option></select></div>'
+         +     '<div class="tic-field"><label class="tic-field-lbl">Income Source (18+)</label>' + _ticIncomeSelectHtml('id="tic_hab_inc"', '') + '</div>'
          +   '</div>'
          +   '<div class="tic-form-actions">'
          +     '<button type="button" class="btn btn-ghost"   data-tic-action="hab-cancel">Cancel</button>'
@@ -1408,6 +1444,183 @@
          +   '<div class="tic-row-val"><input class="tic-input" type="' + t + '" data-tic-occ-input="1" value="' + _ticEsc(v) + '"/></div>'
          + '</div>';
   }
+  // ── Occupant income sources + household OW/ODSP shelter rent ─────────────
+  // Adults (18+) have an Income Source recorded on the Occupants tab. The
+  // primary applicant / co-applicant quick-selects read+write app.incomes
+  // (same records as Overview's Employment & Income); other household members
+  // store incomeSource on their habitants[] entry. When any adult is on
+  // OW/ODSP, the household's calculated rent is computeHouseholdShelterRent
+  // (shared-config.js — split model) and can be applied as the monthly rent.
+  function _ticIncomeSelectHtml(attr, val){
+    var opts = '<option value="">—</option>';
+    TIC_INCOME_TYPES.forEach(function(t){
+      opts += '<option value="' + _ticEsc(t) + '"' + (val === t ? ' selected' : '') + '>' + _ticEsc(t) + '</option>';
+    });
+    return '<select class="tic-input" ' + attr + '>' + opts + '</select>';
+  }
+  // First income row's type for a person ('Applicant'/'Co-Applicant') — an
+  // OW/ODSP row wins so the select surfaces the benefit status.
+  function _ticPersonIncomeType(person){
+    var app = _ticState.application;
+    var rows = _ticIsArray(app && app.incomes) ? app.incomes : [];
+    var first = '';
+    for(var i = 0; i < rows.length; i++){
+      var r = rows[i];
+      if(!r || r.person !== person) continue;
+      if(r.incomeType === 'OW' || r.incomeType === 'ODSP') return r.incomeType;
+      if(!first && r.incomeType) first = r.incomeType;
+    }
+    return first;
+  }
+  function _ticPersonProgram(person){
+    var t = _ticPersonIncomeType(person);
+    return (t === 'OW' || t === 'ODSP') ? t : '';
+  }
+  // One entry per person living in the house, for computeHouseholdShelterRent.
+  function _ticHouseholdMembers(){
+    var app = _ticState.application;
+    if(!app) return [];
+    var members = [];
+    members.push({ name: ((app.fn||'') + ' ' + (app.ln||'')).trim() || 'Applicant', adult: true, program: _ticPersonProgram('Applicant') });
+    if(app.hasCoApp){
+      var co = app.coApp || {};
+      members.push({ name: ((co.fn||'') + ' ' + (co.ln||'')).trim() || 'Co-Applicant', adult: true, program: _ticPersonProgram('Co-Applicant') });
+    }
+    var hab = _ticIsArray(app.habitants) ? app.habitants : [];
+    hab.forEach(function(h){
+      if(!h || (!h.fn && !h.ln)) return;
+      var ageN = _ticAgeNum(h.dob);
+      var t = h.incomeSource || '';
+      // Adult when DOB confirms 18+, or DOB unknown but an income source was
+      // recorded (staff marked them as an income-earning adult).
+      var adult = (ageN != null) ? ageN >= 18 : !!t;
+      members.push({ name: _ticAppFullName(h), adult: adult, program: (t === 'OW' || t === 'ODSP') ? t : '' });
+    });
+    return members;
+  }
+  function _ticCurrentRentAmount(){
+    var l = _ticState.ledger || {};
+    var u = _ticState.unit || {};
+    if(l[TIC_C.monthly_rent] != null) return Number(l[TIC_C.monthly_rent]);
+    if(u.monthlyRent  != null) return Number(u.monthlyRent);
+    if(u.monthly_rent != null) return Number(u.monthly_rent);
+    return null;
+  }
+  function _ticHouseholdRentCardHtml(){
+    if(typeof computeHouseholdShelterRent !== 'function') return '';
+    var calc = computeHouseholdShelterRent(_ticHouseholdMembers());
+    var html = '<div class="tic-section">';
+    html += '<div class="tic-section-h">Household Rent Calculation</div>';
+    if(!calc.hasRecipients){
+      html += '<div class="tic-empty">No household members on OW/ODSP — the standard market-rent calculation applies. Record income sources below for adults (18+).</div>';
+      return html + '</div>';
+    }
+    var cur = _ticCurrentRentAmount();
+    var money = function(v){ return '$' + Number(v).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}); };
+    html += '<table class="tic-table"><thead><tr><th>Recipient</th><th>Program</th><th>Benefit Unit</th><th>Shelter Allowance</th></tr></thead><tbody>';
+    calc.lines.forEach(function(ln){
+      html += '<tr><td>' + _ticEsc(ln.name || '—') + '</td><td>' + _ticEsc(ln.program) + '</td>'
+           +  '<td>' + ln.size + (ln.size === 1 ? ' person' : ' people') + '</td>'
+           +  '<td>' + money(ln.amount) + '/mo</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div class="tic-row"><div class="tic-row-lbl">Calculated Monthly Rent (' + calc.householdSize + ' in household)</div>'
+         +  '<div class="tic-row-val" style="font-weight:800;">' + money(calc.total) + '/month</div></div>';
+    if(cur != null){
+      html += '<div class="tic-row"><div class="tic-row-lbl">Current Monthly Rent</div><div class="tic-row-val">' + money(cur) + '/month</div></div>';
+    } else {
+      html += '<div class="tic-pending-inline">No monthly rent is set yet — the calculated shelter amount is the default.</div>';
+    }
+    var canSet = !_ticReadOnlyRole()
+      && (typeof APPROVAL_AUTHORITY === 'undefined' || APPROVAL_AUTHORITY.can('assignRentAmount', window.currentRole));
+    if(canSet && cur !== calc.total){
+      html += '<div class="tic-form-actions"><button type="button" class="btn btn-primary" data-tic-action="occ-apply-shelter-rent">Set ' + money(calc.total) + ' as Monthly Rent</button></div>';
+    }
+    return html + '</div>';
+  }
+  async function _ticApplyShelterRent(){
+    if(_ticReadOnlyRole()) return;
+    if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('assignRentAmount', window.currentRole)){
+      if(typeof showToast === 'function') showToast('You are not authorized to set the rent amount.', {type:'error'});
+      return;
+    }
+    var calc = computeHouseholdShelterRent(_ticHouseholdMembers());
+    if(!calc.hasRecipients) return;
+    var total = calc.total;
+    var go = (typeof showConfirm === 'function')
+      ? await showConfirm({ title:'Set monthly rent?',
+          message:'Set the monthly rent to $' + total.toFixed(2) + ' — the calculated OW/ODSP shelter allowance for this household (' + calc.lines.length + ' recipient' + (calc.lines.length===1?'':'s') + ', ' + calc.householdSize + ' in household)?',
+          confirmText:'Set Rent', cancelText:'Cancel' })
+      : window.confirm('Set monthly rent to $' + total.toFixed(2) + '?');
+    if(!go) return;
+    try {
+      var u = _ticState.unit;
+      if(u && u.id){
+        u.monthlyRent = total;
+        if(window.housingUnits){
+          var i = window.housingUnits.findIndex(function(x){ return x.id === u.id; });
+          if(i !== -1) window.housingUnits[i].monthlyRent = total;
+        }
+        if(typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+        else if(typeof sbSaveUnit === 'function') await sbSaveUnit(u);
+      }
+      // Mirror onto the rent ledger row when one exists (it wins the display).
+      var l = _ticState.ledger;
+      if(l && l.id){
+        await _ticWrite('PATCH', TIC_T.rent_ledger + '?id=eq.' + encodeURIComponent(l.id), { monthly_rent: total });
+        _ticState.ledger[TIC_C.monthly_rent] = total;
+      }
+      _ticAudit('tic_rent_set_shelter', 'Monthly rent set to $' + total.toFixed(2) + ' from the OW/ODSP shelter-allowance calculation (' + calc.lines.length + ' recipient(s), household of ' + calc.householdSize + ')');
+      if(typeof showToast === 'function') showToast('Monthly rent set to $' + total.toFixed(2) + '.', {type:'info'});
+      _ticRenderOccupants(); _ticRenderOverview(); _ticRenderStrip();
+    } catch(err){
+      if(typeof showToast === 'function') showToast('Rent save failed: ' + err.message, {type:'error'});
+    }
+  }
+  // Quick-set for the Applicant / Co-Applicant income source — upserts into
+  // app.incomes (updates the person's existing row, preserving employer and
+  // amount; creates one when they have none).
+  function _ticQuickIncomeSave(person, type){
+    var app = _ticState.application;
+    if(!app) return;
+    app.incomes = _ticIsArray(app.incomes) ? app.incomes : [];
+    var row = null;
+    for(var i = 0; i < app.incomes.length; i++){
+      var r = app.incomes[i];
+      if(r && r.person === person){
+        if(r.incomeType === 'OW' || r.incomeType === 'ODSP'){ row = r; break; }
+        if(!row) row = r;
+      }
+    }
+    var prev = row ? row.incomeType : '';
+    if(row) row.incomeType = type || '';
+    else if(type) app.incomes.push({ person: person, incomeType: type, employer: '', primaryAmt: null });
+    _ticPersistApplication()
+      .then(function(){
+        _ticAudit('tic_income_update', _ticDescribe(person + ' income source', prev, type));
+        _ticRenderOccupants();
+      })
+      .catch(function(err){
+        if(typeof showToast === 'function') showToast('Save failed: ' + err.message, {type:'error'});
+      });
+  }
+  function _ticHabIncomeSave(idx, type){
+    var app = _ticState.application;
+    var i = Number(idx);
+    if(!app || isNaN(i) || !app.habitants || !app.habitants[i]) return;
+    var h = app.habitants[i];
+    var prev = h.incomeSource || '';
+    h.incomeSource = type || '';
+    _ticPersistApplication()
+      .then(function(){
+        _ticAudit('tic_habitant_update', _ticDescribe((_ticAppFullName(h) || 'household member') + ' income source', prev, type));
+        _ticRenderOccupants();
+      })
+      .catch(function(err){
+        if(typeof showToast === 'function') showToast('Save failed: ' + err.message, {type:'error'});
+      });
+  }
+
   // Save handler for inline-edit rows on the Occupants tab. Triggered by the
   // body-level change listener; key looks like "hasCoApp" or "coApp.fn".
   function _ticOccInlineSave(rowEl){
@@ -1457,6 +1670,7 @@
     _ticEl('tic_hab_ln').value  = h.ln  || '';
     _ticEl('tic_hab_dob').value = h.dob ? String(h.dob).slice(0,10) : '';
     _ticEl('tic_hab_rel').value = h.relationship || '';
+    var incEl = _ticEl('tic_hab_inc'); if(incEl) incEl.value = h.incomeSource || '';
     form.classList.add('tic-open');
   }
   function _ticResetHabForm(){
@@ -1464,7 +1678,7 @@
     f.removeAttribute('data-tic-hab-idx');
     f.setAttribute('data-tic-hab-mode','add');
     f.classList.remove('tic-open');
-    ['tic_hab_fn','tic_hab_ln','tic_hab_dob','tic_hab_rel'].forEach(function(id){
+    ['tic_hab_fn','tic_hab_ln','tic_hab_dob','tic_hab_rel','tic_hab_inc'].forEach(function(id){
       var el = _ticEl(id); if(el) el.value='';
     });
   }
@@ -1483,7 +1697,8 @@
       fn:           fn,
       ln:           ln,
       dob:          (_ticEl('tic_hab_dob').value||'').trim() || '',
-      relationship: (_ticEl('tic_hab_rel').value||'').trim() || ''
+      relationship: (_ticEl('tic_hab_rel').value||'').trim() || '',
+      incomeSource: ((_ticEl('tic_hab_inc')||{}).value||'').trim() || ''
     };
     app.habitants = _ticIsArray(app.habitants) ? app.habitants : [];
     var auditAction, auditDetail;
@@ -2221,6 +2436,7 @@
       if(irow2) _ticIncDelete(irow2.getAttribute('data-tic-inc-idx'));
       return;
     }
+    if(act === 'occ-apply-shelter-rent'){ _ticApplyShelterRent(); return; }
     // Habitants (household members on application)
     if(act === 'hab-add')      { _ticResetHabForm(); _ticEl('tic_hab_form').classList.add('tic-open'); return; }
     if(act === 'hab-cancel')   { _ticResetHabForm(); return; }

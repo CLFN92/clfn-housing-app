@@ -241,7 +241,7 @@ function openUnitEditModal(unitId){
   set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
-  set('ue_est_market_rent', (u.estimatedMarketRent != null ? u.estimatedMarketRent : ''));
+  _ueSetEmrField(u);                      // auto-fills from the Settings rent table by bedroom count
   _gateRentInput('ue_est_market_rent');   // same authority as the rent amount (assignRentAmount)
   _ueSetStatus(u.status||'vacant');
   _ueSetUnderRenovation(!!u.under_renovation);
@@ -719,9 +719,14 @@ function saveUnitEdit(){
     u.monthlyRent = (rentRaw === '' || rentRaw == null) ? null : Math.round(Number(rentRaw) * 100) / 100;
     // Estimated Market Rent — feeds the rent model (standard rent = EMR x
     // payable percentage). Must be a number >= 0; invalid input blocks the
-    // save rather than silently persisting garbage.
+    // save rather than silently persisting garbage. A table-derived value
+    // (dataset.auto) stores NULL so the unit keeps tracking the Settings
+    // rent table; only a typed per-unit override persists.
+    var emrEl = document.getElementById('ue_est_market_rent');
     var emrRaw = get('ue_est_market_rent');
-    if(emrRaw !== '' && emrRaw != null){
+    if(emrEl && emrEl.dataset.auto === '1'){
+      u.estimatedMarketRent = null;
+    } else if(emrRaw !== '' && emrRaw != null){
       var emrN = Number(emrRaw);
       if(isNaN(emrN) || emrN < 0){
         showToast('Estimated Market Rent must be a dollar amount of zero or greater', {type:'error'});
@@ -1947,6 +1952,85 @@ function _gateRentInput(inputId){
   el.disabled = !allowed;
   el.title = allowed ? '' : 'Only Housing Manager or Executive Director can set the unit rent.';
   if(!allowed) el.classList.add('tic-readonly-input'); else el.classList.remove('tic-readonly-input');
+}
+
+// ── Estimated Market Rent auto-derivation (unit card) ────────────────────────
+// The field auto-fills from the Settings rent-model baseline table by the
+// unit's bedroom count (5 = "5 or more"). dataset.auto='1' marks a
+// table-derived value: saveUnitEdit then stores NULL so the unit keeps
+// tracking the table when rates change. Any typed value clears the flag and
+// persists as a per-unit override; clearing the field re-derives from the
+// table. The readout under the field shows the discounted estimated rent.
+function _ueEmrTableRate(){
+  if(typeof getRentModel !== 'function') return null;
+  var m = getRentModel();
+  var beds = parseInt((document.getElementById('ue_bedrooms')||{}).value, 10);
+  if(isNaN(beds) || beds < 1 || !m.market || !m.market.rates) return null;
+  var v = Number(m.market.rates[Math.min(beds, 5)]);
+  return isNaN(v) ? null : v;
+}
+function _ueRefreshEmrCalc(){
+  var el = document.getElementById('ue_est_market_rent');
+  if(!el) return;
+  var out = document.getElementById('ue_emr_calc');
+  if(!out){
+    out = document.createElement('div');
+    out.id = 'ue_emr_calc';
+    out.style.cssText = 'font-size:11px;color:var(--muted);margin-top:3px;';
+    if(el.parentNode) el.parentNode.appendChild(out);
+  }
+  if(typeof getRentModel !== 'function'){ out.textContent = ''; return; }
+  var m = getRentModel();
+  var pay = 1 - m.discountPct / 100;
+  var v = parseFloat(el.value);
+  var tbl = _ueEmrTableRate();
+  var bits = [];
+  if(!isNaN(v) && v >= 0){
+    var est = Math.round(v * pay * 100) / 100;
+    bits.push('Estimated rent: $' + est.toFixed(2) + '/month (' + (Math.round((100 - m.discountPct) * 100) / 100) + '% payable)');
+  }
+  if(el.dataset.auto === '1') bits.push('auto from the Settings rent table');
+  else if(tbl != null) bits.push('per-unit override — clear the field to use the table rate ($' + tbl.toFixed(2) + ')');
+  out.textContent = bits.join(' · ');
+}
+function _ueSetEmrField(u){
+  var el = document.getElementById('ue_est_market_rent');
+  if(!el) return;
+  var manual = (u && u.estimatedMarketRent != null && u.estimatedMarketRent !== '');
+  if(manual){
+    el.value = String(u.estimatedMarketRent);
+    el.dataset.auto = '';
+  } else {
+    var rate = _ueEmrTableRate();
+    el.value = rate != null ? String(rate) : '';
+    el.dataset.auto = rate != null ? '1' : '';
+  }
+  if(!el.dataset.emrWired){
+    el.dataset.emrWired = '1';
+    el.addEventListener('input', function(){
+      if(String(el.value).trim() === ''){
+        // Cleared = go back to tracking the table.
+        var r = _ueEmrTableRate();
+        if(r != null){ el.value = String(r); el.dataset.auto = '1'; }
+        else el.dataset.auto = '';
+      } else {
+        el.dataset.auto = '';
+      }
+      _ueRefreshEmrCalc();
+    });
+    var bedsEl = document.getElementById('ue_bedrooms');
+    if(bedsEl) bedsEl.addEventListener('change', function(){
+      // Re-derive on a size change while tracking the table — also when the
+      // field is empty (a unit with no rate yet just had its size set).
+      if(el.dataset.auto === '1' || String(el.value).trim() === ''){
+        var r2 = _ueEmrTableRate();
+        el.value = r2 != null ? String(r2) : '';
+        el.dataset.auto = r2 != null ? '1' : '';
+      }
+      _ueRefreshEmrCalc();
+    });
+  }
+  _ueRefreshEmrCalc();
 }
 function openAddUnitModal(){
   var fields = ['au_num','au_street','au_bathrooms','au_year','au_phase','au_notes','au_rent','au_constructionCost','au_building_name'];

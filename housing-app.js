@@ -2334,7 +2334,11 @@ function _rentCalcCardHtml(){
   if(app && app.assignedUnit && typeof housingUnits !== 'undefined'){
     unit = (housingUnits || []).find(function(u){ return u && u.id === app.assignedUnit; }) || null;
   }
-  var emr = unit ? unit.estimatedMarketRent : null;
+  // Market rent resolves via the shared rule: per-unit override if entered,
+  // else the Settings rent-table rate for the unit's bedroom count.
+  var emrInfo = (unit && typeof unitMarketRent === 'function') ? unitMarketRent(unit) : null;
+  var emr = emrInfo ? emrInfo.marketRent : (unit ? unit.estimatedMarketRent : null);
+  var emrSrc = emrInfo ? emrInfo.source : (emr != null ? 'manual' : null);
   var prog = (typeof _appAssistProgram === 'function') ? _appAssistProgram() : '';
   var spouse = (typeof _appSpouseIndicator === 'function') ? _appSpouseIndicator() : 0;
   var deps = (typeof _appDependentsCount === 'function') ? _appDependentsCount() : 0;
@@ -2362,7 +2366,7 @@ function _rentCalcCardHtml(){
       + 'Rates effective ' + esc(c.effectiveDate || 'n/a') + '. ' + esc(c.sourceNote || '') + '</div>';
   } else {
     body += row('Calculation method', 'Standard Market Rent Formula');
-    body += row('Estimated Market Rent', unit ? _rcMoney(emr) : 'no unit assigned yet');
+    body += row('Estimated Market Rent', unit ? (_rcMoney(emr) + (emrSrc === 'table' ? ' <span style="font-size:10px;color:var(--muted);">(from rent table)</span>' : '')) : 'no unit assigned yet');
     body += row('Market Rent Discount', (model ? model.discountPct : '\u2014') + '%');
     body += row('Payable Market Percentage', (Math.round(c.payablePct * 10000) / 100) + '%');
     body += row('Calculated Monthly Rent', c.standardRent != null ? _rcMoney(c.standardRent) : '\u2014 (needs a unit with an Estimated Market Rent)', true);

@@ -142,6 +142,17 @@ window.RENT_MODEL_DEFAULTS = {
   // "35" means the tenant pays 65% of estimated market rent. The payable
   // percentage is ALWAYS derived from this — never hard-coded.
   discountPct: 35,
+  // Baseline market rent by unit size (bedroom count; 5 = "5 or more").
+  // Seeded as placeholders pending the nation's CMHC figures — the ED enters
+  // the real CMHC Ontario North rates in Settings > App Settings > Rent Model.
+  // Units auto-derive their Estimated Market Rent from this table by bedroom
+  // count; a value entered on the unit card overrides the table for that unit.
+  market: {
+    label: 'Baseline Market Rent',
+    rates: { 1: 1000, 2: 1200, 3: 1400, 4: 1550, 5: 1700 },
+    effectiveDate: '',
+    sourceNote: 'Baseline market rent rates per CMHC rental market data for Ontario North. Verify and update from the current CMHC table.'
+  },
   ow: {
     label: 'Ontario Works',
     rates: { 1: 390, 2: 642, 3: 697, 4: 756, 5: 815, 6: 844 },   // 6 = "6 or more"
@@ -160,10 +171,10 @@ window.RENT_MODEL_DEFAULTS = {
 // still gets it — same pattern as match_priority_model).
 window.getRentModel = function () {
   var d = window.RENT_MODEL_DEFAULTS, s = ((window._appSettings || {}).rent_model) || {};
-  function tbl(key) {
+  function tbl(key, max) {
     var sd = d[key], ss = s[key] || {};
     var rates = {};
-    for (var i = 1; i <= 6; i++) {
+    for (var i = 1; i <= max; i++) {
       var v = ss.rates && ss.rates[i] != null ? Number(ss.rates[i]) : sd.rates[i];
       rates[i] = (isNaN(v) || v < 0) ? sd.rates[i] : v;
     }
@@ -173,11 +184,35 @@ window.getRentModel = function () {
   }
   var disc = s.discountPct != null ? Number(s.discountPct) : d.discountPct;
   if (isNaN(disc) || disc < 0 || disc > 100) disc = d.discountPct;
-  return { discountPct: disc, ow: tbl('ow'), odsp: tbl('odsp') };
+  return { discountPct: disc, market: tbl('market', 5), ow: tbl('ow', 6), odsp: tbl('odsp', 6) };
 };
 
 // Currency-safe rounding to cents.
 window.roundCents = function (x) { return Math.round((Number(x) + Number.EPSILON) * 100) / 100; };
+
+// The ONE market-rent resolution for a unit. The rent model's market table
+// holds baseline rates by bedroom count (5 = "5 or more"); a manually entered
+// estimatedMarketRent on the unit overrides the table for that unit only.
+// estRent = the discounted "estimated rent" (market rent x payable %).
+// Returns { marketRent, estRent, payablePct, source:'manual'|'table'|null, beds }.
+window.unitMarketRent = function (unit, model) {
+  model = model || window.getRentModel();
+  var manual = (unit && unit.estimatedMarketRent != null && unit.estimatedMarketRent !== '')
+    ? Number(unit.estimatedMarketRent) : null;
+  if (manual != null && (isNaN(manual) || manual < 0)) manual = null;
+  var beds = unit ? parseInt(unit.bedrooms, 10) : NaN;
+  var tableRate = (!isNaN(beds) && beds >= 1 && model.market && model.market.rates)
+    ? Number(model.market.rates[Math.min(beds, 5)]) : NaN;
+  var market = manual != null ? manual : (isNaN(tableRate) ? null : tableRate);
+  var payablePct = 1 - (model.discountPct / 100);
+  return {
+    marketRent: market,
+    estRent: market != null ? window.roundCents(market * payablePct) : null,
+    payablePct: payablePct,
+    source: manual != null ? 'manual' : (market != null ? 'table' : null),
+    beds: isNaN(beds) ? null : beds
+  };
+};
 
 // The ONE rent calculation. opts:
 //   incomeType          'OW' | 'ODSP' | anything else (stable internal values)
@@ -221,6 +256,37 @@ window.computeRentCalc = function (opts) {
            benefitUnitSize: size, shelterAmount: shelter,
            finalRent: window.roundCents(fin), capApplied: (std != null && std < shelter),
            effectiveDate: table.effectiveDate, sourceNote: table.sourceNote };
+};
+
+// Household OW/ODSP shelter rent (split model, confirmed w/ housing dept):
+// the FIRST recipient's benefit unit covers themselves plus every non-recipient
+// household member (so a lone recipient with family gets the household-size
+// rate); each ADDITIONAL OW/ODSP adult is their own single benefit unit (two
+// single OW adults sharing = 2 x the 1-person rate). Rent = sum of the lines.
+// members: one entry PER PERSON living in the house:
+//   { name, adult: true|false, program: 'OW'|'ODSP'|'' }
+// Returns { hasRecipients, householdSize, total, lines:[{name,program,size,amount}] }.
+window.computeHouseholdShelterRent = function (members, model) {
+  members = members || [];
+  model = model || window.getRentModel();
+  var N = members.length;
+  var recips = [];
+  for (var i = 0; i < members.length; i++) {
+    var m = members[i];
+    if (m && m.adult && (m.program === 'OW' || m.program === 'ODSP')) recips.push(m);
+  }
+  if (!recips.length || N < 1) return { hasRecipients: false, householdSize: N, total: null, lines: [] };
+  var nonRecip = N - recips.length;
+  var lines = [];
+  var total = 0;
+  for (var j = 0; j < recips.length; j++) {
+    var size = (j === 0) ? 1 + nonRecip : 1;
+    var table = recips[j].program === 'ODSP' ? model.odsp : model.ow;
+    var amt = window.roundCents(table.rates[Math.min(size, 6)]);
+    lines.push({ name: recips[j].name || '', program: recips[j].program, size: size, amount: amt });
+    total += amt;
+  }
+  return { hasRecipients: true, householdSize: N, total: window.roundCents(total), lines: lines };
 };
 
 // ── Application-population predicates (single source) ────────────────────────

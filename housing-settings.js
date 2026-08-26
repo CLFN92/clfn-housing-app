@@ -2063,6 +2063,24 @@ function renderRentModelPanel(){
   }
   var ex = (typeof computeRentCalc === 'function')
     ? computeRentCalc({ incomeType:'', estimatedMarketRent:1400, model:m }) : null;
+  // Baseline market-rent table (1..5+ bedrooms) — units auto-derive their
+  // Estimated Market Rent from this by bedroom count; each row shows the
+  // resulting discounted estimated rent live (updates with the discount too).
+  var mktRows = '';
+  for(var b=1;b<=5;b++){
+    mktRows += '<div class="f"><label>' + (b===5?'5+ bedroom':b+' bedroom') + '</label>'
+      + '<input type="number" min="0" step="0.01" id="rm_mkt_r' + b + '" value="' + money(m.market.rates[b]) + '"' + dis + '/>'
+      + '<div id="rm_mkt_est' + b + '" style="font-size:11px;color:var(--muted);margin-top:3px;"></div></div>';
+  }
+  var mktCard = '<div class="card" style="margin-top:14px;">'
+    + '<div class="ctitle">Baseline market rent by unit size (CMHC — Ontario North)</div>'
+    + '<div class="fg c3">' + mktRows + '</div>'
+    + '<div class="fg c2" style="margin-top:6px;">'
+    +   '<div class="f"><label>Effective Date</label><input type="date" id="rm_mkt_date" value="' + (m.market.effectiveDate||'') + '"' + dis + '/></div>'
+    +   '<div class="f"><label>Source note</label><input type="text" id="rm_mkt_note" value="' + String(m.market.sourceNote||'').replace(/"/g,'&quot;') + '"' + dis + '/></div>'
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">Each unit\'s Estimated Market Rent auto-fills from this table using its bedroom count (5+ bedrooms uses the 5+ rate); entering a value on a unit card overrides the table for that unit only. Estimated rent charged = table rate &times; payable percentage.</div>'
+    + '</div>';
   body.innerHTML =
     '<div class="card">'
     + '<div class="ctitle">Standard rental calculation</div>'
@@ -2075,13 +2093,34 @@ function renderRentModelPanel(){
     + '</div>'
     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">Monthly rent = the unit\'s Estimated Market Rent &times; payable percentage. '
     + (ex && ex.standardRent != null ? 'Example: $1,400.00 market rent &rarr; <strong>$' + ex.standardRent.toFixed(2) + '</strong>/month.' : '')
-    + ' Each unit\'s Estimated Market Rent is set on its unit card (Inventory).</div>'
+    + ' Units take their Estimated Market Rent from the baseline table below unless a per-unit override is entered on the unit card.</div>'
     + '</div>'
+    + mktCard
     + tableCard('ow', m.ow)
     + tableCard('odsp', m.odsp)
     + '<div style="font-size:11px;color:var(--muted);margin:10px 0;">The two tables are separate records: editing one never changes the other. For Ontario Works / ODSP applicants the charged rent is the LOWER of the shelter amount for their benefit unit size and the unit\'s standard discounted rent.</div>'
     + (canEdit ? '<button class="btn btn-primary" onclick="saveRentModel()">Save Rent Model</button>'
                : '<div class="empty-state-ctr">Only the Executive Director can edit the rent model.</div>');
+  // Per-row discounted preview under each market rate; refreshed when a rate
+  // or the discount changes so the previews always reflect the live inputs.
+  function refreshMktEst(){
+    var dv = parseFloat((document.getElementById('rm_discount')||{}).value);
+    if(isNaN(dv) || dv < 0 || dv > 100) dv = m.discountPct;
+    var pay = 1 - dv/100;
+    for(var b2=1;b2<=5;b2++){
+      var out = document.getElementById('rm_mkt_est'+b2);
+      if(!out) continue;
+      var rv = parseFloat((document.getElementById('rm_mkt_r'+b2)||{}).value);
+      out.textContent = (!isNaN(rv) && rv >= 0)
+        ? '→ $' + (Math.round(rv*pay*100)/100).toFixed(2) + '/mo estimated rent'
+        : '';
+    }
+  }
+  refreshMktEst();
+  for(var b3=1;b3<=5;b3++){
+    var mi = document.getElementById('rm_mkt_r'+b3);
+    if(mi) mi.addEventListener('input', refreshMktEst);
+  }
   var d = document.getElementById('rm_discount');
   if(d) d.addEventListener('input', function(){
     var v = parseFloat(d.value);
@@ -2090,6 +2129,7 @@ function renderRentModelPanel(){
     if(err) err.style.display = bad ? '' : 'none';
     var p = document.getElementById('rm_payable');
     if(p && !bad) p.value = (Math.round((100 - v) * 100) / 100) + '%';
+    refreshMktEst();
   });
 }
 window.renderRentModelPanel = renderRentModelPanel;
@@ -2110,14 +2150,25 @@ function saveRentModel(){
              effectiveDate: (document.getElementById('rm_'+key+'_date')||{}).value || '',
              sourceNote: (document.getElementById('rm_'+key+'_note')||{}).value || '' };
   }
+  function mktTbl(){
+    var rates = {};
+    for(var i=1;i<=5;i++){
+      var v = parseFloat((document.getElementById('rm_mkt_r'+i)||{}).value);
+      if(isNaN(v) || v < 0){ throw new Error('Baseline market rent for ' + (i===5?'5+':i) + ' bedroom must be zero or greater'); }
+      rates[i] = Math.round(v * 100) / 100;
+    }
+    return { rates: rates,
+             effectiveDate: (document.getElementById('rm_mkt_date')||{}).value || '',
+             sourceNote: (document.getElementById('rm_mkt_note')||{}).value || '' };
+  }
   var model;
-  try { model = { discountPct: Math.round(disc * 100) / 100, ow: tbl('ow'), odsp: tbl('odsp') }; }
+  try { model = { discountPct: Math.round(disc * 100) / 100, market: mktTbl(), ow: tbl('ow'), odsp: tbl('odsp') }; }
   catch(e){ showToast(e.message, {type:'error'}); return; }
   window._appSettings = window._appSettings || {};
   window._appSettings.rent_model = model;
   if(typeof saveSettingWithDraftFallback === 'function') saveSettingWithDraftFallback('rent_model', model);
   if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'rent_model_updated',
-    'Rent model saved — discount ' + model.discountPct + '%, OW/ODSP shelter tables updated', role);
+    'Rent model saved — discount ' + model.discountPct + '%, baseline market rent + OW/ODSP shelter tables updated', role);
   showToast('Rent model saved', {type:'info'});
   renderRentModelPanel();
 }
