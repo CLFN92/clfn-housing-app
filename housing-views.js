@@ -1496,15 +1496,16 @@ function _renderLandingKpis(){
   var condemnedN = units.filter(function(u){
     return u && !u.archived && (u.status||'').toLowerCase() === 'condemned';
   }).length;
+  // "Of which under repair" — a SUBSET of the vacant headline, not a separate
+  // pool. sbLoadUnits migrates status='under_repair' to status 'vacant' +
+  // under_renovation=true at boot, so every unoccupied unit under repair IS
+  // vacant-status; the old "exclude vacant status" guard (meant to stop a
+  // double count) therefore excluded them all and pinned this row at 0. As an
+  // explicit of-which subset there is nothing to double count.
   var underRepairN = units.filter(function(u){
     if(!u || u.archived) return false;
     if(u.assignedTo || u.assignedName) return false;   // occupied units being repaired aren't vacant stock
-    var st = (u.status||'').toLowerCase();
-    // A vacant-STATUS unit with the under-renovation pill is counted in the
-    // headline (it's assignable) — counting it here too double-counted it and
-    // disagreed with the reconcile buckets, which test vacant first.
-    if(st === 'condemned' || st === 'vacant') return false;
-    return u.under_renovation || st.indexOf('renovat') !== -1 || st.indexOf('repair') !== -1;
+    return (u.status||'').toLowerCase() === 'vacant' && !!u.under_renovation;
   }).length;
 
   // Application-type breakdown (active = non-archived, not declined):
@@ -1667,12 +1668,10 @@ function showHousingKpiDrilldown(type) {
     var _unitCfg = {
       vacant:       { title:'Vacant Units', empty:'No vacant units.',
                       pred:function(u){ return u.status==='vacant'; } },
-      under_repair: { title:'Units Under Repair / Renovation (vacant stock)', empty:'No unoccupied units under repair.',
+      under_repair: { title:'Vacant Units Under Repair / Renovation', empty:'No vacant units under repair.',
                       pred:function(u){
                         if(u.assignedTo || u.assignedName) return false;
-                        var st=(u.status||'').toLowerCase();
-                        if(st==='condemned' || st==='vacant') return false;
-                        return u.under_renovation || st.indexOf('renovat')!==-1 || st.indexOf('repair')!==-1;
+                        return (u.status||'').toLowerCase()==='vacant' && !!u.under_renovation;
                       } },
       condemned:    { title:'Condemned Units', empty:'No condemned units.',
                       pred:function(u){ return (u.status||'').toLowerCase()==='condemned'; } }

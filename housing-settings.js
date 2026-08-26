@@ -2090,22 +2090,32 @@ function renderRentModelPanel(){
     var sched = getRentAgeSchedule();
     var canAge = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('editRentAgeFactors', role);
     var aDis = canAge ? '' : ' disabled';
+    // Compact one-line rows: "Band N · up to [nn] yrs · factor [0.00]" — the
+    // inputs are fixed-width so the factor field doesn't stretch full-width
+    // on phones the way a stacked .f block does.
+    var _ageNum = 'style="width:76px;flex:none;display:inline-block;padding:6px 8px;"';
     var bandRows = '';
     for(var ab = 0; ab < 5; ab++){
       var band = sched.bands[ab] || {};
       var lbl = ab < 4
-        ? 'Up to <input type="number" min="1" max="200" id="rm_age_max' + ab + '" value="' + (band.maxAge != null ? band.maxAge : '') + '"' + aDis + ' style="width:64px;display:inline-block;"/> yrs'
-        : 'Older (36+)';
-      bandRows += '<div class="f"><label>Band ' + (ab + 1) + '</label>'
-        + '<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">' + lbl + '</div>'
-        + '<input type="number" min="0" max="1" step="0.01" id="rm_age_f' + ab + '" value="' + (band.factor != null ? band.factor : '') + '"' + aDis + ' title="Factor applied to base market rent"/></div>';
+        ? 'up to <input type="number" min="1" max="200" id="rm_age_max' + ab + '" value="' + (band.maxAge != null ? band.maxAge : '') + '"' + aDis + ' ' + _ageNum + '/> yrs'
+        : 'older (36+ yrs)';
+      bandRows += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);">'
+        + '<span style="min-width:54px;font-weight:700;color:var(--text);">Band ' + (ab + 1) + '</span>'
+        + '<span style="display:inline-flex;align-items:center;gap:6px;">' + lbl + '</span>'
+        + '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;">factor '
+        +   '<input type="number" min="0" max="1" step="0.01" id="rm_age_f' + ab + '" value="' + (band.factor != null ? band.factor : '') + '"' + aDis + ' ' + _ageNum + ' title="Factor applied to base market rent"/></span>'
+        + '</div>';
     }
+    bandRows += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;font-size:12px;color:var(--muted);">'
+      + '<span style="font-weight:700;color:var(--text);">Floor</span> automatic minimum'
+      + '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;">factor '
+      +   '<input type="number" min="0" max="1" step="0.01" id="rm_age_floor" value="' + sched.floor + '"' + aDis + ' ' + _ageNum + ' title="The automatic factor never goes below this; only the per-unit pending-major-rehab override (0.60–0.70, reason required) can"/></span>'
+      + '</div>';
     ageCard = '<div class="card" style="margin-top:14px;">'
       + '<div class="ctitle">Age adjustment (applies at turnover — sitting tenants grandfathered)</div>'
       + '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Adjusted market rent = base market rent &times; the factor for the unit\'s effective age (Major Renovation Year when set, else Year Built), rounded to the nearest dollar, before the payable-percentage discount. Currently <strong>schedule v' + sched.version + '</strong>' + (sched.effectiveDate ? ' (effective ' + sched.effectiveDate + ')' : ' (built-in defaults)') + '. Rent only changes when a new tenant moves in.</div>'
-      + '<div class="fg c3">' + bandRows
-      +   '<div class="f"><label>Floor (automatic minimum)</label><input type="number" min="0" max="1" step="0.01" id="rm_age_floor" value="' + sched.floor + '"' + aDis + ' title="The automatic factor never goes below this; only the per-unit pending-major-rehab override (0.60–0.70, reason required) can"/></div>'
-      + '</div>'
+      + '<div style="margin-bottom:6px;">' + bandRows + '</div>'
       + '<div class="fg c2" style="margin-top:6px;">'
       +   '<div class="f"><label>Effective Date (new version)</label><input type="date" id="rm_age_date" value="' + new Date().toISOString().split('T')[0] + '"' + aDis + '/></div>'
       + '</div>'
