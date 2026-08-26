@@ -65,11 +65,11 @@ type TableDef = { roles: string[]; cols: string }
 const TABLES: Record<string, TableDef> = {
   housing_units: {
     roles: ALL,
-    cols: 'id, num (unit number), street, status (vacant|occupied), assigned_name (current tenant), archived, latitude, longitude, last_inspection_date, next_inspection_due. Other fields (bedrooms, type, funder, insured_value) live in a `data` jsonb - use select=* to read them.',
+    cols: 'id, num (unit number), street, status (vacant|occupied|reserved|under_repair|condemned|archived), assigned_name (current tenant), archived, latitude, longitude, last_inspection_date, next_inspection_due. Condemned is an ACCEPTED out-of-service state (its own KPI breakdown; not an error and not part of the reconcile gap). Other fields (bedrooms, type, funder, insured_value) live in a `data` jsonb - use select=* to read them.',
   },
   housing_applications: {
     roles: MGMT,
-    cols: 'id, status, score, tier, app_type, urgent_need, health_risk, assigned_unit_id, assigned_address, submitted_at, created_by_email, archived. Applicant name and household details live in a `data` jsonb (filter on these top-level columns; names are also in the loaded context). app_type is one of: new_housing (applicant seeking a new unit; scored and ranked), existing_tenant (a file update only -- NOT scored, never on Match), transfer_request (a current CLFN tenant who already has a house on reserve applying for a DIFFERENT unit; scored and ranked; this is the "On Rez" / transfer case shown on the Match page).',
+    cols: 'id, status, score, tier, app_type, urgent_need, health_risk, assigned_unit_id, assigned_address, submitted_at, created_by_email, archived. Applicant name and household details live in a `data` jsonb (filter on these top-level columns; names are also in the loaded context). app_type is one of: new_housing (applicant seeking a new unit; scored and ranked), existing_tenant (a file update only -- NOT scored, never on Match), transfer_request (a current CLFN tenant who already has a house on reserve applying for a DIFFERENT unit; scored and ranked; this is the "On Rez" / transfer case shown on the Match page), commercial (a business or department requesting a commercial/admin/band building -- short form, never scored or waitlisted, assignable ONLY to those building types). The data jsonb also carries: livingSituation (own_home | family_on_reserve = staying with family on reserve i.e. DOUBLED UP | renting_off_reserve | no_fixed_address | other), deceased (boolean) + deceasedDate, and reserve. A deceased application is kept as a record but is zero-scored, never on Match, unassignable, and excluded from every application count.',
   },
   tenants: {
     roles: ALL,
@@ -102,6 +102,10 @@ const TABLES: Record<string, TableDef> = {
   housing_project_lots: {
     roles: ALL,
     cols: 'id, project_id (-> housing_projects), lot_number, address, legal_description, status (raw|serviced|built), unit_id (-> housing_units, set once a unit is built/linked on the lot), created_at. Count units delivered by a project via unit_id is not null.',
+  },
+  bcr_registry: {
+    roles: ['ed', 'super_user', 'housing_manager'],
+    cols: 'id, full_name, bcrd_date, reason, active, created_at, created_by, lifted_at, lifted_by, date_of_birth. The Band Council Resolution ineligibility list: a person with an ACTIVE row (banished, or evicted for harbouring) is INELIGIBLE for housing -- their applications are excluded from every application count and flagged "Ineligible -- BCR list" on Match. An entry with no bcrd_date is a details-pending stub written from the Tenant Card; the block is ALREADY in effect for it. Treat this list as highly sensitive -- only discuss it when directly asked by ED/HM staff.',
   },
   housing_audit_log: {
     roles: ['ed', 'super_user', 'housing_manager'],
@@ -594,6 +598,45 @@ jsonb -- those are unrelated to the Match On Rez flag and will give the wrong
 count (e.g. they include declined or never-approved applications that never
 appear on Match).
 
+Applicant statuses and eligibility (added 2026-08):
+  - Living Situation (application data jsonb, livingSituation): own_home,
+    family_on_reserve (= staying with family on reserve, i.e. DOUBLED UP -- on
+    reserve with a reserve address but no home of their own), renting_off_reserve,
+    no_fixed_address (homeless), other. The Residency & Housing Status card at
+    the top of the application wizard captures it; for a New Application from an
+    On Reserve member it is mandatory, and "own home" there is rejected (an
+    on-reserve member in their own home files a Transfer Request or File Update,
+    not a New Application).
+  - To count DOUBLED-UP applicants (the "of which Doubled Up" KPI): count
+    housing_applications where app_type = 'new_housing' (or null), status not in
+    (draft, declined), assigned_unit_id is null, archived = false, and the data
+    jsonb livingSituation = 'family_on_reserve'. Doubled-up and no-fixed-address
+    applicants show amber/red badges on Match.
+  - DECEASED applicants (data jsonb deceased = true): the record is kept but the
+    application is zero-scored ("Not Scored"), never on Match, cannot be
+    assigned a unit, and is excluded from EVERY application count (Open
+    Applications and all Applications-by-Type rows). Setting a Tenant Card
+    tenancy status to Deceased flags the linked application automatically.
+  - BANISHED / HARBOURING (BCR list): a person with an ACTIVE bcr_registry row
+    is ineligible for housing. Their applications are excluded from every
+    application count; Match still lists them with a red "Ineligible -- BCR
+    list" badge so staff can see and filter them; approval/assignment shows a
+    warning gate. "Harbouring" means housing/sheltering someone who is on the
+    list -- the HARBOURED person belongs on the list, and eviction for
+    harbouring also puts the evicted person on it. Setting a Tenant Card
+    tenancy to Banished writes the registry entry immediately (a details-pending
+    stub still blocks). Never present a BCR-listed person as a normal waitlist
+    applicant.
+  - HARD RULE: a current tenant (a unit is assigned to them) can never have
+    app_type new_housing -- the form blocks it. Their options are Transfer
+    Request (different unit) or File Update. To count the real New Applications
+    waitlist, also exclude housed applicants (status assigned / assigned_unit_id
+    set), deceased, BCR-listed, and commercial applications.
+  - COMMERCIAL applications (app_type = 'commercial'): a business or department
+    requesting a building. Short form, never scored, never on the waitlist or
+    Match; assignable only to commercial / admin / band buildings from the unit
+    card or the Business/Department review modal.
+
 Inspections: open the Inspections page (under the Operations nav) > "New
 Inspection". Pick the unit and type (Move-In, Move-Out, Annual, Routine,
 Emergency), complete the room-by-room checklist (pass / fail / needs repair),
@@ -719,7 +762,7 @@ Write 2-4 sentences. Be professional, clear, and compassionate. Reference specif
   const role = ctx?.role ?? 'staff'
 
   const appsJson = ctx?.apps?.length
-    ? `\n\n## Housing Applications (${ctx.apps.length} total)\nEach record is one application. Fields: id, fn/ln (name), status, score, tier (priority tier), bedrooms (requested), household_size, app_type, assignedUnit/assignedAddress (if placed), submittedAt.\n` + JSON.stringify(ctx.apps.slice(0, 50))
+    ? `\n\n## Housing Applications (${ctx.apps.length} total)\nEach record is one application. Fields: id, fn/ln (name), status, score, tier (priority tier), bedrooms (requested), household_size, app_type, assignedUnit/assignedAddress (if placed), submittedAt, reserve, living_situation (family_on_reserve = doubled up), deceased (true = record kept, excluded from all counts), bcr_ineligible (true = on the BCR banishment list, excluded from counts, flagged on Match).\n` + JSON.stringify(ctx.apps.slice(0, 50))
     : '\n\n## Housing Applications\nNo application data available.'
 
   const unitsJson = ctx?.units?.length

@@ -205,6 +205,10 @@ function aiSendMessage() {
         app_type: a.appType || a.app_type || a.type,  // loaded apps use camelCase appType (sbLoadApplications mapper)
         assignedUnit: a.assignedUnit, assignedAddress: a.assignedAddress,
         submittedAt: a.submittedAt,
+        reserve: a.reserve,
+        living_situation: a.livingSituation || undefined,   // own_home | family_on_reserve (doubled up) | renting_off_reserve | no_fixed_address | other
+        deceased: a.deceased || undefined,
+        bcr_ineligible: (typeof appIsBcrIneligible === 'function' && appIsBcrIneligible(a)) || undefined,
       };
     }),
     units:       (window.housingUnits  || []).map(function(u) {
