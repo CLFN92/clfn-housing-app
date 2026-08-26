@@ -861,8 +861,8 @@ async function rescoreAndSave() {
   var btn = document.getElementById('settings_save_scoring_btn');
   if(btn) { btn.disabled = true; btn.textContent = 'Rescoring...'; }
   try {
-    await rescoreAllApplications();
-    showToast('✓ Rescored ' + applications.length + ' applications', {type:'info'});
+    var _changedN = await rescoreAllApplications();
+    showToast('✓ Rescored ' + applications.length + ' applications — ' + (_changedN || 0) + ' score' + (_changedN === 1 ? '' : 's') + ' changed and saved', {type:'info'});
     // Reload data from Supabase to get fresh breakdowns, then refresh scorecard
     if(true) {
       sbLoadApplications().then(function(fresh) {

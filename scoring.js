@@ -2167,16 +2167,38 @@ function tierColor(tier){
 // Re-score every application in the global array using the current V2 model.
 // Called after scoring model changes or on data load.
 async function rescoreAllApplications() {
-  if (!window.applications || !window.applications.length) return;
+  if (!window.applications || !window.applications.length) return 0;
+  // Recompute every score, then PERSIST the ones that changed. (An earlier
+  // version only mutated the in-memory list — and rescoreAndSave's follow-up
+  // reload from Supabase then overwrote the recomputed values with the old
+  // stored ones, so "Rescore All" never actually stuck.)
+  var changed = [];
   window.applications.forEach(function(app) {
     try {
       var result = scoreApplicationLocally(app);
-      if (result) {
+      if (result && (app.score !== result.score || app.tier !== result.tier)) {
         app.score = result.score;
         app.tier  = result.tier;
+        changed.push(app);
       }
     } catch(e) { /* skip individual failures silently */ }
   });
+  // Save sequentially in small chunks — only the changed records, so a
+  // routine rescore over a large backlog doesn't flood the API.
+  for (var i = 0; i < changed.length; i += 5) {
+    var batch = changed.slice(i, i + 5).map(function(a){
+      return (typeof saveApplicationWithDraftFallback === 'function')
+        ? saveApplicationWithDraftFallback(a)
+        : (typeof sbSaveApplication === 'function' ? sbSaveApplication(a).catch(function(){}) : Promise.resolve());
+    });
+    await Promise.all(batch);
+  }
+  if (typeof auditEntry === 'function' && changed.length) {
+    auditEntry('SETTINGS', 'applications_rescored',
+      'Rescore All: ' + changed.length + ' of ' + window.applications.length + ' application scores changed and saved',
+      window.currentRole || 'ed');
+  }
+  return changed.length;
 }
 
 // ── Default model initialisers ────────────────────────────────────────────────
