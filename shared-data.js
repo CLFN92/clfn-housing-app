@@ -1545,6 +1545,16 @@ function bcrLookup(name) {
 window.bcrLookup = bcrLookup;
 window.isBcrd = function (name) { return !!bcrLookup(name); };
 
+// Application-level ineligibility: the applicant's name is on the active BCR
+// list (banished, or evicted for harbouring). Used to keep them out of the
+// Applications-by-Type KPI counts while Match still lists them flagged as
+// ineligible (their record stays; nothing is deleted).
+function appIsBcrIneligible(app){
+  if (!app) return false;
+  return !!bcrLookup(((app.fn || '') + ' ' + (app.ln || '')).trim());
+}
+window.appIsBcrIneligible = appIsBcrIneligible;
+
 async function sbAddBcr(fullName, bcrdDate, reason, dateOfBirth) {
   var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
   var body = {

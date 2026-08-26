@@ -58,6 +58,14 @@ function _livingSituationBadge(a) {
   return '';
 }
 
+// Red "ineligible" badge for applicants on the active BCR list (banished, or
+// evicted for harbouring). They stay VISIBLE on Match — flagged, filterable —
+// while the Applications-by-Type KPI counts exclude them entirely.
+function _bcrIneligibleBadge(a) {
+  if (typeof appIsBcrIneligible !== 'function' || !appIsBcrIneligible(a)) return '';
+  return '<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 7px;border-radius:4px;white-space:nowrap;">🚫 Ineligible — BCR list</span>';
+}
+
 function _assignmentTypeBadge(u) {
   if (!u || !u.assignmentType) return '';
   if (u.assignmentType === 'temporary') return '<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 5px;border-radius:6px;">TEMPORARY</span>';
@@ -788,6 +796,7 @@ function renderMatchView(){
         +'<div class="js-lbl-sm">'+app.id+'</div>'
         +(isTransfer?'<div style="margin-top:4px;"><span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez'+(curAddr?' · '+curAddr:'')+'</span> <span style="font-size:10px;color:var(--muted);font-weight:600;">transfer</span></div>':'')
         +(!isTransfer && _livingSituationBadge(app) ? '<div style="margin-top:4px;">'+_livingSituationBadge(app)+'</div>' : '')
+        +(_bcrIneligibleBadge(app) ? '<div style="margin-top:4px;">'+_bcrIneligibleBadge(app)+'</div>' : '')
       +'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:18px;font-weight:800;color:'+tCol+';">'+(app.score||0)+'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:11px;font-weight:700;color:'+tCol+';">'+tier+'</td>'
@@ -831,6 +840,7 @@ function renderMatchView(){
     var badges = [];
     if (isTransfer) badges.push('<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez'+(curAddr?' · '+curAddr:'')+'</span>');
     if (!isTransfer && _livingSituationBadge(app)) badges.push(_livingSituationBadge(app));
+    if (_bcrIneligibleBadge(app)) badges.push(_bcrIneligibleBadge(app));
     var metas = [
       {k:'Score',     v: app.score||0},
       {k:'Reserve',   v: app.reserve||''},
@@ -1498,10 +1508,14 @@ function _renderLandingKpis(){
   var _housedIds = {};
   units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds[u.assignedTo] = true; });
   function _isHoused(a){ return a.status === 'assigned' || !!a.assignedUnit || !!_housedIds[a.id]; }
+  // BCR-listed applicants (banished / evicted for harbouring) are ineligible —
+  // out of the type counts entirely; Match still lists them flagged.
+  var _bcrBlocked = function(a){ return typeof appIsBcrIneligible === 'function' && appIsBcrIneligible(a); };
   function _activeOfType(pred, excludeHoused){
     return apps.filter(function(a){
       if(!a || a.archived || a.status === 'declined') return false;
       if(a.deceased) return false;   // deceased apps live in their own group
+      if(_bcrBlocked(a)) return false;
       if(excludeHoused && _isHoused(a)) return false;
       return pred(a.appType || 'new_housing');
     }).length;
@@ -1514,7 +1528,7 @@ function _renderLandingKpis(){
   // never submitted) — same population rules as the New Applications row.
   var draftApps = apps.filter(function(a){
     if(!a || a.archived || a.status !== 'draft' || a.deceased) return false;
-    if(_isHoused(a)) return false;
+    if(_bcrBlocked(a) || _isHoused(a)) return false;
     var t = a.appType || 'new_housing';
     return t !== 'existing_tenant' && t !== 'transfer_request' && t !== 'commercial';
   }).length;
@@ -1522,7 +1536,7 @@ function _renderLandingKpis(){
   // their own (staying with family). Same population rules as New Applications.
   var doubledApps = apps.filter(function(a){
     if(!a || a.archived || a.status === 'declined' || a.status === 'draft' || a.deceased) return false;
-    if(_isHoused(a)) return false;
+    if(_bcrBlocked(a) || _isHoused(a)) return false;
     var t = a.appType || 'new_housing';
     if(t === 'existing_tenant' || t === 'transfer_request' || t === 'commercial') return false;
     return a.livingSituation === 'family_on_reserve';
@@ -1672,6 +1686,9 @@ function showHousingKpiDrilldown(type) {
       // Deceased apps live only in their own group; every other group excludes them.
       if (type === 'deceased_apps') return !!a.deceased;
       if (a.deceased || a.status==='declined') return false;
+      // BCR-listed (banished / harbouring-evicted) applicants are excluded
+      // from every type group — Match shows them flagged as ineligible.
+      if (typeof appIsBcrIneligible === 'function' && appIsBcrIneligible(a)) return false;
       if ((type === 'new_apps' || type === 'draft_apps' || type === 'doubled_apps') && _isHoused2(a)) return false;
       if (type === 'draft_apps' && a.status !== 'draft') return false;
       if (type === 'doubled_apps' && (a.status === 'draft' || a.livingSituation !== 'family_on_reserve')) return false;
