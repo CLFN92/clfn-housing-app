@@ -427,7 +427,7 @@ var APPROVAL_AUTHORITY = (function() {
       setUnitLocation:          'Set unit GPS location &amp; house photo',
       approveInspection:        'Approve inspection report',
       manageBcr:                'Manage BCR / ineligibility list',
-      mergeTenants:             'Merge duplicate tenant records',
+      mergeTenants:             'Merge duplicate records (tenants & applications)',
       archiveTenantFiles:       'Archive / restore tenant files',
       manageStaffRecord:        'Edit / deactivate a staff record',
       manageAllStaffRoles:      'Assign any role to staff',

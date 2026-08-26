@@ -2043,10 +2043,33 @@ function _housingReconcile(){
     return typeof onRezNewAppIssue === 'function' && onRezNewAppIssue(a.reserve, a.livingSituation || '') !== '';
   }).sort(function(x,y){ return (y.score||0)-(x.score||0); });
 
+  // Address check — ONLY for applicants actually assigned to a unit: does the
+  // application's own street line match the assigned unit's address? Drift
+  // happens when the address was typed at intake and the person was later
+  // housed (or migrated data kept the old address). The UNIT address is the
+  // authoritative one; the Merge action writes it onto the application.
+  function _normAddr(x){ return String(x || '').toLowerCase().replace(/[.,#]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  var addrMismatch = [];
+  activeApps.forEach(function(a){
+    if (a.deceased) return;
+    var unit = (a.assignedUnit && unitById[a.assignedUnit]) ? unitById[a.assignedUnit]
+      : units.find(function(u){ return u && !u.archived && u.assignedTo === a.id; }) || null;
+    if (!unit) return;
+    var unitAddr = ((unit.num || '') + ' ' + (unit.street || '')).trim();
+    if (!unitAddr) return;
+    var appAddr = (a.street || '').trim();
+    var na = _normAddr(appAddr), nu = _normAddr(unitAddr);
+    // A blank application address is a mismatch too — it should carry the
+    // unit's. Containment either way counts as a match ("1 Main St" vs
+    // "1 Main").
+    if (na && (na === nu || na.indexOf(nu) !== -1 || nu.indexOf(na) !== -1)) return;
+    addrMismatch.push({ app: a, unit: unit, unitAddr: unitAddr, appAddr: appAddr || '(blank)' });
+  });
+
   // Total = ACTIVE units only — archived (demolished/removed) units are
   // history, not stock, so they don't inflate the headline count. They keep
   // their own state-table row for the full accounting.
-  return { totalUnits:(units.length - buckets.archived.length), buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp, onRezUnclassified:onRezUnclassified };
+  return { totalUnits:(units.length - buckets.archived.length), buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp, onRezUnclassified:onRezUnclassified, addrMismatch:addrMismatch };
 }
 
 function showReconcileReport(){
@@ -2150,6 +2173,29 @@ function showReconcileReport(){
       + '</tbody></table>' + (_orN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_orN+'.</div>' : '')
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every on-reserve new application has a living situation on file.</div>';
 
+  // Address check — assigned applicants whose application address differs
+  // from their unit's. Merge writes the unit address (the winner) onto the
+  // application's street line; city/province/postal are left as entered.
+  var _amN = R.addrMismatch.length;
+  var addrBulkBtn = _amN
+    ? '<button class="btn btn-primary" style="margin-bottom:10px;" onclick="_reconMergeAllAddresses()">&#127968; Merge all '+_amN+' to the unit address</button>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">The unit address wins: merging copies the assigned unit\u2019s address onto the application\u2019s street line (city/province/postal are left as entered). Each merge is audited.</div>'
+    : '';
+  var addrTbl = _amN
+    ? '<table class="tbl"><thead><tr><th>Applicant</th><th>Application address</th><th>Unit address</th><th></th></tr></thead><tbody>'
+      + R.addrMismatch.slice(0,120).map(function(x){
+          var a = x.app, sid = (a.id||'').replace(/'/g,"\\'");
+          return '<tr><td style="font-weight:600;">'+esc((a.fn||'')+' '+(a.ln||''))+'</td>'
+            + '<td class="std-cell-muted">'+esc(x.appAddr)+'</td>'
+            + '<td style="font-weight:600;">'+esc(x.unitAddr)+'</td>'
+            + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
+            + '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reconMergeAddress(\''+sid+'\')">&#8646; Merge &rarr; unit</button>'
+            + '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeReconcile();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+            + '</div></td></tr>';
+        }).join('')
+      + '</tbody></table>' + (_amN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_amN+'.</div>' : '')
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every assigned applicant\u2019s address matches their unit.</div>';
+
   // BCR entries missing details — Tenant-Card stubs (blocking is already in
   // effect for them) waiting for the BCR date/reason to be completed.
   var bcrIncomplete = (window._bcrRegistry || []).filter(function(b){
@@ -2230,6 +2276,9 @@ function showReconcileReport(){
     +   dupTbl
     +   secH('Applications with a stale unit link', R.stale.length, R.stale.length?'#b45309':null)
     +   staleTbl
+    +   secH('Address check \u2014 application vs assigned unit', R.addrMismatch.length, R.addrMismatch.length?'var(--warn-amber-text)':null)
+    +   addrBulkBtn
+    +   addrTbl
     +   secH('BCR entries missing details', bcrIncomplete.length, bcrIncomplete.length?'var(--warn-amber-text)':null)
     +   bcrTbl
     +   secH('Occupied units with no application', R.occNoApp.length)
@@ -2363,6 +2412,49 @@ async function _reconMarkAllDoubledUp(){
 }
 window._reconMarkAllDoubledUp = _reconMarkAllDoubledUp;
 
+// Address merge: the assigned unit's address is authoritative — copy it onto
+// the application's street line (and the assignedAddress mirror).
+function _reconApplyUnitAddress(a, unitAddr, role){
+  var prev = a.street || '(blank)';
+  a.street = unitAddr;
+  a.assignedAddress = unitAddr;
+  _saveAppRecord(a);
+  if (typeof auditEntry === 'function') auditEntry(a.id, 'app_address_merged',
+    'Application address merged to unit address: "' + prev + '" \u2192 "' + unitAddr + '" (reconciliation; unit wins)', role);
+}
+function _reconFindAddrPair(appId){
+  var R = _housingReconcile();
+  return R.addrMismatch.find(function(x){ return x.app && x.app.id === appId; }) || null;
+}
+async function _reconMergeAddress(appId){
+  if (!_mgmtActionGate()) return;
+  var role = window.currentRole || 'staff';
+  var pair = _reconFindAddrPair(appId);
+  if (!pair) return;
+  _reconApplyUnitAddress(pair.app, pair.unitAddr, role);
+  if (typeof showToast === 'function') showToast(((pair.app.fn||'')+' '+(pair.app.ln||'')).trim() + ' \u2014 address set to ' + pair.unitAddr + '.', {type:'info'});
+  showReconcileReport();
+}
+window._reconMergeAddress = _reconMergeAddress;
+async function _reconMergeAllAddresses(){
+  if (!_mgmtActionGate()) return;
+  var role = window.currentRole || 'staff';
+  var R = _housingReconcile();
+  var list = R.addrMismatch;
+  if (!list.length) return;
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({
+        title: 'Merge ' + list.length + ' address' + (list.length===1?'':'es') + ' to the unit address?',
+        message: 'Each listed application\u2019s street line is replaced with its assigned unit\u2019s address (the unit wins). City, province and postal code are left as entered. Every change is audited.',
+        confirmText: 'Merge all', cancelText: 'Cancel' })
+    : window.confirm('Merge ' + list.length + ' addresses to the unit address?');
+  if (!go) return;
+  list.forEach(function(x){ _reconApplyUnitAddress(x.app, x.unitAddr, role); });
+  if (typeof showToast === 'function') showToast(list.length + ' address' + (list.length===1?'':'es') + ' merged to the unit address.', {type:'info'});
+  showReconcileReport();
+}
+window._reconMergeAllAddresses = _reconMergeAllAddresses;
+
 async function _reconClearLink(appId){
   var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
   var a = apps.find(function(x){ return x && x.id === appId; });
@@ -2460,10 +2552,13 @@ window._reconMergePrompt = _reconMergePrompt;
 // rest with a merged_into pointer (reversible), audit both sides.
 async function _reconDoMerge(){
   var role = window.currentRole || 'staff';
+  // Same authority as the tenant-record merge manager (mergeTenants, default
+  // HM + ED) — this WAS gated on deleteApplication (ED-only), so a Housing
+  // Manager the Settings screen promised merge rights to was blocked here.
   var canMerge = (typeof APPROVAL_AUTHORITY === 'undefined')
     ? (typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(role))
-    : APPROVAL_AUTHORITY.can('deleteApplication', role);
-  if (!canMerge) { if (typeof showToast === 'function') showToast('You are not authorized to merge applications.', { type:'error' }); return; }
+    : APPROVAL_AUTHORITY.can('mergeTenants', role);
+  if (!canMerge) { if (typeof showToast === 'function') showToast('You are not authorized to merge duplicate records.', { type:'error' }); return; }
   var sel = document.querySelector('#modalReconMerge input[name="recon_keep"]:checked');
   if (!sel) { if (typeof showToast === 'function') showToast('Pick the application to keep.', {type:'info'}); return; }
   var canonicalId = sel.value;
