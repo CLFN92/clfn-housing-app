@@ -2120,7 +2120,7 @@ function renderRentModelPanel(){
       +   '<div class="f"><label>Effective Date (new version)</label><input type="date" id="rm_age_date" value="' + new Date().toISOString().split('T')[0] + '"' + aDis + '/></div>'
       + '</div>'
       + (canAge
-          ? '<button class="btn btn-primary" onclick="saveRentAgeSchedule()">Save as New Version (v' + (sched.version + 1) + ')</button>'
+          ? '<div style="margin-top:12px;"><button class="btn btn-primary" onclick="saveRentAgeSchedule()">Save Age Adjustment</button></div>'
           + '<div style="font-size:11px;color:var(--muted);margin-top:6px;">Saving appends a new version — rents already applied keep the version they were calculated under.</div>'
           : '<div class="empty-state-ctr">Editing the age schedule requires the "Edit rent age-adjustment schedule" authority (Settings &rarr; Approval Authority &rarr; Unit Assignment).</div>')
       + '</div>';
