@@ -2837,7 +2837,12 @@ async function renderRecentActivity(role) {
   };
 
   var filterFn = roleFilters[role] || roleFilters.employee;
-  var filtered = log.filter(function(e){ return filterFn(e) && isMyEntry(e); }).slice(0, 40);
+  // 40 rows initially; "Show all" reveals everything loaded (the loader
+  // fetches 150 from the server, so that's the true ceiling per page load).
+  var allMine = log.filter(function(e){ return filterFn(e) && isMyEntry(e); });
+  var _showAll = window._recentActivityShowAll === true;
+  var filtered = _showAll ? allMine : allMine.slice(0, 40);
+  var _hiddenN = allMine.length - filtered.length;
 
   if(!filtered.length) {
     el.innerHTML = '<div style="color:var(--muted);font-style:italic;font-size:13px;">No recent activity yet.</div>';
@@ -3014,7 +3019,13 @@ async function renderRecentActivity(role) {
         + entriesHtml
       + '</div>'
       + '</div>';
-  }).join('');
+  }).join('')
+  // "Show all" footer — the list caps at 40 rows until expanded.
+  + (_hiddenN > 0
+      ? '<div style="text-align:center;padding:8px 0 2px;"><button class="btn btn-ghost" style="padding:4px 14px;font-size:12px;" onclick="window._recentActivityShowAll=true;renderRecentActivity(\'' + String(role||'').replace(/[^a-z_]/g,'') + '\')">Show all ' + allMine.length + ' &#9662;</button></div>'
+      : (_showAll && allMine.length > 40
+          ? '<div style="text-align:center;padding:8px 0 2px;"><button class="btn btn-ghost" style="padding:4px 14px;font-size:12px;" onclick="window._recentActivityShowAll=false;renderRecentActivity(\'' + String(role||'').replace(/[^a-z_]/g,'') + '\')">Show fewer &#9652;</button></div>'
+          : ''));
 
   // Update the section count pill — show TODAY's event count only (post role
   // filter), so the header reflects "what happened today" rather than the full
