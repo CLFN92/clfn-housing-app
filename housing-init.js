@@ -1886,9 +1886,9 @@ function initHousingPage() {
   else if(view==='leadership')  { if(typeof showLeadershipDashboard==='function') showLeadershipDashboard(); }
   // Data Health deep links (Operations nav on sub-pages lands here): show the
   // landing page, then open the tool once the data it reads has loaded.
-  else if(view==='reconcile' || view==='likely-housed' || view==='archived-apps'){
+  else if(view==='reconcile' || view==='likely-housed' || view==='archived-apps' || view==='ar-import'){
     if(typeof showLanding==='function') showLanding();
-    var _dhOpen = view==='reconcile' ? 'showReconcileReport' : view==='likely-housed' ? 'showLikelyHousedReport' : 'showArchivedApplications';
+    var _dhOpen = view==='reconcile' ? 'showReconcileReport' : view==='likely-housed' ? 'showLikelyHousedReport' : view==='ar-import' ? 'openArrearsImport' : 'showArchivedApplications';
     var _dhTries = 0;
     (function _dhWait(){
       var ready = (window.applications && applications.length) || (window.housingUnits && housingUnits.length) || _dhTries >= 20;
@@ -2033,6 +2033,7 @@ window.HEADER_NAV = [
       { divider:true, label:'Data Health' },
       { key:'dh_likely',    label:'Likely Already-Housed',   module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5L12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>', run:function(){ if(typeof showLikelyHousedReport==='function') showLikelyHousedReport(); else window.location.href='housing.html?view=likely-housed'; } },
       { key:'dh_reconcile', label:'Reconcile Units & Apps',  module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>', run:function(){ if(typeof showReconcileReport==='function') showReconcileReport(); else window.location.href='housing.html?view=reconcile'; } },
+      { key:'dh_arimport',  label:'Import Arrears Ledger',    module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', run:function(){ if(typeof openArrearsImport==='function') openArrearsImport(); else window.location.href='housing.html?view=ar-import'; } },
       { key:'dh_archived',  label:'Archived Applications',   module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>', run:function(){ if(typeof showArchivedApplications==='function') showArchivedApplications(); else window.location.href='housing.html?view=archived-apps'; } },
     ]
   },

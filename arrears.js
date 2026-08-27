@@ -519,6 +519,315 @@
     });
   };
 
+  // ── A/R ledger import (reconciliation exercise) ──────────────────────────
+  // Paste a Sage-style "A/R Aged Trial Balance" report (or any text/CSV where
+  // each line ends with the six money columns Current / 1-30 / 31-60 / 61-90 /
+  // Over-90 / Total). Rows are fuzzy-matched to tenants, reviewed, then:
+  //   - Total    -> an opening_balance row in finance_rent_ledger (the arrears
+  //                 machine + finance module pick it up immediately)
+  //   - Current  -> the tenant's unit monthly rent, ONLY when the unit has no
+  //                 rent recorded (never overwrites)
+  // Every imported row is tagged [AR-IMPORT:<customer-no>] in the ledger
+  // description, so re-pasting the same report skips already-imported rows.
+  var IMP = { rows: [], imported: {} };
+
+  function _normName(s) {
+    return String(s || '').toLowerCase()
+      .replace(/\(.*?\)/g, ' ')                        // (SIW) etc.
+      .replace(/\b(rent|mort|mortgage|sec(tion)?)\b/g, ' ')
+      .replace(/[^a-z\s]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  function _parseArText(text) {
+    var rows = [];
+    String(text || '').split(/\r?\n/).forEach(function (line) {
+      var l = line.trim();
+      if (!l) return;
+      var moneys = l.match(/-?[\d,]+\.\d{2}/g);
+      if (!moneys || moneys.length < 6) return;
+      var last6 = moneys.slice(-6).map(function (m) { return parseFloat(m.replace(/,/g, '')); });
+      var headEnd = l.indexOf(moneys[moneys.length - 6]);
+      var head = l.slice(0, headEnd).trim();
+      var mHead = head.match(/^(\S+)\s+(.+)$/);
+      if (!mHead) return;
+      var custno = mHead[1], name = mHead[2].replace(/[-–]\s*$/, '').trim();
+      if (/interest/i.test(name) || /^HYDRO/i.test(custno)) return;   // non-tenant accounts
+      rows.push({ custno: custno, rawName: name, name: _normName(name),
+                  current: last6[0], total: last6[5] });
+    });
+    return rows;
+  }
+  function _matchTenant(normName) {
+    var tenants = CACHE.tenants || [];
+    var exact = tenants.find(function (t) { return _normName(t.full_name) === normName; });
+    if (exact) return { tenant: exact, how: 'exact' };
+    var toks = normName.split(' ');
+    if (toks.length >= 2) {
+      var f = toks[0], l = toks[toks.length - 1];
+      var hits = tenants.filter(function (t) {
+        var tt = _normName(t.full_name).split(' ');
+        return tt.length >= 2 && ((tt[0] === f && tt[tt.length - 1] === l) || (tt[0] === l && tt[tt.length - 1] === f));
+      });
+      if (hits.length === 1) return { tenant: hits[0], how: 'fuzzy' };
+    }
+    return { tenant: null, how: 'none' };
+  }
+  function _unitForTenant(t) {
+    if (!t || !t.current_unit_id) return null;
+    return ((window.housingUnits || []).find(function (u) { return u && u.id === t.current_unit_id; })) || null;
+  }
+
+  window.openArrearsImport = function () {
+    if (!_can('manageArrears')) { showToast('You are not authorized to import arrears.', { type: 'error' }); return; }
+    var ex = document.getElementById('modalArImport'); if (ex) ex.remove();
+    var mo = document.createElement('div');
+    mo.className = 'modal-ov'; mo.id = 'modalArImport';
+    mo.innerHTML = '<div class="modal" style="max-width:1000px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
+      + '<div class="modal-hdr"><div><h2>Import Arrears Ledger (A/R)</h2>'
+      + '<div style="font-size:11px;opacity:.7;margin-top:2px;">Paste the A/R Aged Trial Balance text. Totals become opening balances in the rent ledger; the Current column sets unit rent where none is recorded. Already-imported rows are skipped automatically.</div></div>'
+      + '<button class="modal-close" onclick="var m=document.getElementById(\'modalArImport\');if(m)m.remove();">&#x2715;</button></div>'
+      + '<div class="modal-body" style="padding:14px 16px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;">'
+      +   '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'
+      +     '<label class="btn btn-ghost" style="padding:6px 12px;font-size:12px;cursor:pointer;">📄 Upload PDF / text file'
+      +       '<input type="file" id="ar_import_file" accept=".pdf,.txt,.csv,application/pdf,text/plain,text/csv" style="display:none;" onchange="_arImpFile(this)"/></label>'
+      +     '<span id="ar_import_file_status" style="font-size:11px;color:var(--muted);">…or paste the report text below</span>'
+      +   '</div>'
+      +   '<textarea id="ar_import_text" style="width:100%;min-height:130px;box-sizing:border-box;font-family:ui-monospace,Menlo,monospace;font-size:11px;" placeholder="Paste the report text here — each customer line ending in the six amount columns…"></textarea>'
+      +   '<div style="margin:8px 0;"><button class="btn btn-primary" onclick="_arImpParse()">Parse &amp; Match</button></div>'
+      +   '<div id="ar_import_review"></div>'
+      + '</div></div>';
+    mo.addEventListener('click', function (e) { if (e.target === mo) mo.remove(); });
+    document.body.appendChild(mo); mo.style.display = ''; mo.classList.add('on');
+    window.arrearsLoad();
+  };
+
+  // ── File upload: .txt/.csv read directly; .pdf extracted in-browser via
+  // pdf.js (lazy-loaded from cdnjs — the same CSP-allowlisted host as jsPDF;
+  // cross-origin workers can't start, so pdf.js falls back to its main-thread
+  // "fake worker" automatically, fine for a report-sized document).
+  var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  var _pdfjsPromise = null;
+  function _loadPdfjs() {
+    if (window.pdfjsLib) return Promise.resolve();
+    if (_pdfjsPromise) return _pdfjsPromise;
+    _pdfjsPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = PDFJS_URL;
+      s.onload = function () {
+        try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; } catch (e) {}
+        resolve();
+      };
+      s.onerror = function () { _pdfjsPromise = null; reject(new Error('PDF library failed to load (offline?)')); };
+      document.head.appendChild(s);
+    });
+    return _pdfjsPromise;
+  }
+  // Rebuild text LINES from pdf.js text items: group by row (rounded y within
+  // the page), order by x, join with spaces — the report is a table, so each
+  // customer's columns share one baseline.
+  function _arImpLinesFromItems(items) {
+    var rows = {};
+    (items || []).forEach(function (it) {
+      if (!it || !it.str || !it.transform) return;
+      var y = Math.round(it.transform[5]);
+      var key = null;
+      // Snap to an existing row within 2px so tiny baseline jitter doesn't split rows.
+      for (var dy = -2; dy <= 2; dy++) { if (rows[y + dy]) { key = y + dy; break; } }
+      if (key == null) { key = y; rows[key] = []; }
+      rows[key].push({ x: it.transform[4], s: it.str });
+    });
+    return Object.keys(rows)
+      .sort(function (a, b) { return Number(b) - Number(a); })   // top of page first
+      .map(function (k) {
+        return rows[k].sort(function (a, b) { return a.x - b.x; }).map(function (p) { return p.s; }).join(' ');
+      });
+  }
+  window._arImpLinesFromItems = _arImpLinesFromItems;   // exposed for tests
+  window._arImpFile = function (input) {
+    var f = input && input.files && input.files[0];
+    if (!f) return;
+    var status = document.getElementById('ar_import_file_status');
+    var setStatus = function (t) { if (status) status.textContent = t; };
+    var finish = function (text) {
+      var ta = document.getElementById('ar_import_text');
+      if (ta) ta.value = text;
+      setStatus(f.name + ' loaded — parsing…');
+      window._arImpParse();
+      setStatus(f.name + ' loaded.');
+    };
+    input.value = '';
+    if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') {
+      setStatus('Reading ' + f.name + '…');
+      var reader = new FileReader();
+      reader.onload = function () {
+        _loadPdfjs().then(function () {
+          return window.pdfjsLib.getDocument({ data: new Uint8Array(reader.result) }).promise;
+        }).then(function (doc) {
+          var pages = [];
+          var chain = Promise.resolve();
+          for (var i = 1; i <= doc.numPages; i++) {
+            (function (n) {
+              chain = chain.then(function () {
+                setStatus('Reading ' + f.name + ' — page ' + n + ' of ' + doc.numPages + '…');
+                return doc.getPage(n).then(function (p) { return p.getTextContent(); })
+                  .then(function (tc) { pages.push(_arImpLinesFromItems(tc.items).join('\n')); });
+              });
+            })(i);
+          }
+          return chain.then(function () { finish(pages.join('\n')); });
+        }).catch(function (err) {
+          setStatus('');
+          showToast('Could not read the PDF (' + err.message + '). Paste the report text instead.', { type: 'error' });
+        });
+      };
+      reader.readAsArrayBuffer(f);
+    } else {
+      var r2 = new FileReader();
+      r2.onload = function () { finish(String(r2.result || '')); };
+      r2.readAsText(f);
+    }
+  };
+
+  window._arImpParse = function () {
+    var txt = (document.getElementById('ar_import_text') || {}).value || '';
+    var review = document.getElementById('ar_import_review');
+    if (!review) return;
+    review.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Matching against tenants and prior imports…</div>';
+    Promise.all([
+      window.arrearsLoad(),
+      _get('finance_rent_ledger?entry_type=eq.opening_balance&description=like.*AR-IMPORT*&select=description&limit=5000')
+    ]).then(function (res) {
+      IMP.imported = {};
+      (res[1] || []).forEach(function (r) {
+        var m = String(r.description || '').match(/\[AR-IMPORT:([^\]]+)\]/);
+        if (m) IMP.imported[m[1]] = true;
+      });
+      IMP.rows = _parseArText(txt).map(function (row) {
+        var m = _matchTenant(row.name);
+        row.tenantId = m.tenant ? m.tenant.id : '';
+        row.tenantName = m.tenant ? m.tenant.full_name : '';
+        row.how = m.how;
+        row.already = !!IMP.imported[row.custno];
+        return row;
+      });
+      _arImpRender();
+    });
+  };
+
+  function _arImpRender() {
+    var review = document.getElementById('ar_import_review');
+    if (!review) return;
+    if (!IMP.rows.length) { review.innerHTML = '<div style="color:var(--muted);font-size:12px;">No ledger lines recognized — each line must end with six amount columns.</div>'; return; }
+    var chips = { exact: ['Matched', 'var(--success)', 'var(--success-bg)'], fuzzy: ['Fuzzy', 'var(--warn-amber-text)', 'var(--warn-amber-bg)'], none: ['Unmatched', 'var(--danger)', 'var(--danger-bg)'] };
+    var counts = { exact: 0, fuzzy: 0, none: 0, already: 0, rentSets: 0 };
+    var dl = '<datalist id="ar_tenant_dl">' + (CACHE.tenants || []).map(function (t) { return '<option value="' + _esc(t.full_name) + '"></option>'; }).join('') + '</datalist>';
+    var body = IMP.rows.map(function (r, i) {
+      var c = chips[r.how];
+      if (r.already) counts.already++; else counts[r.how]++;
+      var t = r.tenantId ? CACHE.byTenant[r.tenantId] : null;
+      var unit = t ? _unitForTenant(t.tenant) : null;
+      var willSetRent = !!(unit && r.current > 0 && !(Number(unit.monthlyRent) > 0) && !r.already);
+      if (willSetRent && r.tenantId) counts.rentSets++;
+      r._willSetRent = willSetRent;
+      return '<tr' + (r.already ? ' style="opacity:.5;"' : '') + '>'
+        + '<td style="font-family:ui-monospace,monospace;font-size:10px;">' + _esc(r.custno) + '</td>'
+        + '<td style="font-weight:600;font-size:12px;">' + _esc(r.rawName) + '</td>'
+        + '<td>' + (r.already
+            ? '<span style="font-size:10px;font-weight:700;color:var(--muted);">Already imported</span>'
+            : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:' + c[1] + ';background:' + c[2] + ';">' + c[0] + '</span>') + '</td>'
+        + '<td><input list="ar_tenant_dl" data-ar-row="' + i + '" value="' + _esc(r.tenantName) + '" placeholder="pick tenant…" style="width:150px;font-size:11px;padding:3px 6px;"' + (r.already ? ' disabled' : '') + '/></td>'
+        + '<td style="text-align:right;font-size:12px;">' + _money(r.current) + '</td>'
+        + '<td style="text-align:right;font-size:12px;font-weight:700;">' + _money(r.total) + '</td>'
+        + '<td style="font-size:10px;color:var(--muted);">' + (willSetRent ? 'rent → ' + _money(r.current) : (unit && Number(unit.monthlyRent) > 0 ? 'rent set' : '')) + '</td>'
+        + '</tr>';
+    }).join('');
+    review.innerHTML = dl
+      + '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">' + IMP.rows.length + ' rows — '
+      + counts.exact + ' matched · ' + counts.fuzzy + ' fuzzy · ' + counts.none + ' unmatched · ' + counts.already + ' already imported · ' + counts.rentSets + ' unit rents will be set. Fix unmatched rows with the tenant picker (leave blank to skip).</div>'
+      + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Cust #</th><th>Ledger name</th><th>Match</th><th>Tenant</th><th style="text-align:right;">Current</th><th style="text-align:right;">Total</th><th></th></tr></thead><tbody>'
+      + body + '</tbody></table></div>'
+      + '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" onclick="_arImpRun()">Import matched rows</button>'
+      + '<span id="ar_import_progress" style="font-size:12px;color:var(--muted);"></span></div>';
+    review.querySelectorAll('[data-ar-row]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var r = IMP.rows[Number(inp.getAttribute('data-ar-row'))];
+        var t = (CACHE.tenants || []).find(function (x) { return x.full_name === inp.value; });
+        r.tenantId = t ? t.id : '';
+        r.tenantName = t ? t.full_name : '';
+        r.how = t ? 'exact' : 'none';
+        _arImpRender();
+      });
+    });
+  }
+
+  window._arImpRun = async function () {
+    if (!_can('manageArrears')) return;
+    var todo = IMP.rows.filter(function (r) { return r.tenantId && !r.already && r.total !== 0; });
+    if (!todo.length) { showToast('Nothing to import — no matched, un-imported rows with a total.', { type: 'error' }); return; }
+    var go = (typeof showConfirm === 'function')
+      ? await showConfirm({ title: 'Import ' + todo.length + ' ledger rows?',
+          message: 'Writes one opening-balance row per ledger line into the finance rent ledger (tagged for re-run safety) and sets unit rent from the Current column where none is recorded. Every write is audited.',
+          confirmText: 'Import ' + todo.length, cancelText: 'Cancel' })
+      : window.confirm('Import ' + todo.length + ' rows?');
+    if (!go) return;
+    var prog = document.getElementById('ar_import_progress');
+    var asOf = _todayISO();
+    var nation = (window.NATION_CONFIG && NATION_CONFIG.id) || 'default';
+    var ledgerRows = todo.map(function (r) {
+      var t = CACHE.byTenant[r.tenantId];
+      return {
+        id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+        nation_id: nation,
+        tenant_id: r.tenantId,
+        unit_id: (t && t.tenant.current_unit_id) || null,
+        entry_type: 'opening_balance',
+        amount: r.total,
+        entry_date: asOf,
+        description: 'A/R arrears import ' + asOf + ' — ' + r.rawName + ' [AR-IMPORT:' + r.custno + ']'
+      };
+    });
+    try {
+      if (prog) prog.textContent = 'Writing ' + ledgerRows.length + ' ledger rows…';
+      var resp = await fetch(SUPABASE_URL + '/rest/v1/finance_rent_ledger', {
+        method: 'POST',
+        headers: _hdrs({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+        body: JSON.stringify(ledgerRows)
+      });
+      if (!resp.ok) throw new Error('ledger insert HTTP ' + resp.status);
+    } catch (err) {
+      showToast('Import failed: ' + err.message + ' — nothing was partially applied to units.', { type: 'error' });
+      if (prog) prog.textContent = '';
+      return;
+    }
+    // Unit rents from the Current column — only where no rent is recorded.
+    var rentSet = 0;
+    todo.forEach(function (r) {
+      if (!r._willSetRent) return;
+      var t = CACHE.byTenant[r.tenantId];
+      var unit = t ? _unitForTenant(t.tenant) : null;
+      if (!unit || Number(unit.monthlyRent) > 0) return;
+      unit.monthlyRent = Math.round(r.current * 100) / 100;
+      if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(unit);
+      else if (typeof sbSaveUnit === 'function') sbSaveUnit(unit);
+      if (typeof auditEntry === 'function') auditEntry(unit.id, 'rent_set_from_ar_import',
+        'Monthly rent set to $' + unit.monthlyRent.toFixed(2) + ' from the A/R ledger Current column (' + r.custno + ')', window.currentRole || 'staff');
+      rentSet++;
+    });
+    todo.forEach(function (r) {
+      r.already = true;
+      IMP.imported[r.custno] = true;
+      if (typeof auditEntry === 'function') auditEntry('TENANT:' + r.tenantId, 'arrears_imported',
+        'A/R opening balance imported: ' + _money(r.total) + ' (' + r.custno + ', as of ' + asOf + ')', window.currentRole || 'staff');
+    });
+    if (prog) prog.textContent = '';
+    showToast('Imported ' + todo.length + ' arrears balances' + (rentSet ? ' · set rent on ' + rentSet + ' unit(s)' : '') + '.', { type: 'info' });
+    await window.arrearsLoad(true);
+    _arImpRender();
+    if (typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+  };
+
   // ── Boot: hydrate the cache after login so the allocation gate and the
   // worklist section have data. Re-renders the worklist when ready.
   document.addEventListener('DOMContentLoaded', function () {
