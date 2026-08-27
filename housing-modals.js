@@ -3238,6 +3238,24 @@ function confirmApprovalAction() {
     }
   }
 
+  // Policy 8.4(h) — years-between-allocations rule (configurable, Settings >
+  // Policy Rules). A prior new-housing allocation inside the window makes
+  // final approval an ED exception: explicit confirm + an audit row.
+  if (typeof policyPriorAllocation === 'function' && action === 'ed_approved') {
+    var _pa = policyPriorAllocation(app);
+    if (_pa) {
+      var _paYears = (typeof policyParam === 'function') ? policyParam('rehousing_years', 'years', 15) : 15;
+      if (!window.confirm(
+          ((app.fn||'') + ' ' + (app.ln||'')).trim() + ' was allocated housing on ' + _pa.when
+          + ' — inside the ' + _paYears + '-year re-housing window (Policy 8.4h, application ' + _pa.appId + ').'
+          + '\n\nApproving anyway is an ED EXCEPTION and will be recorded in the audit log.\n\nProceed?')) {
+        return;
+      }
+      if (typeof auditEntry === 'function') auditEntry(app.id, 'policy_exception',
+        'ED exception to the ' + _paYears + '-year re-housing rule (Policy 8.4h) — prior allocation ' + _pa.when + ' on ' + _pa.appId, window.currentRole || 'staff');
+    }
+  }
+
   // Find and update the application
   var idx = applications.findIndex(function(a){ return a.id === app.id; });
   if(idx === -1) { showToast('Application not found', {type:'error'}); closeApprovalModal(); return; }

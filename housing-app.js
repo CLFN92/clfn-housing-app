@@ -201,6 +201,17 @@ function validateStep0() {
       if (typeof isFieldRequired === 'function' && !isFieldRequired(f.id)) return;
       if (!fld(f.id)) errs.push(f.errorLabel || (f.label + ' is required.'));
     });
+  // Policy Rules: minimum applicant age (Policy 8.1b, configurable per
+  // nation in Settings > Policy Rules). Only fires when a DOB is entered —
+  // missing DOB stays the Required-Fields registry's call.
+  if (typeof policyRule === 'function' && policyRule('min_age').enabled) {
+    var _minY = policyParam('min_age', 'years', 18);
+    var _age = (typeof policyAgeYears === 'function') ? policyAgeYears(fld('dob')) : null;
+    if (_age != null && _age < _minY) {
+      errs.push('The primary applicant must be at least ' + _minY + ' years old (Policy 8.1) — DOB gives age ' + _age + '.');
+    }
+  }
+
   // Conditional fields — always required when their toggle is on, regardless
   // of the global config.
   var arrTog = document.getElementById('arrToggle');

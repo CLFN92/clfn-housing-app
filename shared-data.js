@@ -3449,7 +3449,17 @@ function appAssignabilityStatus(app, unit){
   }
   var s = app.status || '';
   var ok = (s === 'ed_approved' || s === 'mgr_approved' || s === 'hm_approved');
-  if(ok) return { ok:true, reason:'' };
+  if(ok){
+    // Policy 8.5 / 12.5 good-standing gate — arrears with no approved
+    // repayment arrangement block assignment. Reads the arrears machine's
+    // cache of FINANCE data; fails open while that hasn't loaded and when
+    // the policy rule is disabled (arrears.js / policy-rules.js).
+    if(typeof arrearsAllocationBlock === 'function'){
+      var _gs = arrearsAllocationBlock(((app.fn||'') + ' ' + (app.ln||'')).trim());
+      if(_gs) return { ok:false, reason:_gs };
+    }
+    return { ok:true, reason:'' };
+  }
   var lbl = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(s) : String(s).replace(/_/g,' ');
   return { ok:false, reason:'Approval required before assigning — application is: ' + lbl };
 }
@@ -7349,6 +7359,34 @@ function renderWorklist() {
         actions:[{text:'Match →',onclick:open}] });
     }).join('');
     html += sectionWrap('🏠', 'Ready to Match', matchItems.length, 'housing.html?view=match', _view==='cards' ? wlGrid(matchCards) : matchRows, 0);
+  }
+
+  // ── Arrears — action needed (Policy s.12 machine, management only) ──────
+  // Pending-ED arrangement approvals, overdue quarterly reviews, and 12-month
+  // windows expiring/expired. Data comes from the arrears machine's cache of
+  // the FINANCE tables; the section simply doesn't render until it loads
+  // (arrears.js re-triggers renderWorklist once ready).
+  if (isManagement && typeof arrearsWorklistItems === 'function' && window._arrearsCache && window._arrearsCache.loaded) {
+    var arrItems = arrearsWorklistItems();
+    if (arrItems.length) {
+      var _arrOpen = function(it){
+        var target = (window._arrearsCache.byTenant[it.tid].tenant.current_unit_id || it.tid);
+        return "if(typeof openTenantCard==='function')openTenantCard('" + String(target).replace(/'/g,"\\'") + "')";
+      };
+      var arrRows = arrItems.map(function(it){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);">'
+          + '<a onclick="' + _arrOpen(it) + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-decoration:none;color:inherit;cursor:pointer;">'
+          +   '<span style="flex:0 0 30%;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(it.name) + '</span>'
+          +   '<span style="flex:1;font-size:12px;color:var(--muted);">' + esc(it.label) + '</span>'
+          + '</a>'
+          + '<a onclick="' + _arrOpen(it) + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;white-space:nowrap;cursor:pointer;display:inline-block;">Open &#8594;</a>'
+          + '</div>';
+      }).join('');
+      var arrCards = arrItems.map(function(it){
+        return wlCard({ title: it.name, open: _arrOpen(it), metas:[{k:'Action', v: it.label}], actions:[{text:'Open →', onclick: _arrOpen(it)}] });
+      }).join('');
+      html += sectionWrap('💰', 'Arrears — Action Needed', arrItems.length, '', _view==='cards' ? wlGrid(arrCards) : arrRows, 0);
+    }
   }
 
   body.innerHTML = html;

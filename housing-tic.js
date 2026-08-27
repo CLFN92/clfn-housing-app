@@ -754,6 +754,23 @@
       + '</div>';
 
     if(mapOn) _ticInitMap(u);
+
+    // Arrears & repayment (Policy s.12 machine, arrears.js) — reads the
+    // FINANCE ledger/arrangements; renders below the overview columns.
+    if (typeof arrearsRenderTicPanel === 'function') {
+      try {
+        var _arMain = _ticEl('tic_panel_overview').querySelector('.tic-overview-main');
+        if (_arMain) {
+          var _arMount = document.createElement('div');
+          _arMount.id = 'tic_arrears_mount';
+          _arMain.appendChild(_arMount);
+          var _arName = (_ticState.tenant && _ticState.tenant[TIC_C.full_name])
+                     || (_ticState.unit && _ticState.unit.assignedName) || '';
+          var _arRent = (_ticState.unit && (_ticState.unit.monthlyRent != null ? _ticState.unit.monthlyRent : _ticState.unit.monthly_rent)) || 0;
+          arrearsRenderTicPanel(_arMount, _arName, Number(_arRent) || 0);
+        }
+      } catch(e) { console.warn('[TIC] arrears panel failed:', e); }
+    }
   }
 
   var _ticUtilDocLib    = null;

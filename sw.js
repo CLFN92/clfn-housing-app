@@ -19,7 +19,7 @@ var LIB_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
 // Minimal boot shell + the libraries needed to generate forms offline.
 var PRECACHE = [
   'index.html',
-  'shared.js', 'shared-config.js', 'rent-age.js', 'shared-auth.js', 'shared-ui.js', 'shared-data.js',
+  'shared.js', 'shared-config.js', 'rent-age.js', 'policy-rules.js', 'arrears.js', 'shared-auth.js', 'shared-ui.js', 'shared-data.js',
   'shared.css',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js',

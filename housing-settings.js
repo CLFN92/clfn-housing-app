@@ -311,6 +311,7 @@ var SETTINGS_SECTION_GROUPS = {
   sec_maint_qr:            'admin',
   sec_app_scoring:         'app',
   sec_rent_model:          'app',
+  sec_policy_rules:        'app',
   sec_required_fields:     'app',
   sec_unit_match:          'app',
   sec_reno_score:          'app',
@@ -346,7 +347,7 @@ function showSettingsGroup(groupId) {
 }
 
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_notifications','sec_terms','sec_contracts','sec_config','sec_maint_qr','sec_audit','sec_occupancy','sec_rent_model'];
+  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_notifications','sec_terms','sec_contracts','sec_config','sec_maint_qr','sec_audit','sec_occupancy','sec_rent_model','sec_policy_rules'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -2275,3 +2276,77 @@ function saveRentAgeSchedule(){
   renderRentModelPanel();
 }
 window.saveRentAgeSchedule = saveRentAgeSchedule;
+
+// ── Policy Rules panel (Settings > App Settings > Policy Rules) ──────────────
+// Renders the POLICY_RULES_DEFAULTS registry (policy-rules.js) grouped, with
+// an enable toggle + numeric parameter inputs per rule. Persisted to
+// housing_settings key 'policy_rules' as {rules:{key:{enabled,params}}};
+// getPolicyRules() merges over the defaults. Gated by editPolicyRules.
+function renderPolicyRulesPanel(){
+  var body = document.getElementById('policy_rules_body');
+  if(!body) return;
+  if(typeof getPolicyRules !== 'function'){ body.innerHTML = '<div class="empty-state-ctr">Policy rules module not loaded.</div>'; return; }
+  var role = window.currentRole || '';
+  var canEdit = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('editPolicyRules', role);
+  var dis = canEdit ? '' : ' disabled';
+  var rules = getPolicyRules();
+  var groups = {};
+  Object.keys(rules).forEach(function(k){ (groups[rules[k].group] = groups[rules[k].group] || []).push(k); });
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">The nation\'s housing-policy parameters as configuration — the app enforces these at the points described under each rule. Change a number here and every gate updates immediately; no deploy. Section references are to the nation\'s Housing Policy.</div>';
+  Object.keys(groups).forEach(function(g){
+    html += '<div class="card" style="margin-top:12px;"><div class="ctitle">' + g + '</div>';
+    groups[g].forEach(function(k){
+      var r = rules[k];
+      var paramInputs = Object.keys(r.params).map(function(p){
+        return '<span style="display:inline-flex;align-items:center;gap:6px;">' + p
+          + ' <input type="number" min="0" step="1" id="pr_' + k + '_' + p + '" value="' + r.params[p] + '"' + dis + ' style="width:76px;flex:none;padding:6px 8px;"/></span>';
+      }).join(' ');
+      html += '<div style="padding:9px 0;border-bottom:1px solid var(--border);">'
+        + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+        +   '<label style="display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;cursor:pointer;">'
+        +     '<input type="checkbox" id="pr_' + k + '_on"' + (r.enabled ? ' checked' : '') + dis + '/> ' + r.label
+        +   '</label>'
+        +   '<span style="font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;">' + (r.cite || '') + '</span>'
+        +   '<span style="margin-left:auto;display:inline-flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);">' + paramInputs + '</span>'
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--muted);margin-top:4px;max-width:70ch;">' + r.desc + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+  html += canEdit
+    ? '<div style="margin-top:12px;"><button class="btn btn-primary" onclick="savePolicyRules()">Save Policy Rules</button></div>'
+    : '<div class="empty-state-ctr">Editing policy rules requires the "Edit Policy Rules parameters" authority.</div>';
+  body.innerHTML = html;
+}
+window.renderPolicyRulesPanel = renderPolicyRulesPanel;
+
+function savePolicyRules(){
+  var role = window.currentRole || '';
+  if(typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('editPolicyRules', role)){
+    showToast('You are not authorized to edit policy rules', {type:'error'});
+    return;
+  }
+  var d = window.POLICY_RULES_DEFAULTS || {};
+  var out = {};
+  var bad = null;
+  Object.keys(d).forEach(function(k){
+    var on = !!((document.getElementById('pr_' + k + '_on')||{}).checked);
+    var params = {};
+    Object.keys(d[k].params).forEach(function(p){
+      var v = parseFloat((document.getElementById('pr_' + k + '_' + p)||{}).value);
+      if(isNaN(v) || v < 0){ bad = d[k].label + ' — ' + p; }
+      params[p] = Math.round(v * 100) / 100;
+    });
+    out[k] = { enabled: on, params: params };
+  });
+  if(bad){ showToast('Invalid value: ' + bad + ' (must be zero or greater)', {type:'error'}); return; }
+  window._appSettings = window._appSettings || {};
+  window._appSettings.policy_rules = { rules: out };
+  if(typeof saveSettingWithDraftFallback === 'function') saveSettingWithDraftFallback('policy_rules', { rules: out });
+  if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'policy_rules_updated',
+    'Policy Rules saved — ' + Object.keys(out).map(function(k){ return k + (out[k].enabled ? '' : '(off)') + '=' + JSON.stringify(out[k].params); }).join('; '), role);
+  showToast('Policy rules saved', {type:'info'});
+  renderPolicyRulesPanel();
+}
+window.savePolicyRules = savePolicyRules;

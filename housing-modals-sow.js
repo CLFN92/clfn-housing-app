@@ -2773,6 +2773,27 @@ function saveSOW(opts){
   if(data.condition) detail += ' · Condition: ' + data.condition;
   auditEntry('SOW:'+(_sowUnitId||'?'), isNew ? 'sow_created' : 'sow_updated', detail, role);
 
+  // Policy 8.4(i) — renovation-support window (Settings > Policy Rules).
+  // A NEW request on a unit with completed renovations inside the window
+  // gets a persistent warning toast; never blocks (health & safety work is
+  // exempt by policy and can't be auto-detected reliably).
+  if (isNew && typeof policyRule === 'function' && policyRule('renovation_years').enabled) {
+    try {
+      var _rvYears = policyParam('renovation_years', 'years', 5);
+      var _rvCut = new Date(); _rvCut.setFullYear(_rvCut.getFullYear() - _rvYears);
+      var _rvPrior = ((typeof getUnitSowList === 'function') ? getUnitSowList(_sowUnitId) : []).find(function(sw){
+        if(!sw || sw.project_number === data.project_number) return false;
+        if(sw.approval_status !== 'completed') return false;
+        var when = sw.completedAt || sw.completed_at || sw.edDate || sw.hmDate || '';
+        return when && new Date(String(when).slice(0,10) + 'T12:00:00') >= _rvCut;
+      });
+      if(_rvPrior){
+        showToast('⚠ Policy 8.4(i): this unit had renovations completed within the last ' + _rvYears + ' years ('
+          + (_rvPrior.project_number || 'prior request') + '). Additional support requires a health & safety justification.', {type:'error'});
+      }
+    } catch(e){}
+  }
+
   // Workflow emails (sow_created / tenant copy / contractor work order /
   // in-house field-employee work order) — extracted to _sowFireEmails with
   // the dedupe conditions unchanged.

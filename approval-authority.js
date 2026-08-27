@@ -61,6 +61,16 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can edit the age-adjustment band schedule (Settings > Rent Model)
     editRentAgeFactors:       ['housing_manager', 'ed'],
 
+    // ── Arrears & policy (Policy s.8 / s.12) ──────────────────────────────
+    // Who can edit the nation's Policy Rules parameters (Settings)
+    editPolicyRules:          ['ed'],
+    // Who can create repayment arrangements / record reviews & final notices
+    manageArrears:            ['housing_manager', 'ed'],
+    // Who approves a repayment arrangement (starts the protected window)
+    approveArrangement:       ['ed'],
+    // Who can authorize an arrears eviction (after the 12.4 precondition gate)
+    authorizeEviction:        ['ed'],
+
     // ── Application signatures ────────────────────────────────────────────
     // Who can unlock (override) applicant signatures after an app is submitted
     unlockSignatures:         ['housing_manager', 'ed'],
@@ -410,6 +420,10 @@ var APPROVAL_AUTHORITY = (function() {
       assignTiedBand:           'Assign within tied score band',
       assignRentAmount:         'Set / edit unit rent amount',
       editRentAgeFactors:       'Edit rent age-adjustment schedule',
+      editPolicyRules:          'Edit Policy Rules parameters',
+      manageArrears:            'Manage repayment arrangements & arrears reviews',
+      approveArrangement:       'Approve repayment arrangements',
+      authorizeEviction:        'Authorize arrears eviction (Policy 12.4 gate)',
       unlockSignatures:         'Unlock applicant signatures after submission',
       sowEdThreshold:           'Maintenance Request dollar threshold for ED approval ($)',
       approveSowUnderThreshold: 'Approve Maintenance Request under threshold',
@@ -452,6 +466,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','deleteApplication','unlockSignatures','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount','overrideRent','editRentAgeFactors'],
+      'Arrears & Policy':     ['editPolicyRules','manageArrears','approveArrangement','authorizeEviction'],
       'Maintenance Request & Renovation': ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor','unlockEmailAttachments'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment','editMatchPriority'],
