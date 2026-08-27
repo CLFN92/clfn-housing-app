@@ -2788,7 +2788,7 @@ function saveSOW(opts){
         return when && new Date(String(when).slice(0,10) + 'T12:00:00') >= _rvCut;
       });
       if(_rvPrior){
-        showToast('⚠ Policy 8.4(i): this unit had renovations completed within the last ' + _rvYears + ' years ('
+        showToast('⚠' + ((typeof policyCite==='function' && policyCite('renovation_years')) ? ' ' + policyCite('renovation_years') + ':' : '') + ' this unit had renovations completed within the last ' + _rvYears + ' years ('
           + (_rvPrior.project_number || 'prior request') + '). Additional support requires a health & safety justification.', {type:'error'});
       }
     } catch(e){}

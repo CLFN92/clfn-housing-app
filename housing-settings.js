@@ -2306,7 +2306,7 @@ function renderPolicyRulesPanel(){
         +   '<label style="display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;cursor:pointer;">'
         +     '<input type="checkbox" id="pr_' + k + '_on"' + (r.enabled ? ' checked' : '') + dis + '/> ' + r.label
         +   '</label>'
-        +   '<span style="font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;">' + (r.cite || '') + '</span>'
+        +   '<input type="text" id="pr_' + k + '_cite" value="' + String(r.cite || '').replace(/"/g,'&quot;') + '"' + dis + ' placeholder="your policy section" title="This nation\'s own policy reference for the rule — shown in warnings, dialogs, and audit rows; blank to omit" style="width:130px;font-size:10px;padding:3px 6px;color:var(--muted);"/>'
         +   '<span style="margin-left:auto;display:inline-flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);">' + paramInputs + '</span>'
         + '</div>'
         + '<div style="font-size:11px;color:var(--muted);margin-top:4px;max-width:70ch;">' + r.desc + '</div>'
@@ -2338,7 +2338,8 @@ function savePolicyRules(){
       if(isNaN(v) || v < 0){ bad = d[k].label + ' — ' + p; }
       params[p] = Math.round(v * 100) / 100;
     });
-    out[k] = { enabled: on, params: params };
+    out[k] = { enabled: on, params: params,
+               cite: ((document.getElementById('pr_' + k + '_cite')||{}).value || '').trim() };
   });
   if(bad){ showToast('Invalid value: ' + bad + ' (must be zero or greater)', {type:'error'}); return; }
   window._appSettings = window._appSettings || {};

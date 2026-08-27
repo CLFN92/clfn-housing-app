@@ -108,7 +108,11 @@ window.getPolicyRules = function () {
       params[p] = (isNaN(v) || v < 0) ? d[k].params[p] : v;
     });
     out[k] = {
-      label: d[k].label, group: d[k].group, cite: d[k].cite, desc: d[k].desc,
+      label: d[k].label, group: d[k].group, desc: d[k].desc,
+      // The policy citation is NATION DATA, not app copy — the shipped
+      // defaults are the reference nation's section numbers; every nation
+      // edits (or blanks) them in Settings to match its own policy.
+      cite: (s.cite != null) ? String(s.cite) : d[k].cite,
       enabled: (s.enabled != null) ? !!s.enabled : d[k].enabled,
       params: params
     };
@@ -121,6 +125,16 @@ window.getPolicyRules = function () {
 window.policyRule = function (key) {
   var r = window.getPolicyRules()[key];
   return r || { enabled: false, params: {} };
+};
+// The nation's own policy citation for a rule — '' when blanked/unknown.
+// policyCiteSuffix wraps it as ' (…)' for message building.
+window.policyCite = function (key) {
+  var r = window.getPolicyRules()[key];
+  return (r && r.cite) ? String(r.cite) : '';
+};
+window.policyCiteSuffix = function (key) {
+  var c = window.policyCite(key);
+  return c ? ' (' + c + ')' : '';
 };
 window.policyParam = function (key, name, fallback) {
   var r = window.policyRule(key);

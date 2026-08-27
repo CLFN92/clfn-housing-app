@@ -208,7 +208,7 @@ function validateStep0() {
     var _minY = policyParam('min_age', 'years', 18);
     var _age = (typeof policyAgeYears === 'function') ? policyAgeYears(fld('dob')) : null;
     if (_age != null && _age < _minY) {
-      errs.push('The primary applicant must be at least ' + _minY + ' years old (Policy 8.1) — DOB gives age ' + _age + '.');
+      errs.push('The primary applicant must be at least ' + _minY + ' years old' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('min_age'):'') + ' — DOB gives age ' + _age + '.');
     }
   }
 

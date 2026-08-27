@@ -3247,12 +3247,12 @@ function confirmApprovalAction() {
       var _paYears = (typeof policyParam === 'function') ? policyParam('rehousing_years', 'years', 15) : 15;
       if (!window.confirm(
           ((app.fn||'') + ' ' + (app.ln||'')).trim() + ' was allocated housing on ' + _pa.when
-          + ' — inside the ' + _paYears + '-year re-housing window (Policy 8.4h, application ' + _pa.appId + ').'
+          + ' — inside the ' + _paYears + '-year re-housing window' + ((typeof policyCite==='function' && policyCite('rehousing_years')) ? ' (' + policyCite('rehousing_years') + ', application ' + _pa.appId + ')' : ' (application ' + _pa.appId + ')') + '.'
           + '\n\nApproving anyway is an ED EXCEPTION and will be recorded in the audit log.\n\nProceed?')) {
         return;
       }
       if (typeof auditEntry === 'function') auditEntry(app.id, 'policy_exception',
-        'ED exception to the ' + _paYears + '-year re-housing rule (Policy 8.4h) — prior allocation ' + _pa.when + ' on ' + _pa.appId, window.currentRole || 'staff');
+        'ED exception to the ' + _paYears + '-year re-housing rule' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('rehousing_years'):'') + ' — prior allocation ' + _pa.when + ' on ' + _pa.appId, window.currentRole || 'staff');
     }
   }
 

@@ -312,7 +312,7 @@
   window.arrearsRecordFinalNotice = function (tenantId) {
     if (!_can('manageArrears')) { showToast('You are not authorized to record notices.', { type: 'error' }); return false; }
     var days = (typeof policyParam === 'function') ? policyParam('final_notice_days', 'days', 30) : 30;
-    _audit(tenantId, 'arrears_final_notice', 'Final written notice recorded — ' + days + '-day re-engagement period begins (Policy 12.4)');
+    _audit(tenantId, 'arrears_final_notice', 'Final written notice recorded — ' + days + '-day re-engagement period begins' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('final_notice_days'):''));
     showToast('Final notice recorded. Eviction cannot be authorized for ' + days + ' days.', { type: 'info' });
     return true;
   };
@@ -330,7 +330,7 @@
     var chk = window.arrearsEvictionCheck(tenantId);
     if (!chk) return false;
     var met = chk.conditions.filter(function (c) { return c.machine || (attestedKeys || []).indexOf(c.key) !== -1; });
-    if (!met.length) { showToast('No Policy 12.4 condition is met or attested — eviction cannot be authorized.', { type: 'error' }); return false; }
+    if (!met.length) { showToast('No eviction precondition' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('final_notice_days'):'') + ' is met or attested — eviction cannot be authorized.', { type: 'error' }); return false; }
     if (!chk.noticeSatisfied) {
       showToast('The final written notice must be recorded and at least ' + chk.noticeDaysRequired + ' days old first.', { type: 'error' });
       return false;
@@ -356,7 +356,7 @@
       if (!st) return null;
       var min = Number(rule.params.minArrears) || 1;
       if (st.balance >= min && !st.hasApproved) {
-        return 'Not in good standing: $' + st.balance.toFixed(2) + ' arrears with no approved repayment arrangement (Policy 8.5). Set up an arrangement first.';
+        return 'Not in good standing: $' + st.balance.toFixed(2) + ' arrears with no approved repayment arrangement' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('good_standing_gate'):'') + '. Set up an arrangement first.';
       }
       return null;
     } catch (e) { return null; }
@@ -425,7 +425,7 @@
     if (canApprove && st.hasApproved && st.windowExpired && !st.stamps.arrears_extension) btns.push(b('⏩ Extend window', '_arrUiExtend(' + args + ')'));
     if (canManage && st.balance > 0) btns.push(b('📮 Record final notice', '_arrUiFinalNotice(' + args + ')'));
     if (canEvict && st.balance > 0) btns.push(b('⚖ Eviction readiness', '_arrUiEvictionCheck(' + args + ')'));
-    mount.innerHTML = '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Arrears &amp; Repayment (Policy s.12)</div>'
+    mount.innerHTML = '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Arrears &amp; Repayment</div>'
       + '<div style="padding:6px 0 2px;">' + rows.join('') + '</div>'
       + (btns.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + btns.join('') + '</div>' : '')
       + '<div id="tic_arrears_detail" style="margin-top:8px;"></div>'
@@ -474,14 +474,14 @@
   };
   window._arrUiExtend = function (tid, rent) {
     var p = (typeof showPrompt === 'function')
-      ? showPrompt({ title: 'Extend the window (ED)', message: 'Documented reason for extending past the 12-month window (Policy 12.3).', placeholder: 'required', confirmText: 'Record extension' })
+      ? showPrompt({ title: 'Extend the window (ED)', message: 'Documented reason for extending past the protected window' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('arrangement_window_months'):'') + '.', placeholder: 'required', confirmText: 'Record extension' })
       : Promise.resolve(window.prompt('Extension reason (required):'));
     p.then(function (txt) { if (txt != null && String(txt).trim()) { window.arrearsRecordExtension(tid, String(txt)); _repaint(tid, rent); } });
   };
   window._arrUiFinalNotice = function (tid, rent) {
     var days = (typeof policyParam === 'function') ? policyParam('final_notice_days', 'days', 30) : 30;
     var go = (typeof showConfirm === 'function')
-      ? showConfirm({ title: 'Record final written notice?', message: 'Confirms the final written notice (grounds + a ' + days + '-day opportunity to re-engage, Policy 12.4) has been GIVEN to the tenant. Eviction cannot be authorized until ' + days + ' days after this record.', confirmText: 'Record notice' })
+      ? showConfirm({ title: 'Record final written notice?', message: 'Confirms the final written notice (grounds + a ' + days + '-day opportunity to re-engage' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('final_notice_days'):'') + ') has been GIVEN to the tenant. Eviction cannot be authorized until ' + days + ' days after this record.', confirmText: 'Record notice' })
       : Promise.resolve(window.confirm('Record final written notice?'));
     go.then(function (ok) { if (ok) { window.arrearsRecordFinalNotice(tid); _repaint(tid, rent); } });
   };
@@ -490,7 +490,7 @@
     var out = document.getElementById('tic_arrears_detail');
     if (!chk || !out) return;
     var html = '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">'
-      + '<div style="font-weight:700;font-size:12px;margin-bottom:6px;">Policy 12.4 — eviction preconditions</div>'
+      + '<div style="font-weight:700;font-size:12px;margin-bottom:6px;">Eviction preconditions' + ((typeof policyCiteSuffix==='function')?policyCiteSuffix('final_notice_days'):'') + '</div>'
       + chk.conditions.map(function (c) {
           var mark = c.machine ? '<strong style="color:var(--danger);">MET (verified)</strong>'
                    : (c.attest ? '<label style="cursor:pointer;"><input type="checkbox" data-arr-attest="' + c.key + '"/> ED attests</label>'
@@ -513,7 +513,7 @@
     var out = document.getElementById('tic_arrears_detail');
     var attested = out ? Array.prototype.map.call(out.querySelectorAll('[data-arr-attest]:checked'), function (el) { return el.getAttribute('data-arr-attest'); }) : [];
     var go = (typeof showConfirm === 'function')
-      ? showConfirm({ title: 'Authorize arrears eviction?', message: 'This records the ED\'s written authorization with the verified/attested Policy 12.4 conditions and the notice history. It is the LAST resort after supportive collection has been exhausted.', confirmText: 'Authorize', cancelText: 'Cancel' })
+      ? showConfirm({ title: 'Authorize arrears eviction?', message: 'This records the ED\'s written authorization with the verified/attested policy conditions and the notice history. It is the LAST resort after supportive collection has been exhausted.', confirmText: 'Authorize', cancelText: 'Cancel' })
       : Promise.resolve(window.confirm('Authorize arrears eviction?'));
     go.then(function (ok) {
       if (!ok) return;
