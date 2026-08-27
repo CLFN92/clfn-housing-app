@@ -647,7 +647,10 @@
   //                 rent recorded (never overwrites)
   // Every imported row is tagged [AR-IMPORT:<customer-no>] in the ledger
   // description, so re-pasting the same report skips already-imported rows.
-  var IMP = { rows: [], imported: {} };
+  // The same tagged rows double as a customer-number -> tenant memory: once a
+  // ledger customer has been imported (even via a manual picker choice), later
+  // uploads match them to that tenant automatically, before the name cascade.
+  var IMP = { rows: [], imported: {}, remembered: {} };
 
   function _normName(s) {
     return String(s || '').toLowerCase()
@@ -888,15 +891,29 @@
     review.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Matching against tenants and prior imports…</div>';
     Promise.all([
       window.arrearsLoad(),
-      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=description&limit=8000')
+      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=description,tenant_id&limit=8000')
     ]).then(function (res) {
       IMP.imported = {};
+      IMP.remembered = {};
       (res[1] || []).forEach(function (r) {
         var m = String(r.description || '').match(/\[AR-IMPORT:([^\]:]+)(?::([^\]]+))?\]/);
-        if (m) { (IMP.imported[m[1]] = IMP.imported[m[1]] || {})[m[2] || 'initial'] = true; }
+        if (m) {
+          (IMP.imported[m[1]] = IMP.imported[m[1]] || {})[m[2] || 'initial'] = true;
+          if (r.tenant_id) IMP.remembered[m[1]] = r.tenant_id;
+        }
       });
       IMP.rows = _parseArText(txt).map(function (row) {
-        var m = _matchLedgerRow(row.name);
+        // Remembered match first: a customer number imported before resolves
+        // straight to the tenant its ledger rows were written against — no
+        // name matching, so spelling-variant rows picked manually last month
+        // stay matched every month after. Falls back to the name cascade if
+        // the remembered tenant no longer exists (merged/removed).
+        var m = null, remId = IMP.remembered[row.custno];
+        if (remId) {
+          var remT = (CACHE.tenants || []).find(function (t) { return t && t.id === remId; });
+          if (remT) m = { kind: 'tenant', how: 'remembered', tenant: remT };
+        }
+        if (!m) m = _matchLedgerRow(row.name);
         row.kind = m.kind; row.how = m.how; row.ambiguous = m.ambiguous || 0;
         row.tenantId = m.tenant ? m.tenant.id : '';
         row.unitId = m.unit ? m.unit.id : (m.tenant && m.tenant.current_unit_id) || '';
@@ -961,7 +978,7 @@
         ? '<span style="font-size:10px;font-weight:700;color:var(--muted);">Imported ✓</span>'
         : isAmb
           ? '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:var(--danger);background:var(--danger-bg);">' + r.ambiguous + ' matches — pick one</span>'
-          : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:' + c[1] + ';background:' + c[2] + ';">' + c[0] + (r.how === 'fuzzy' ? ' ~' : '') + '</span>';
+          : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:' + c[1] + ';background:' + c[2] + ';"' + (r.how === 'remembered' ? ' title="Matched from a prior import of this customer number"' : '') + '>' + c[0] + (r.how === 'fuzzy' ? ' ~' : r.how === 'remembered' ? ' ✓' : '') + '</span>';
       var pickerVal = _rowResolved(r) && !isAmb
         ? r.targetName + (r.kind === 'unit' ? '  [unit ' + _esc(r.targetDetail) + ']' : r.kind === 'application' ? '  [' + _esc(r.targetDetail) + ']' : '  [tenant]')
         : '';
@@ -984,7 +1001,7 @@
       + '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">' + IMP.rows.length + ' rows — '
       + counts.tenant + ' tenant · ' + counts.unit + ' unit · ' + counts.application + ' applicant · '
       + counts.none + ' unmatched · ' + counts.ambiguous + ' ambiguous · ' + counts.already + ' imported · '
-      + (counts.insync || 0) + ' already in sync · ' + counts.rentSets + ' unit rents will be set. Each import writes the DIFFERENCE between the report total and the app balance (first import = opening balance; monthly re-imports = adjustments), so re-running the monthly A/R keeps balances synced. Unit/Applicant matches create the missing tenant record on import (find-first, audited). ~ marks a fuzzy name match.</div>'
+      + (counts.insync || 0) + ' already in sync · ' + counts.rentSets + ' unit rents will be set. Each import writes the DIFFERENCE between the report total and the app balance (first import = opening balance; monthly re-imports = adjustments), so re-running the monthly A/R keeps balances synced. Unit/Applicant matches create the missing tenant record on import (find-first, audited). ~ marks a fuzzy name match; ✓ marks a customer remembered from a prior import (matched by customer number, not name).</div>'
       + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Cust #</th><th>Ledger name</th><th>Match</th><th>Matched to</th><th style="text-align:right;">Current</th><th style="text-align:right;">Ledger Total</th><th style="text-align:right;">App Balance</th><th style="text-align:right;">Will Write</th><th></th><th></th></tr></thead><tbody>'
       + body + '</tbody></table></div>'
       + '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
