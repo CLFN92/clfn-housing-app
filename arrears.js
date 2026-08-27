@@ -41,7 +41,7 @@
     if (CACHE.loaded && !force) return Promise.resolve(CACHE);
     if (CACHE.loading && !force) return CACHE.loading;
     CACHE.loading = Promise.all([
-      _get('finance_rent_ledger?select=tenant_id,entry_type,amount&limit=20000'),
+      _get('finance_rent_ledger?select=tenant_id,entry_type,amount,entry_date&limit=20000'),
       _get('finance_arrangements?select=*&order=created_at.desc&limit=2000'),
       _get('finance_arr_payments?select=arrangement_id,payment_date,amount,voids_id&limit=20000'),
       _get('tenants?select=id,full_name,application_id,current_unit_id&merged_into=is.null&limit=5000')
@@ -53,10 +53,15 @@
       // including void reversals. Summing signed amounts exactly matches the
       // finance module's charge-minus-payment running balance.
       var TYPES = { opening_balance: 1, rent_charge: 1, adjustment_debit: 1, payment: 1, adjustment_credit: 1, void: 1 };
-      var bal = {};
+      var bal = {}, lastPay = {};
       ledger.forEach(function (r) {
         if (!r || !r.tenant_id || !TYPES[r.entry_type]) return;
         bal[r.tenant_id] = (bal[r.tenant_id] || 0) + (Number(r.amount) || 0);
+        // Last real payment date (negative payment rows), for the C&C report.
+        if (r.entry_type === 'payment' && Number(r.amount) < 0) {
+          var d = String(r.entry_date || '').slice(0, 10);
+          if (d && (!lastPay[r.tenant_id] || d > lastPay[r.tenant_id])) lastPay[r.tenant_id] = d;
+        }
       });
       var paysByArr = {};
       pays.forEach(function (p) {
@@ -67,7 +72,7 @@
       CACHE.tenants = tenants;
       CACHE.arrangements = arrs;
       tenants.forEach(function (t) {
-        CACHE.byTenant[t.id] = { tenant: t, balance: Math.round((bal[t.id] || 0) * 100) / 100, arrangements: [], payments: [] };
+        CACHE.byTenant[t.id] = { tenant: t, balance: Math.round((bal[t.id] || 0) * 100) / 100, lastPayment: lastPay[t.id] || '', arrangements: [], payments: [] };
       });
       arrs.forEach(function (a) {
         if (!a || a.archived) return;
@@ -513,6 +518,122 @@
     go.then(function (ok) {
       if (!ok) return;
       if (window.arrearsAuthorizeEviction(tid, attested, '')) _repaint(tid, rent);
+    });
+  };
+
+  // ── A/R report for Chief & Council ───────────────────────────────────────
+  // The quarterly-report arrears content (Policy s.5.2/s.31): totals, account
+  // states, and a per-tenant table — straight from the live finance data the
+  // machine already holds. PDF via lazy-loaded jsPDF+autotable (nation header,
+  // no hardcoded branding); CSV for spreadsheets.
+  window.arrearsReportData = function () {
+    var rows = [];
+    var sum = { outstanding: 0, credits: 0, inArrears: 0, creditCount: 0,
+                arrActive: 0, arrPending: 0, arrNonCompliant: 0, evictions: 0 };
+    Object.keys(CACHE.byTenant).forEach(function (tid) {
+      var st = window.arrearsStateForTenant(tid);
+      if (!st || (st.balance === 0 && !st.arrangement)) return;
+      var unit = _unitForTenant(st.tenant);
+      var arrStatus = st.hasApproved
+        ? (st.compliant ? 'Active — compliant' : 'Active — ' + st.consecutiveMissed + ' mo missed')
+        : st.pendingEd ? 'Pending ED approval' : 'None';
+      if (st.balance > 0) { sum.outstanding += st.balance; sum.inArrears++; }
+      else if (st.balance < 0) { sum.credits += st.balance; sum.creditCount++; }
+      if (st.hasApproved) { sum.arrActive++; if (!st.compliant) sum.arrNonCompliant++; }
+      if (st.pendingEd) sum.arrPending++;
+      if (st.stamps.arrears_eviction_authorized) sum.evictions++;
+      rows.push({
+        name: (st.tenant && st.tenant.full_name) || tid,
+        unit: unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : '',
+        balance: st.balance,
+        arrangement: arrStatus,
+        monthly: st.hasApproved ? Number(st.arrangement.payment_amount || 0) : null,
+        lastPayment: (CACHE.byTenant[tid].lastPayment || ''),
+        windowEnds: st.windowEndsAt || ''
+      });
+    });
+    rows.sort(function (a, b) { return b.balance - a.balance; });
+    sum.outstanding = Math.round(sum.outstanding * 100) / 100;
+    sum.credits = Math.round(sum.credits * 100) / 100;
+    return { rows: rows, sum: sum, asOf: _todayISO() };
+  };
+
+  var _jspdfPromise = null;
+  function _loadJsPdf() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+    if (_jspdfPromise) return _jspdfPromise;
+    function inject(src) {
+      return new Promise(function (res, rej) {
+        var sc = document.createElement('script');
+        sc.src = src; sc.onload = res;
+        sc.onerror = function () { rej(new Error('PDF library failed to load')); };
+        document.head.appendChild(sc);
+      });
+    }
+    _jspdfPromise = inject('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+      .then(function () { return inject('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js'); })
+      .catch(function (e) { _jspdfPromise = null; throw e; });
+    return _jspdfPromise;
+  }
+
+  window.arrearsCouncilReport = function (format) {
+    window.arrearsLoad().then(function () {
+      var ids = Object.keys(CACHE.byTenant).filter(function (tid) { return CACHE.byTenant[tid].arrangements.length || CACHE.byTenant[tid].balance !== 0; });
+      return window.arrearsLoadStamps(ids.slice(0, 500));
+    }).then(function () {
+      var d = window.arrearsReportData();
+      var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
+      var money = function (v) { return '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 }); };
+      if (format === 'csv') {
+        var head = ['Tenant', 'Unit', 'Balance', 'Arrangement', 'Monthly Payment', 'Last Payment', 'Window Ends'];
+        var csv = [head.join(',')].concat(d.rows.map(function (r) {
+          return [r.name, r.unit, r.balance.toFixed(2), r.arrangement, r.monthly != null ? r.monthly.toFixed(2) : '', r.lastPayment, r.windowEnds]
+            .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+        })).join('\n');
+        var a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+        a.download = ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Report_' + d.asOf + '.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', 'A/R report exported (CSV) — ' + d.rows.length + ' accounts, ' + money(d.sum.outstanding) + ' outstanding', window.currentRole || 'staff');
+        return;
+      }
+      _loadJsPdf().then(function () {
+        var doc = new window.jspdf.jsPDF();
+        var pw = doc.internal.pageSize.getWidth();
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+        doc.text(nation, 14, 16);
+        doc.setFontSize(12); doc.text('Rental Arrears (A/R) Report — Chief & Council', 14, 24);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        doc.text('As of ' + d.asOf + ' · generated from the housing management system rent ledger', 14, 30);
+        var s = d.sum;
+        var lines = [
+          'Total arrears outstanding: ' + money(s.outstanding) + ' across ' + s.inArrears + ' account(s)',
+          'Credit balances: ' + money(s.credits) + ' (' + s.creditCount + ' account(s))',
+          'Repayment arrangements: ' + s.arrActive + ' active (' + s.arrNonCompliant + ' non-compliant) · ' + s.arrPending + ' awaiting ED approval',
+          'Arrears evictions authorized: ' + s.evictions
+        ];
+        doc.setFontSize(10);
+        lines.forEach(function (t, i) { doc.text(t, 14, 40 + i * 6); });
+        doc.autoTable({
+          startY: 40 + lines.length * 6 + 4,
+          head: [['Tenant', 'Unit', 'Balance', 'Arrangement', '$/mo', 'Last Payment']],
+          body: d.rows.map(function (r) {
+            return [r.name, r.unit, money(r.balance), r.arrangement, r.monthly != null ? money(r.monthly) : '—', r.lastPayment || '—'];
+          }),
+          styles: { fontSize: 8, cellPadding: 1.6 },
+          headStyles: { fillColor: [40, 40, 40] },
+          columnStyles: { 2: { halign: 'right' }, 4: { halign: 'right' } },
+          didDrawPage: function () {
+            var page = doc.internal.getNumberOfPages();
+            doc.setFontSize(8);
+            doc.text(nation + ' — A/R Report ' + d.asOf + ' — Page ' + page, 14, doc.internal.pageSize.getHeight() - 8);
+          }
+        });
+        doc.save(((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Report_' + d.asOf + '.pdf');
+        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', 'A/R report generated (PDF) — ' + d.rows.length + ' accounts, ' + money(d.sum.outstanding) + ' outstanding', window.currentRole || 'staff');
+      }).catch(function (e) {
+        showToast('PDF library unavailable (' + e.message + ') — use the CSV export.', { type: 'error' });
+      });
     });
   };
 

@@ -287,7 +287,11 @@
       + '<div class="page-header-bar" style="margin-bottom:14px;">'
       +   '<div><h1 style="margin:0;">Reports</h1>'
       +   '<p style="margin:2px 0 0;color:var(--muted);font-size:13px;">' + _esc(nation ? nation + ' — ' : '') + 'Housing at a glance · read-only</p></div>'
-      +   '<button class="btn btn-ghost" onclick="renderLeadershipDashboard()" title="Refresh">&#8635; Refresh</button>'
+      +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +     '<button class="btn btn-ghost" onclick="if(typeof arrearsCouncilReport===\'function\')arrearsCouncilReport(\'pdf\')" title="Rental arrears report for Chief & Council">&#128196; A/R Report (PDF)</button>'
+      +     '<button class="btn btn-ghost" onclick="if(typeof arrearsCouncilReport===\'function\')arrearsCouncilReport(\'csv\')">A/R CSV</button>'
+      +     '<button class="btn btn-ghost" onclick="renderLeadershipDashboard()" title="Refresh">&#8635; Refresh</button>'
+      +   '</div>'
       + '</div>';
 
     // KPI strip
@@ -299,6 +303,23 @@
       + _kpiCard('Awaiting Match', k.awaitingMatch, 'Approved, no unit yet')
       + _kpiCard('Active Renovations', k.activeReno, k.completedYtd + ' completed this year')
       + _kpiCard('Inspections Overdue', k.overdueInsp, 'Past their due date', k.overdueInsp > 0 ? 'kpi-accent-danger' : '')
+      + (function () {
+          // Arrears KPI — from the arrears machine's live finance data. When
+          // the cache hasn't loaded yet, kick it and re-render once ready.
+          if (typeof arrearsReportData !== 'function') return '';
+          if (!(window._arrearsCache && window._arrearsCache.loaded)) {
+            if (typeof arrearsLoad === 'function' && !window._ldArrKick) {
+              window._ldArrKick = true;
+              arrearsLoad().then(function () { window._ldArrKick = false; renderLeadershipDashboard(); }).catch(function () {});
+            }
+            return _kpiCard('Arrears Outstanding', '…', 'loading finance data');
+          }
+          var ar = arrearsReportData();
+          return _kpiCard('Arrears Outstanding',
+            '$' + Math.round(ar.sum.outstanding).toLocaleString(),
+            ar.sum.inArrears + ' accounts · ' + ar.sum.arrActive + ' arrangements',
+            ar.sum.outstanding > 0 ? 'kpi-accent-danger' : 'kpi-accent-success');
+        })()
       + '</div>';
 
     // Charts grid
