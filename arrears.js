@@ -47,19 +47,16 @@
       _get('tenants?select=id,full_name,application_id,current_unit_id&merged_into=is.null&limit=5000')
     ]).then(function (res) {
       var ledger = res[0] || [], arrs = res[1] || [], pays = res[2] || [], tenants = res[3] || [];
-      // Balance per tenant — SAME semantics as finance's _rentLedgerFromRow:
-      // charges (opening/rent_charge/adjustment_debit) minus payments
-      // (payment/adjustment_credit); void reversal rows carry a signed amount
-      // so they net out against their originals without status tracking.
+      // Balance per tenant. Finance stores every row's amount SIGNED (charges
+      // positive; payments and credits negative — see _rentLedgerToRow), so a
+      // row's amount IS its balance contribution for every entry_type,
+      // including void reversals. Summing signed amounts exactly matches the
+      // finance module's charge-minus-payment running balance.
+      var TYPES = { opening_balance: 1, rent_charge: 1, adjustment_debit: 1, payment: 1, adjustment_credit: 1, void: 1 };
       var bal = {};
       ledger.forEach(function (r) {
-        if (!r || !r.tenant_id) return;
-        var amt = Number(r.amount) || 0, delta = 0;
-        var t = r.entry_type;
-        if (t === 'opening_balance' || t === 'rent_charge' || t === 'adjustment_debit') delta = amt;
-        else if (t === 'payment' || t === 'adjustment_credit') delta = -amt;
-        else if (t === 'void') delta = amt;   // reversal rows store a SIGNED amount (charge-reversal negative, payment-reversal positive), so adding it nets out the original
-        bal[r.tenant_id] = (bal[r.tenant_id] || 0) + delta;
+        if (!r || !r.tenant_id || !TYPES[r.entry_type]) return;
+        bal[r.tenant_id] = (bal[r.tenant_id] || 0) + (Number(r.amount) || 0);
       });
       var paysByArr = {};
       pays.forEach(function (p) {
@@ -557,24 +554,94 @@
     });
     return rows;
   }
-  function _matchTenant(normName) {
-    var tenants = CACHE.tenants || [];
-    var exact = tenants.find(function (t) { return _normName(t.full_name) === normName; });
-    if (exact) return { tenant: exact, how: 'exact' };
+  // Display name for minted tenant rows: the ledger name minus account
+  // decorations, keeping the original casing.
+  function _cleanDisplayName(raw) {
+    return String(raw || '').replace(/\(.*?\)/g, ' ')
+      .replace(/\b(RENT|MORT(GAGE)?|SEC(TION)?\d*)\b/gi, ' ')
+      .replace(/[–-]\s*$/, '').replace(/\s+/g, ' ').trim();
+  }
+  function _fuzzyHits(normName, list, nameOf) {
     var toks = normName.split(' ');
-    if (toks.length >= 2) {
-      var f = toks[0], l = toks[toks.length - 1];
-      var hits = tenants.filter(function (t) {
-        var tt = _normName(t.full_name).split(' ');
-        return tt.length >= 2 && ((tt[0] === f && tt[tt.length - 1] === l) || (tt[0] === l && tt[tt.length - 1] === f));
-      });
-      if (hits.length === 1) return { tenant: hits[0], how: 'fuzzy' };
-    }
-    return { tenant: null, how: 'none' };
+    if (toks.length < 2) return [];
+    var f = toks[0], l = toks[toks.length - 1];
+    return list.filter(function (x) {
+      var tt = _normName(nameOf(x)).split(' ');
+      return tt.length >= 2 && ((tt[0] === f && tt[tt.length - 1] === l) || (tt[0] === l && tt[tt.length - 1] === f));
+    });
+  }
+  // Three-level match cascade: TENANT (person already in the shared tenants
+  // table) -> UNIT (a housing unit's assigned tenant name — housed but no
+  // tenant row yet) -> APPLICATION (an applicant on file — arrears from a
+  // past tenancy follow them onto the waitlist and feed the good-standing
+  // gate). More than one hit at a level = ambiguous: the picker decides.
+  function _matchLedgerRow(normName) {
+    var tenants = CACHE.tenants || [];
+    var units = (window.housingUnits || []).filter(function (u) { return u && !u.archived && u.assignedName; });
+    var apps = ((typeof applications !== 'undefined' && applications) ? applications : (window.applications || []))
+      .filter(function (a) { return a && !a.archived; });
+    var appName = function (a) { return (a.fn || '') + ' ' + (a.ln || ''); };
+    // tenants
+    var hits = tenants.filter(function (t) { return _normName(t.full_name) === normName; });
+    var how = 'exact';
+    if (!hits.length) { hits = _fuzzyHits(normName, tenants, function (t) { return t.full_name; }); how = 'fuzzy'; }
+    if (hits.length === 1) return { kind: 'tenant', how: how, tenant: hits[0] };
+    if (hits.length > 1) return { kind: 'tenant', how: 'ambiguous', ambiguous: hits.length };
+    // units
+    hits = units.filter(function (u) { return _normName(u.assignedName) === normName; });
+    how = 'exact';
+    if (!hits.length) { hits = _fuzzyHits(normName, units, function (u) { return u.assignedName; }); how = 'fuzzy'; }
+    if (hits.length === 1) return { kind: 'unit', how: how, unit: hits[0] };
+    if (hits.length > 1) return { kind: 'unit', how: 'ambiguous', ambiguous: hits.length };
+    // applications
+    hits = apps.filter(function (a) { return _normName(appName(a)) === normName; });
+    how = 'exact';
+    if (!hits.length) { hits = _fuzzyHits(normName, apps, appName); how = 'fuzzy'; }
+    if (hits.length === 1) return { kind: 'application', how: how, app: hits[0] };
+    if (hits.length > 1) return { kind: 'application', how: 'ambiguous', ambiguous: hits.length };
+    return { kind: 'none', how: 'none' };
   }
   function _unitForTenant(t) {
     if (!t || !t.current_unit_id) return null;
     return ((window.housingUnits || []).find(function (u) { return u && u.id === t.current_unit_id; })) || null;
+  }
+  // Resolve (or mint) the tenant row a ledger line's balance attaches to.
+  // Unit matches mint an 'active' tenant on the unit; application matches
+  // mint an 'applicant' tenant linked to the application — both find-first
+  // via sbResolveTenantId so no duplicates are created.
+  async function _arImpEnsureTenant(row) {
+    if (row.kind === 'tenant' && row.tenantId) return row.tenantId;
+    var display = _cleanDisplayName(row.rawName);
+    // Find-FIRST only (sbResolveTenantId would create a bare row on miss —
+    // we mint our own richer row below, with status + unit/application link).
+    try {
+      var fr = await fetch(SUPABASE_URL + '/rest/v1/tenants?full_name=eq.'
+        + encodeURIComponent(display) + '&merged_into=is.null&select=id&order=id.asc&limit=1', { headers: _hdrs() });
+      if (fr.ok) {
+        var found = await fr.json();
+        if (found && found.length && found[0].id) { row.tenantId = found[0].id; return found[0].id; }
+      }
+    } catch (e) {}
+    var insert = { full_name: display, created_at: new Date().toISOString() };
+    if (row.kind === 'unit' && row.unitId) { insert.status = 'active'; insert.current_unit_id = row.unitId; }
+    else if (row.kind === 'application' && row.appId) { insert.status = 'applicant'; insert.application_id = row.appId; }
+    else return null;
+    var r = await fetch(SUPABASE_URL + '/rest/v1/tenants', {
+      method: 'POST',
+      headers: _hdrs({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify(insert)
+    });
+    if (!r.ok) throw new Error('tenant create HTTP ' + r.status);
+    var saved = (await r.json())[0];
+    if (saved && saved.id) {
+      CACHE.tenants.push(saved);
+      CACHE.byTenant[saved.id] = { tenant: saved, balance: 0, arrangements: [], payments: [] };
+      if (typeof auditEntry === 'function') auditEntry('TENANT:' + saved.id, 'tenant_created',
+        'Tenant record minted by A/R import (' + row.kind + ' match, ' + row.custno + ')', window.currentRole || 'staff');
+      row.tenantId = saved.id;
+      return saved.id;
+    }
+    return null;
   }
 
   window.openArrearsImport = function () {
@@ -593,7 +660,11 @@
       +     '<span id="ar_import_file_status" style="font-size:11px;color:var(--muted);">…or paste the report text below</span>'
       +   '</div>'
       +   '<textarea id="ar_import_text" style="width:100%;min-height:130px;box-sizing:border-box;font-family:ui-monospace,Menlo,monospace;font-size:11px;" placeholder="Paste the report text here — each customer line ending in the six amount columns…"></textarea>'
-      +   '<div style="margin:8px 0;"><button class="btn btn-primary" onclick="_arImpParse()">Parse &amp; Match</button></div>'
+      +   '<div style="margin:8px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+      +     '<button class="btn btn-primary" onclick="_arImpParse()">Parse &amp; Match</button>'
+      +     '<label style="font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;">Report as-of date '
+      +       '<input type="date" id="ar_import_asof" value="' + _todayISO() + '" style="padding:4px 8px;font-size:12px;"/></label>'
+      +   '</div>'
       +   '<div id="ar_import_review"></div>'
       + '</div></div>';
     mo.addEventListener('click', function (e) { if (e.target === mo) mo.remove(); });
@@ -696,133 +767,211 @@
     review.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Matching against tenants and prior imports…</div>';
     Promise.all([
       window.arrearsLoad(),
-      _get('finance_rent_ledger?entry_type=eq.opening_balance&description=like.*AR-IMPORT*&select=description&limit=5000')
+      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=description&limit=8000')
     ]).then(function (res) {
       IMP.imported = {};
       (res[1] || []).forEach(function (r) {
-        var m = String(r.description || '').match(/\[AR-IMPORT:([^\]]+)\]/);
-        if (m) IMP.imported[m[1]] = true;
+        var m = String(r.description || '').match(/\[AR-IMPORT:([^\]:]+)(?::([^\]]+))?\]/);
+        if (m) { (IMP.imported[m[1]] = IMP.imported[m[1]] || {})[m[2] || 'initial'] = true; }
       });
       IMP.rows = _parseArText(txt).map(function (row) {
-        var m = _matchTenant(row.name);
+        var m = _matchLedgerRow(row.name);
+        row.kind = m.kind; row.how = m.how; row.ambiguous = m.ambiguous || 0;
         row.tenantId = m.tenant ? m.tenant.id : '';
-        row.tenantName = m.tenant ? m.tenant.full_name : '';
-        row.how = m.how;
-        row.already = !!IMP.imported[row.custno];
+        row.unitId = m.unit ? m.unit.id : (m.tenant && m.tenant.current_unit_id) || '';
+        row.appId = m.app ? m.app.id : '';
+        row.targetName = m.tenant ? m.tenant.full_name
+                       : m.unit ? m.unit.assignedName
+                       : m.app ? ((m.app.fn || '') + ' ' + (m.app.ln || '')).trim() : '';
+        row.targetDetail = m.unit ? ((m.unit.num || '') + ' ' + (m.unit.street || '')).trim()
+                         : m.app ? m.app.id
+                         : (m.tenant && m.tenant.current_unit_id) || '';
+        var period = (document.getElementById('ar_import_asof') || {}).value || _todayISO();
+        row.period = period;
+        row.already = !!(IMP.imported[row.custno] && IMP.imported[row.custno][period]);
+        row.appBalance = row.tenantId && CACHE.byTenant[row.tenantId]
+          ? CACHE.byTenant[row.tenantId].balance : 0;
+        row.delta = Math.round((row.total - row.appBalance) * 100) / 100;
+        row.inSync = Math.abs(row.delta) < 0.005;
         return row;
       });
       _arImpRender();
     });
   };
+  // Manual picker options: tenants + housed units + applications, disambiguated
+  // by a suffix the change-handler parses back.
+  function _arImpPickerOptions() {
+    var opts = [];
+    (CACHE.tenants || []).forEach(function (t) { opts.push({ v: t.full_name + '  [tenant]', kind: 'tenant', tenant: t }); });
+    (window.housingUnits || []).forEach(function (u) {
+      if (u && !u.archived && u.assignedName) opts.push({ v: u.assignedName + '  [unit ' + ((u.num || '') + ' ' + (u.street || '')).trim() + ']', kind: 'unit', unit: u });
+    });
+    (((typeof applications !== 'undefined' && applications) ? applications : (window.applications || [])) || []).forEach(function (a) {
+      if (a && !a.archived) opts.push({ v: (((a.fn || '') + ' ' + (a.ln || '')).trim() || a.id) + '  [' + a.id + ']', kind: 'application', app: a });
+    });
+    return opts;
+  }
 
+  function _rowResolved(r) { return !!(r.tenantId || (r.kind === 'unit' && r.unitId) || (r.kind === 'application' && r.appId)); }
   function _arImpRender() {
     var review = document.getElementById('ar_import_review');
     if (!review) return;
     if (!IMP.rows.length) { review.innerHTML = '<div style="color:var(--muted);font-size:12px;">No ledger lines recognized — each line must end with six amount columns.</div>'; return; }
-    var chips = { exact: ['Matched', 'var(--success)', 'var(--success-bg)'], fuzzy: ['Fuzzy', 'var(--warn-amber-text)', 'var(--warn-amber-bg)'], none: ['Unmatched', 'var(--danger)', 'var(--danger-bg)'] };
-    var counts = { exact: 0, fuzzy: 0, none: 0, already: 0, rentSets: 0 };
-    var dl = '<datalist id="ar_tenant_dl">' + (CACHE.tenants || []).map(function (t) { return '<option value="' + _esc(t.full_name) + '"></option>'; }).join('') + '</datalist>';
+    var kindChip = {
+      tenant:      ['Tenant', 'var(--success)', 'var(--success-bg)'],
+      unit:        ['Unit', 'var(--info-blue)', 'var(--info-blue-bg)'],
+      application: ['Applicant', 'var(--warn-amber-text)', 'var(--warn-amber-bg)'],
+      none:        ['Unmatched', 'var(--danger)', 'var(--danger-bg)']
+    };
+    var counts = { tenant: 0, unit: 0, application: 0, none: 0, ambiguous: 0, already: 0, rentSets: 0 };
+    var picker = _arImpPickerOptions();
+    var dl = '<datalist id="ar_tenant_dl">' + picker.map(function (o) { return '<option value="' + _esc(o.v) + '"></option>'; }).join('') + '</datalist>';
     var body = IMP.rows.map(function (r, i) {
-      var c = chips[r.how];
-      if (r.already) counts.already++; else counts[r.how]++;
-      var t = r.tenantId ? CACHE.byTenant[r.tenantId] : null;
-      var unit = t ? _unitForTenant(t.tenant) : null;
-      var willSetRent = !!(unit && r.current > 0 && !(Number(unit.monthlyRent) > 0) && !r.already);
-      if (willSetRent && r.tenantId) counts.rentSets++;
+      var isAmb = r.how === 'ambiguous';
+      if (r.already) counts.already++;
+      else if (isAmb) counts.ambiguous++;
+      else counts[_rowResolved(r) ? r.kind : 'none']++;
+      var unit = r.unitId ? ((window.housingUnits || []).find(function (u) { return u && u.id === r.unitId; })) : null;
+      var willSetRent = !!(unit && r.current > 0 && !(Number(unit.monthlyRent) > 0) && !r.already && !isAmb);
+      if (willSetRent) counts.rentSets++;
       r._willSetRent = willSetRent;
+      var c = kindChip[_rowResolved(r) && !isAmb ? r.kind : 'none'];
+      var chipHtml = r.already
+        ? '<span style="font-size:10px;font-weight:700;color:var(--muted);">Imported ✓</span>'
+        : isAmb
+          ? '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:var(--danger);background:var(--danger-bg);">' + r.ambiguous + ' matches — pick one</span>'
+          : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:' + c[1] + ';background:' + c[2] + ';">' + c[0] + (r.how === 'fuzzy' ? ' ~' : '') + '</span>';
+      var pickerVal = _rowResolved(r) && !isAmb
+        ? r.targetName + (r.kind === 'unit' ? '  [unit ' + _esc(r.targetDetail) + ']' : r.kind === 'application' ? '  [' + _esc(r.targetDetail) + ']' : '  [tenant]')
+        : '';
+      if (!r.already && !isAmb && _rowResolved(r) && r.inSync) counts.insync = (counts.insync || 0) + 1;
+      var canRow = _rowResolved(r) && !isAmb && !r.already && !r.inSync;
       return '<tr' + (r.already ? ' style="opacity:.5;"' : '') + '>'
         + '<td style="font-family:ui-monospace,monospace;font-size:10px;">' + _esc(r.custno) + '</td>'
         + '<td style="font-weight:600;font-size:12px;">' + _esc(r.rawName) + '</td>'
-        + '<td>' + (r.already
-            ? '<span style="font-size:10px;font-weight:700;color:var(--muted);">Already imported</span>'
-            : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:' + c[1] + ';background:' + c[2] + ';">' + c[0] + '</span>') + '</td>'
-        + '<td><input list="ar_tenant_dl" data-ar-row="' + i + '" value="' + _esc(r.tenantName) + '" placeholder="pick tenant…" style="width:150px;font-size:11px;padding:3px 6px;"' + (r.already ? ' disabled' : '') + '/></td>'
+        + '<td>' + chipHtml + '</td>'
+        + '<td><input list="ar_tenant_dl" data-ar-row="' + i + '" value="' + _esc(pickerVal) + '" placeholder="pick person…" style="width:190px;font-size:11px;padding:3px 6px;"' + (r.already ? ' disabled' : '') + '/></td>'
         + '<td style="text-align:right;font-size:12px;">' + _money(r.current) + '</td>'
         + '<td style="text-align:right;font-size:12px;font-weight:700;">' + _money(r.total) + '</td>'
-        + '<td style="font-size:10px;color:var(--muted);">' + (willSetRent ? 'rent → ' + _money(r.current) : (unit && Number(unit.monthlyRent) > 0 ? 'rent set' : '')) + '</td>'
+        + '<td style="text-align:right;font-size:11px;color:var(--muted);">' + (_rowResolved(r) && !isAmb ? _money(r.appBalance) : '') + '</td>'
+        + '<td style="text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">' + (r.already ? '' : isAmb || !_rowResolved(r) ? '' : (r.inSync ? '<span style="color:var(--success);">in sync</span>' : ((r.delta > 0 ? '+' : '') + _money(r.delta).replace('$-','-$')))) + '</td>'
+        + '<td style="font-size:10px;color:var(--muted);white-space:nowrap;">' + (willSetRent ? 'rent → ' + _money(r.current) : (unit && Number(unit.monthlyRent) > 0 ? 'rent set' : '')) + '</td>'
+        + '<td>' + (canRow ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-import-one="' + i + '">Import</button>' : '') + '</td>'
         + '</tr>';
     }).join('');
     review.innerHTML = dl
       + '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">' + IMP.rows.length + ' rows — '
-      + counts.exact + ' matched · ' + counts.fuzzy + ' fuzzy · ' + counts.none + ' unmatched · ' + counts.already + ' already imported · ' + counts.rentSets + ' unit rents will be set. Fix unmatched rows with the tenant picker (leave blank to skip).</div>'
-      + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Cust #</th><th>Ledger name</th><th>Match</th><th>Tenant</th><th style="text-align:right;">Current</th><th style="text-align:right;">Total</th><th></th></tr></thead><tbody>'
+      + counts.tenant + ' tenant · ' + counts.unit + ' unit · ' + counts.application + ' applicant · '
+      + counts.none + ' unmatched · ' + counts.ambiguous + ' ambiguous · ' + counts.already + ' imported · '
+      + (counts.insync || 0) + ' already in sync · ' + counts.rentSets + ' unit rents will be set. Each import writes the DIFFERENCE between the report total and the app balance (first import = opening balance; monthly re-imports = adjustments), so re-running the monthly A/R keeps balances synced. Unit/Applicant matches create the missing tenant record on import (find-first, audited). ~ marks a fuzzy name match.</div>'
+      + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Cust #</th><th>Ledger name</th><th>Match</th><th>Matched to</th><th style="text-align:right;">Current</th><th style="text-align:right;">Ledger Total</th><th style="text-align:right;">App Balance</th><th style="text-align:right;">Will Write</th><th></th><th></th></tr></thead><tbody>'
       + body + '</tbody></table></div>'
       + '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" onclick="_arImpRun()">Import matched rows</button>'
+      + '<button class="btn btn-primary" onclick="_arImpRun()">Import all matched rows</button>'
       + '<span id="ar_import_progress" style="font-size:12px;color:var(--muted);"></span></div>';
     review.querySelectorAll('[data-ar-row]').forEach(function (inp) {
       inp.addEventListener('change', function () {
         var r = IMP.rows[Number(inp.getAttribute('data-ar-row'))];
-        var t = (CACHE.tenants || []).find(function (x) { return x.full_name === inp.value; });
-        r.tenantId = t ? t.id : '';
-        r.tenantName = t ? t.full_name : '';
-        r.how = t ? 'exact' : 'none';
+        var o = picker.find(function (x) { return x.v === inp.value; });
+        r.tenantId = ''; r.unitId = ''; r.appId = ''; r.ambiguous = 0;
+        if (o) {
+          r.kind = o.kind; r.how = 'exact';
+          if (o.kind === 'tenant') { r.tenantId = o.tenant.id; r.unitId = o.tenant.current_unit_id || ''; r.targetName = o.tenant.full_name; r.targetDetail = o.tenant.current_unit_id || ''; }
+          else if (o.kind === 'unit') { r.unitId = o.unit.id; r.targetName = o.unit.assignedName; r.targetDetail = ((o.unit.num || '') + ' ' + (o.unit.street || '')).trim(); }
+          else { r.appId = o.app.id; r.targetName = ((o.app.fn || '') + ' ' + (o.app.ln || '')).trim(); r.targetDetail = o.app.id; r.unitId = o.app.assignedUnit || ''; }
+        } else { r.kind = 'none'; r.how = 'none'; r.targetName = ''; r.targetDetail = ''; }
         _arImpRender();
       });
     });
+    review.querySelectorAll('[data-ar-import-one]').forEach(function (btn) {
+      btn.addEventListener('click', function () { _arImpImportOne(Number(btn.getAttribute('data-ar-import-one'))); });
+    });
   }
+
+  // Per-row import: resolve/mint the tenant, write the opening balance, set
+  // unit rent where applicable, audit — then refresh the table in place.
+  window._arImpImportOne = async function (i) {
+    var r = IMP.rows[i];
+    if (!r || r.already || !_rowResolved(r) || r.how === 'ambiguous' || r.inSync) return false;
+    if (!_can('manageArrears')) { showToast('You are not authorized to import arrears.', { type: 'error' }); return false; }
+    var prog = document.getElementById('ar_import_progress');
+    try {
+      var tid = await _arImpEnsureTenant(r);
+      if (!tid) { showToast('Could not resolve a tenant record for ' + r.rawName + '.', { type: 'error' }); return false; }
+      // Balance SYNC: write the difference between the report total and the
+      // current app balance. First import (no balance) lands as an opening
+      // balance; later monthly imports land as adjustments. Signed amounts:
+      // positive = adjustment_debit, negative = adjustment_credit — either
+      // way the stored amount is the balance contribution.
+      var bal = (CACHE.byTenant[tid] && CACHE.byTenant[tid].balance) || 0;
+      var delta = Math.round((r.total - bal) * 100) / 100;
+      if (Math.abs(delta) < 0.005) { r.already = true; _arImpRender(); return true; }
+      var etype = bal === 0 ? 'opening_balance' : (delta > 0 ? 'adjustment_debit' : 'adjustment_credit');
+      var asOf = r.period || _todayISO();
+      var resp = await fetch(SUPABASE_URL + '/rest/v1/finance_rent_ledger', {
+        method: 'POST',
+        headers: _hdrs({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+        body: JSON.stringify([{
+          id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+          nation_id: (window.NATION_CONFIG && NATION_CONFIG.id) || 'default',
+          tenant_id: tid,
+          unit_id: r.unitId || null,
+          entry_type: etype,
+          amount: delta,
+          entry_date: asOf,
+          description: 'A/R balance sync ' + asOf + ' — ' + r.rawName + ' (ledger ' + r.total.toFixed(2) + ', app ' + bal.toFixed(2) + ') [AR-IMPORT:' + r.custno + ':' + asOf + ']'
+        }])
+      });
+      if (!resp.ok) throw new Error('ledger insert HTTP ' + resp.status);
+      if (r._willSetRent && r.unitId) {
+        var unit = (window.housingUnits || []).find(function (u) { return u && u.id === r.unitId; });
+        if (unit && !(Number(unit.monthlyRent) > 0)) {
+          unit.monthlyRent = Math.round(r.current * 100) / 100;
+          if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(unit);
+          else if (typeof sbSaveUnit === 'function') sbSaveUnit(unit);
+          if (typeof auditEntry === 'function') auditEntry(unit.id, 'rent_set_from_ar_import',
+            'Monthly rent set to $' + unit.monthlyRent.toFixed(2) + ' from the A/R ledger Current column (' + r.custno + ')', window.currentRole || 'staff');
+        }
+      }
+      if (typeof auditEntry === 'function') auditEntry('TENANT:' + tid, 'arrears_imported',
+        'A/R balance synced to ' + _money(r.total) + ' (' + etype + ' ' + _money(delta) + ', ' + r.custno + ', ' + r.kind + ' match, as of ' + asOf + ')', window.currentRole || 'staff');
+      var e = CACHE.byTenant[tid];
+      if (e) e.balance = Math.round((e.balance + delta) * 100) / 100;
+      r.already = true;
+      (IMP.imported[r.custno] = IMP.imported[r.custno] || {})[asOf] = true;
+      _arImpRender();
+      return true;
+    } catch (err) {
+      if (prog) prog.textContent = '';
+      showToast('Import failed for ' + r.rawName + ': ' + err.message, { type: 'error' });
+      return false;
+    }
+  };
 
   window._arImpRun = async function () {
     if (!_can('manageArrears')) return;
-    var todo = IMP.rows.filter(function (r) { return r.tenantId && !r.already && r.total !== 0; });
+    var todo = IMP.rows.map(function (r, i) { return { r: r, i: i }; })
+      .filter(function (x) { return _rowResolved(x.r) && x.r.how !== 'ambiguous' && !x.r.already && !x.r.inSync; });
     if (!todo.length) { showToast('Nothing to import — no matched, un-imported rows with a total.', { type: 'error' }); return; }
+    var kinds = { tenant: 0, unit: 0, application: 0 };
+    todo.forEach(function (x) { kinds[x.r.kind] = (kinds[x.r.kind] || 0) + 1; });
     var go = (typeof showConfirm === 'function')
       ? await showConfirm({ title: 'Import ' + todo.length + ' ledger rows?',
-          message: 'Writes one opening-balance row per ledger line into the finance rent ledger (tagged for re-run safety) and sets unit rent from the Current column where none is recorded. Every write is audited.',
+          message: kinds.tenant + ' tenant matches, ' + kinds.unit + ' unit matches, ' + kinds.application + ' applicant matches. '
+            + 'Each row writes an opening balance into the finance rent ledger (tagged for re-run safety); unit and applicant matches create their missing tenant record first (find-first); '
+            + 'unit rent is set from the Current column only where none is recorded. Every write is audited.',
           confirmText: 'Import ' + todo.length, cancelText: 'Cancel' })
       : window.confirm('Import ' + todo.length + ' rows?');
     if (!go) return;
     var prog = document.getElementById('ar_import_progress');
-    var asOf = _todayISO();
-    var nation = (window.NATION_CONFIG && NATION_CONFIG.id) || 'default';
-    var ledgerRows = todo.map(function (r) {
-      var t = CACHE.byTenant[r.tenantId];
-      return {
-        id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random(),
-        nation_id: nation,
-        tenant_id: r.tenantId,
-        unit_id: (t && t.tenant.current_unit_id) || null,
-        entry_type: 'opening_balance',
-        amount: r.total,
-        entry_date: asOf,
-        description: 'A/R arrears import ' + asOf + ' — ' + r.rawName + ' [AR-IMPORT:' + r.custno + ']'
-      };
-    });
-    try {
-      if (prog) prog.textContent = 'Writing ' + ledgerRows.length + ' ledger rows…';
-      var resp = await fetch(SUPABASE_URL + '/rest/v1/finance_rent_ledger', {
-        method: 'POST',
-        headers: _hdrs({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-        body: JSON.stringify(ledgerRows)
-      });
-      if (!resp.ok) throw new Error('ledger insert HTTP ' + resp.status);
-    } catch (err) {
-      showToast('Import failed: ' + err.message + ' — nothing was partially applied to units.', { type: 'error' });
-      if (prog) prog.textContent = '';
-      return;
+    var done = 0, failed = 0;
+    for (var k = 0; k < todo.length; k++) {
+      if (prog) prog.textContent = 'Importing ' + (k + 1) + ' of ' + todo.length + '…';
+      var okRow = await window._arImpImportOne(todo[k].i);
+      if (okRow) done++; else failed++;
     }
-    // Unit rents from the Current column — only where no rent is recorded.
-    var rentSet = 0;
-    todo.forEach(function (r) {
-      if (!r._willSetRent) return;
-      var t = CACHE.byTenant[r.tenantId];
-      var unit = t ? _unitForTenant(t.tenant) : null;
-      if (!unit || Number(unit.monthlyRent) > 0) return;
-      unit.monthlyRent = Math.round(r.current * 100) / 100;
-      if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(unit);
-      else if (typeof sbSaveUnit === 'function') sbSaveUnit(unit);
-      if (typeof auditEntry === 'function') auditEntry(unit.id, 'rent_set_from_ar_import',
-        'Monthly rent set to $' + unit.monthlyRent.toFixed(2) + ' from the A/R ledger Current column (' + r.custno + ')', window.currentRole || 'staff');
-      rentSet++;
-    });
-    todo.forEach(function (r) {
-      r.already = true;
-      IMP.imported[r.custno] = true;
-      if (typeof auditEntry === 'function') auditEntry('TENANT:' + r.tenantId, 'arrears_imported',
-        'A/R opening balance imported: ' + _money(r.total) + ' (' + r.custno + ', as of ' + asOf + ')', window.currentRole || 'staff');
-    });
     if (prog) prog.textContent = '';
-    showToast('Imported ' + todo.length + ' arrears balances' + (rentSet ? ' · set rent on ' + rentSet + ' unit(s)' : '') + '.', { type: 'info' });
+    showToast('Imported ' + done + ' arrears balances' + (failed ? ' · ' + failed + ' failed (see messages)' : '') + '.', { type: failed ? 'error' : 'info' });
     await window.arrearsLoad(true);
     _arImpRender();
     if (typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
