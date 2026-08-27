@@ -2064,30 +2064,28 @@ function _ueRehabOverrideHtml(fu){
   if(!_canEditUnitRent() || !window._editingUnitId) return '';
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(x){ return String(x == null ? '' : x); };
   // The rehab factor is CONFIGURED in Settings (schedule.rehabFactor,
-  // 0.60-0.70) and auto-applied — never typed per unit.
+  // 0.60-0.70) and auto-applied — one confirmed tap flags the unit.
   var schedFactor = (typeof getRentAgeSchedule === 'function') ? getRentAgeSchedule().rehabFactor : 0.65;
   var ovr = fu.rehabOverride;
   if(ovr && (ovr.pending || ovr.factor != null)){
-    return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" title="' + esc(ovr.reason || '') + '" onclick="_ueClearRehabOverride()">🔧 Rehab pending · factor ' + Number(schedFactor).toFixed(2) + ' (auto) — clear ✕</button>';
+    return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" onclick="_ueClearRehabOverride()">🔧 Rehab pending · factor ' + Number(schedFactor).toFixed(2) + ' (auto) — clear ✕</button>';
   }
-  return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" title="Applies the configured pending-rehab factor (' + Number(schedFactor).toFixed(2) + ', set in Settings &gt; Rent Model) until the renovation is done" onclick="_ueOpenRehabOverride()">🔧 Pending major rehab…</button>'
-    + '<span id="ue_rehab_form" style="display:none;"> reason <input id="ue_rehab_reason" type="text" placeholder="required" style="width:170px;padding:2px 4px;font-size:11px;"/>'
-    + ' <button type="button" class="btn btn-primary" style="padding:2px 8px;font-size:10px;" onclick="_ueSaveRehabOverride()">Apply ' + Number(schedFactor).toFixed(2) + '</button></span>';
+  return '<br/><button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:10px;margin-top:2px;" title="Applies the configured pending-rehab factor (' + Number(schedFactor).toFixed(2) + ', set in Settings &gt; Rent Model) until the renovation is done" onclick="_ueSaveRehabOverride()">🔧 Pending major rehab…</button>';
 }
-function _ueOpenRehabOverride(){
-  var f = document.getElementById('ue_rehab_form');
-  if(f) f.style.display = '';
-}
-function _ueSaveRehabOverride(){
+async function _ueSaveRehabOverride(){
   if(!_canEditUnitRent()) return;
-  var reason = ((document.getElementById('ue_rehab_reason')||{}).value || '').trim();
-  if(!reason){ showToast('A reason is required for the pending-major-rehab override', {type:'error'}); return; }
-  // Only the FLAG + reason are stored — the factor resolves from the
-  // Settings schedule at calculation time (auto, never per-unit).
+  // Only the FLAG is stored — the factor resolves from the Settings schedule
+  // at calculation time (auto, never per-unit). One confirmed tap; audited.
   var schedFactor = (typeof getRentAgeSchedule === 'function') ? getRentAgeSchedule().rehabFactor : 0.65;
-  _ueWriteRehabOverride({ pending: true, reason: reason,
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({ title: 'Flag as pending major rehab?',
+        message: 'Applies the configured pending-rehab rent factor (' + Number(schedFactor).toFixed(2) + ', from Settings) to this unit until the renovation is done and the flag is cleared.',
+        confirmText: 'Apply ' + Number(schedFactor).toFixed(2), cancelText: 'Cancel' })
+    : window.confirm('Flag this unit as pending major rehab (factor ' + Number(schedFactor).toFixed(2) + ')?');
+  if(!go) return;
+  _ueWriteRehabOverride({ pending: true,
     setBy: window.currentRole || 'staff', setAt: new Date().toISOString().split('T')[0] },
-    'Pending-major-rehab flag set (factor ' + Number(schedFactor).toFixed(2) + ' from the rent schedule) — ' + reason);
+    'Pending-major-rehab flag set (factor ' + Number(schedFactor).toFixed(2) + ' from the rent schedule)');
 }
 function _ueClearRehabOverride(){
   _ueWriteRehabOverride(null, 'Pending-major-rehab rent override cleared');
@@ -2103,7 +2101,6 @@ function _ueWriteRehabOverride(ovr, auditMsg){
   showToast(ovr ? 'Rehab override saved.' : 'Rehab override cleared.', {type:'info'});
   _ueRefreshEmrCalc();
 }
-window._ueOpenRehabOverride = _ueOpenRehabOverride;
 window._ueSaveRehabOverride = _ueSaveRehabOverride;
 window._ueClearRehabOverride = _ueClearRehabOverride;
 function _ueSetEmrField(u){
