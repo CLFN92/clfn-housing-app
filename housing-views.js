@@ -1606,9 +1606,14 @@ function showHousingKpiDrilldown(type) {
   }
   function appRow(a, cols) {
     var sid = (a.id||'').replace(/'/g,"\\'");
-    // Stamp which drill list opened the app so the form's Back button returns
-    // to this list (reopened fresh) instead of the landing page.
-    return '<tr class="clickable" onclick="_closeHousingKpiDrill();window._appFormReturnDrill=\''+type+'\';if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">'
+    // Stamp which drill list opened the app so Back (form OR scorecard)
+    // returns to this list (reopened fresh) instead of the landing page.
+    // Status-branched open (wlOpenApp): draft/returned -> the edit wizard;
+    // everything else -> the SCORECARD, where the score breakdown and the
+    // ED Adjustment Factor panel live. Opening the wizard unconditionally
+    // here had hidden the scorecard/ED-points form from review flows.
+    return '<tr class="clickable" onclick="_closeHousingKpiDrill();window._appFormReturnDrill=\''+type+'\';'
+      + 'if(typeof wlOpenApp===\'function\'){wlOpenApp(\''+sid+'\');}else if(typeof window.openEditModal===\'function\'){window.openEditModal(\''+sid+'\');}">'
       + cols + '</tr>';
   }
 
@@ -2506,6 +2511,26 @@ window._reconMarkAllDoubledUp = _reconMarkAllDoubledUp;
 
 // Address merge: the assigned unit's address is authoritative — copy it onto
 // the application's street line (and the assignedAddress mirror).
+// Scorecard Back — mirrors closeApplicationForm's drill-return: when the
+// scorecard was opened from a KPI drilldown list (or Likely-Housed report),
+// Back reopens that list fresh; otherwise it falls back to the dashboard.
+function scorecardBack(){
+  var drill = window._appFormReturnDrill || null;
+  window._appFormReturnDrill = null;
+  if (drill) {
+    if (typeof showLanding === 'function') showLanding();
+    else if (typeof showEmployeeHome === 'function') showEmployeeHome();
+    if (drill === 'likely_housed') {
+      if (typeof showLikelyHousedReport === 'function') showLikelyHousedReport();
+    } else if (typeof showHousingKpiDrilldown === 'function') {
+      showHousingKpiDrilldown(drill);
+    }
+    return;
+  }
+  if (typeof showDash === 'function') showDash();
+}
+window.scorecardBack = scorecardBack;
+
 // Backfill: create a linked tenant-file application for every occupied unit
 // that has none (migrated/test data). Type 'existing_tenant' — the file-update
 // type is never scored, never on the waitlist or Match — status 'assigned',

@@ -962,7 +962,7 @@
 <!-- ═══ INDIVIDUAL SCORECARD VIEW ═══ -->
 <div id="scorecardView" class="page-view">
   <div class="page-back-row">
-    <button onclick="showDash()" class="back-btn-yellow">
+    <button onclick="if(typeof scorecardBack==='function')scorecardBack();else showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
