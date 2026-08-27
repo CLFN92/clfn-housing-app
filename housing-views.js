@@ -1561,29 +1561,8 @@ function _renderLandingKpis(){
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
 
-  // "Likely already housed" quick action — new-housing apps whose applicant
-  // already has a home on file (candidates to reclassify). Hidden when zero.
-  var _lhBtn = document.getElementById('qa_likely_housed_btn');
-  if (_lhBtn) {
-    var _lhN = (typeof _housingLikelyHousedApps === 'function') ? _housingLikelyHousedApps().length : 0;
-    var _lhMeta = document.getElementById('qa_likely_housed_meta');
-    if (_lhN > 0) {
-      if (_lhMeta) _lhMeta.textContent = _lhN + ' to review';
-      _lhBtn.style.display = '';
-    } else { _lhBtn.style.display = 'none'; }
-  }
-
-  // Archived-applications quick action — visible only to roles with the
-  // deleteApplication authority (the same one that gates deleting); meta
-  // shows how many archived records exist to restore.
-  var _arBtn = document.getElementById('qa_archived_apps');
-  if (_arBtn) {
-    var _canDel = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole);
-    var _arN = apps.filter(function(a){ return a && a.archived; }).length;
-    _arBtn.style.display = _canDel ? '' : 'none';
-    var _arMeta = document.getElementById('qa_archived_apps_meta');
-    if (_arMeta) _arMeta.textContent = _arN + ' archived';
-  }
+  // (Likely-Housed / Reconcile / Archived-Applications quick actions moved to
+  // the Operations nav dropdown's Data Health section — housing-init.js.)
 
   // Scroll-collapse: shrink the KPI strip to icon-only once the page scrolls,
   // freeing space on tablet/mobile (shared-ui.js). _initScrollCollapse is

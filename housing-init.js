@@ -1884,6 +1884,18 @@ function initHousingPage() {
   else if(view==='tenants')     { if(true) showTenants(); }
   else if(view==='settings')    { if(typeof showSettings==='function') showSettings(); }
   else if(view==='leadership')  { if(typeof showLeadershipDashboard==='function') showLeadershipDashboard(); }
+  // Data Health deep links (Operations nav on sub-pages lands here): show the
+  // landing page, then open the tool once the data it reads has loaded.
+  else if(view==='reconcile' || view==='likely-housed' || view==='archived-apps'){
+    if(typeof showLanding==='function') showLanding();
+    var _dhOpen = view==='reconcile' ? 'showReconcileReport' : view==='likely-housed' ? 'showLikelyHousedReport' : 'showArchivedApplications';
+    var _dhTries = 0;
+    (function _dhWait(){
+      var ready = (window.applications && applications.length) || (window.housingUnits && housingUnits.length) || _dhTries >= 20;
+      if(ready){ if(typeof window[_dhOpen]==='function') window[_dhOpen](); return; }
+      _dhTries++; setTimeout(_dhWait, 400);
+    })();
+  }
   else if(view==='contractors') { if(true) showContractors(); }
   else {
     // Fallback when view doesn't match any branch. The Applications
@@ -2013,6 +2025,15 @@ window.HEADER_NAV = [
       { key:'contractors', label:'Contractors', module:'contractors',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', run:function(){ if(typeof showContractorsForRole==='function') showContractorsForRole(); else if(typeof showContractors==='function') showContractors(); else window.location.href='contractors.html'; } },
       { key:'inspections', label:'Inspections', module:'inspections',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>', run:function(){ window.location.href='inspections.html'; } },
       { key:'projects',    label:'Projects',    module:'projects',     svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>', run:function(){ window.location.href='projects.html'; } },
+      // ── Data Health — compliance / cleanup tools (moved from Quick Actions).
+      // Management-only visibility (data-roles); each opener re-checks its own
+      // gate. run functions are serialized into inline onclick strings, so
+      // they must be self-contained: call the opener when this page has it
+      // (housing.html), else deep-link via ?view= (handled at boot).
+      { divider:true, label:'Data Health' },
+      { key:'dh_likely',    label:'Likely Already-Housed',   module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5L12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>', run:function(){ if(typeof showLikelyHousedReport==='function') showLikelyHousedReport(); else window.location.href='housing.html?view=likely-housed'; } },
+      { key:'dh_reconcile', label:'Reconcile Units & Apps',  module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>', run:function(){ if(typeof showReconcileReport==='function') showReconcileReport(); else window.location.href='housing.html?view=reconcile'; } },
+      { key:'dh_archived',  label:'Archived Applications',   module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>', run:function(){ if(typeof showArchivedApplications==='function') showArchivedApplications(); else window.location.href='housing.html?view=archived-apps'; } },
     ]
   },
   { key:'tenants',      label:'Tenants',      module:'tenants',      svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',                                                                                                       run:function(){ if(typeof showTenants==='function') showTenants(); else window.location.href='tenants.html'; } },
@@ -2049,11 +2070,19 @@ function renderHeaderNav(){
     if(item.isGroup && item.children){
       // Filter children by module enablement + per-user feature access
       var visibleChildren = item.children.filter(function(c){
+        if(c.divider) return true;
         return (!c.module || !window.CLFN_MODULES || CLFN_MODULES.isEnabled(c.module)) && !_navFeatDenied(c.key);
       });
-      if(!visibleChildren.length) return;
+      if(!visibleChildren.some(function(c){ return !c.divider; })) return;
       var dropItems = visibleChildren.map(function(c){
-        return '<button class="nav-dropdown-item" data-nav="'+c.key+'"'+_featAttr(c.key)+' onclick="('+c.run.toString()+')();closeNavDropdowns()">'+c.svg+' '+c.label+'</button>';
+        // Section divider inside a dropdown (e.g. Operations > Data Health).
+        // Carries the same data-roles as its section's items so a role that
+        // can't see the tools doesn't see a lone heading either.
+        if(c.divider){
+          return '<div class="nav-dropdown-sect" data-roles="ed,housing_manager,super_user" style="border-top:1px solid var(--border);margin:6px 0 2px;padding:6px 14px 2px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);">'+(c.label||'')+'</div>';
+        }
+        var rolesAttr = c.roles ? ' data-roles="'+c.roles+'"' : '';
+        return '<button class="nav-dropdown-item" data-nav="'+c.key+'"'+_featAttr(c.key)+rolesAttr+' onclick="('+c.run.toString()+')();closeNavDropdowns()">'+c.svg+' '+c.label+'</button>';
       }).join('');
       html += '<div class="nav-group" data-group="'+item.key+'">'
             + '<button class="app-nav-item nav-group-toggle" data-nav="'+item.key+'" onclick="toggleNavGroup(\''+item.key+'\')">'
