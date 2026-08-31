@@ -255,6 +255,9 @@
       tenant_id: tenantId,
       total_owing: totalOwing,
       payment_amount: payment,
+      // finance_arrangements.frequency is NOT NULL with no default; the
+      // finance module always writes 'monthly' (see _arrangementToRow).
+      frequency: 'monthly',
       start_date: opts.startDate || _todayISO(),
       end_date: null,
       reason: (opts.reason || '') + (rent > 0 && payment < minPay ? ' [ED-approved below policy minimum $' + minPay.toFixed(2) + ']' : ''),
@@ -1057,7 +1060,10 @@
           entry_type: etype,
           amount: delta,
           entry_date: asOf,
-          description: 'A/R balance sync ' + asOf + ' — ' + r.rawName + ' (ledger ' + r.total.toFixed(2) + ', app ' + bal.toFixed(2) + ') [AR-IMPORT:' + r.custno + ':' + asOf + ']'
+          description: 'A/R balance sync ' + asOf + ' — ' + r.rawName + ' (ledger ' + r.total.toFixed(2) + ', app ' + bal.toFixed(2) + ') [AR-IMPORT:' + r.custno + ':' + asOf + ']',
+          // finance_rent_ledger.created_by is NOT NULL with no default —
+          // omitting it 400s the insert.
+          created_by: (window.HOUSING_SESSION && HOUSING_SESSION.email) || 'ar-import'
         }])
       });
       if (!resp.ok) throw new Error('ledger insert HTTP ' + resp.status);

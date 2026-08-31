@@ -371,7 +371,7 @@
     if(stream) badges.push('<span class="std-pill std-pill-info">' + _ticEsc(stream) + '</span>');
     var status = t[TIC_C.tenancy_status] || u.status;
     if(status) badges.push('<span class="std-pill std-pill-info">' + _ticEsc(status) + '</span>');
-    var band   = t[TIC_C.band_membership];
+    var band   = t[TIC_C.band_membership] || ((_ticState.application || {}).band) || '';
     if(band) badges.push('<span class="std-pill std-pill-info">' + _ticEsc(band) + '</span>');
     // BCR / ineligibility flag — prominent so staff see it before any action.
     if(typeof bcrLookup === 'function'){
@@ -514,6 +514,14 @@
     }
     if(field.key === TIC_C.tenancy_status && (v == null || v === '') && u.status){
       return u.status;
+    }
+    // Band Membership — fall back to the linked application's band number.
+    // Applications (staff wizard and the external portal alike) store it as
+    // app.band; the tenants.band_membership column only fills once staff
+    // save it on the TIC, so without this fall-through a portal applicant's
+    // band number never showed here.
+    if(field.key === TIC_C.band_membership && (v == null || v === '') && a && a.band){
+      return a.band;
     }
     // Application Number — prefer the resolved application's id over a
     // potentially stale tenants.application_id column.
