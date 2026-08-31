@@ -159,22 +159,49 @@ async function sendPasswordReset() {
     // which has drifted before and sent users to a dead page.
     // The redirect_to host must be in the dashboard's Redirect URLs allowlist.
     var redirectTo = window.location.origin + '/index.html';
-    var r = await fetch(SUPABASE_URL + '/auth/v1/recover', {
-      method:  'POST',
-      headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email: email, redirect_to: redirectTo })
-    });
-    // Supabase rate-limits /auth/v1/recover per-email and per-IP. Surface
-    // the throttle honestly — previously the UI showed a generic success
-    // message on 429 too, which made the button look broken when really
-    // the request was just being throttled.
-    if (r.status === 429) {
-      if (msgEl) { msgEl.textContent = 'Too many reset attempts. Please wait a few minutes and try again.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
-      return;
-    }
-    if (!r.ok) {
-      if (msgEl) { msgEl.textContent = 'Could not send the reset link. Please try again.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
-      return;
+    // Preferred path: the PUBLIC request-password-reset Edge Function, which
+    // mints the recovery link server-side and emails it from the nation's own
+    // mailbox (the /auth/v1/recover endpoint below depends on the Supabase
+    // auth mailer, which this project doesn't configure — those emails never
+    // arrived). Anti-enumeration is server-side: it answers ok either way.
+    var viaFn = false;
+    try {
+      var _nc = window.NATION_CONFIG || {};
+      var fr = await fetch(SUPABASE_URL + '/functions/v1/request-password-reset', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
+        body:    JSON.stringify({
+          email: email,
+          redirect_to: redirectTo,
+          nation_name: _nc.display_name || _nc.short || '',
+          brand_color: _nc.primary_color || ''
+        })
+      });
+      if (fr.ok) {
+        var fd = await fr.json().catch(function(){ return {}; });
+        if (fd && fd.ok) viaFn = true;
+      }
+      // Not deployed yet (404), email unconfigured (503), or any other
+      // not-ok answer: fall through to the legacy Supabase recover mailer.
+    } catch(_fe) { /* function unreachable — legacy fallback below */ }
+    if (!viaFn) {
+      var r = await fetch(SUPABASE_URL + '/auth/v1/recover', {
+        method:  'POST',
+        headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: email, redirect_to: redirectTo })
+      });
+      // Supabase rate-limits /auth/v1/recover per-email and per-IP. Surface
+      // the throttle honestly — previously the UI showed a generic success
+      // message on 429 too, which made the button look broken when really
+      // the request was just being throttled.
+      if (r.status === 429) {
+        if (msgEl) { msgEl.textContent = 'Too many reset attempts. Please wait a few minutes and try again.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+        return;
+      }
+      if (!r.ok) {
+        if (msgEl) { msgEl.textContent = 'Could not send the reset link. Please try again.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+        return;
+      }
     }
     // 200 path: Supabase returns 200 whether or not the email is registered
     // (anti-enumeration). Keep the generic "if registered" wording here.
