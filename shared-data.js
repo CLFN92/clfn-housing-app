@@ -3142,6 +3142,10 @@ function openApplicationSubmissionReview(id){
     +   listBlock('References', p.references, function(r2){ return [r2.fn, r2.ln].filter(Boolean).join(' ') + (r2.phone ? ' · ' + r2.phone : '') + (r2.relationship ? ' · ' + r2.relationship : ''); })
     +   listBlock('Pets', p.pets, function(pt){ return [pt.name, pt.type, pt.size].filter(Boolean).join(' · '); })
     +   ((p.sig && p.sig.typed) ? '<div style="margin-top:10px;">' + row('Signed', p.sig.typed + (p.sig.date ? ' · ' + e(p.sig.date) : '')) + '</div>' : '')
+    +   (p.applicantComments
+          ? '<div class="tic-field-lbl" style="margin-top:12px;">Applicant comments</div>'
+            + '<div style="font-size:13px;white-space:pre-wrap;border:1px solid var(--border);border-left:3px solid var(--warn-amber-text);border-radius:6px;padding:8px 10px;">' + e(p.applicantComments) + '</div>'
+          : '')
     +   docsHtml
     +   linkSection
     +   '<div class="tic-field-lbl" style="margin-top:14px;">Review note (shown to the applicant if you request changes)</div>'
@@ -3264,7 +3268,7 @@ function _appSubMerge(id, targetAppId){
   // until a reload silently reverted it.
   var merged = JSON.parse(JSON.stringify(target));
   // Scalar applicant fields — overwrite only when the applicant supplied a value.
-  ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp'].forEach(function(k){
+  ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp','livingSituation','applicantComments'].forEach(function(k){
     if(p[k] !== undefined && p[k] !== '' && p[k] !== null) merged[k] = p[k];
   });
   if(p.hasCoApp && p.coApp) merged.coApp = p.coApp;

@@ -345,7 +345,24 @@
   // follow-up (T-B.2). Saves drafts + submits through the applicant-intake fn.
   var _wiz = null;
   var REL_OPTS    = ['Spouse / Partner', 'Child', 'Parent', 'Sibling', 'Grandparent', 'Grandchild', 'Other'];
-  var INCOME_OPTS = ['Employment', 'Social Assistance', 'Disability (ODSP)', 'Pension', 'Employment Insurance', 'Child Benefit', 'Self-employed', 'Other'];
+  // Income types store the CANONICAL staff-side values (same list as the
+  // staff wizard / TIC), with friendly labels for the member. Records saved
+  // by the old label-valued list are normalized on render via _INC_CANON, so
+  // drafts and re-opened submissions migrate themselves.
+  var INCOME_OPTS = [
+    { v: 'Employed',        l: 'Employment' },
+    { v: 'Self-Employment', l: 'Self-employed' },
+    { v: 'OW',              l: 'Ontario Works (OW)' },
+    { v: 'ODSP',            l: 'ODSP (Disability)' },
+    { v: 'EI',              l: 'Employment Insurance (EI)' },
+    { v: 'CPP',             l: 'CPP' },
+    { v: 'Pension',         l: 'Pension' },
+    { v: 'Other',           l: 'Other (child benefit, support, ...)' },
+    { v: 'No Income',       l: 'No income' }
+  ];
+  var _INC_CANON = { 'Employment': 'Employed', 'Self-employed': 'Self-Employment',
+    'Employment Insurance': 'EI', 'Disability (ODSP)': 'ODSP',
+    'Social Assistance': 'OW', 'Child Benefit': 'Other' };
   var PET_SIZES   = ['Small', 'Medium', 'Large'];
   var APPTYPE_OF  = { new: 'new_housing', transfer: 'transfer_request', update: 'existing_tenant' };
   var DOC_CAT_LABEL = { id: 'ID', income: 'Proof of income', housing_hist: 'Housing history', medical: 'Medical', other: 'Other' };
@@ -372,7 +389,7 @@
       return '<div class="wrow" style="border:1px solid var(--hair);border-radius:9px;padding:10px 10px 4px;margin-bottom:8px;position:relative;">'
         + fields.map(function (f) {
             var v = row[f.k];
-            if (f.type === 'select') return '<label>' + wfEsc(f.label) + '</label><select data-k="' + f.k + '"><option value="">Select&hellip;</option>' + (f.opts || []).map(function (o) { return '<option' + (String(v) === o ? ' selected' : '') + '>' + wfEsc(o) + '</option>'; }).join('') + '</select>';
+            if (f.type === 'select') return '<label>' + wfEsc(f.label) + '</label><select data-k="' + f.k + '"><option value="">Select&hellip;</option>' + (f.opts || []).map(function (o) { var ov = (o && typeof o === 'object') ? o.v : o, ol = (o && typeof o === 'object') ? o.l : o; return '<option value="' + wfEsc(ov) + '"' + (String(v) === ov ? ' selected' : '') + '>' + wfEsc(ol) + '</option>'; }).join('') + '</select>';
             return '<label>' + wfEsc(f.label) + '</label><input data-k="' + f.k + '" type="' + (f.type || 'text') + '" value="' + wfEsc(v == null ? '' : v) + '"/>';
           }).join('')
         + '<button type="button" onclick="' + addFn.replace('add', 'rm') + '(' + i + ')" style="position:absolute;top:6px;right:8px;background:none;border:none;color:var(--danger);font-size:20px;line-height:1;cursor:pointer;padding:0;">&times;</button>'
@@ -416,8 +433,8 @@
           + wf('Where do you live right now?', 'w_livsit', _livsitLabel(p.livingSituation), 'select', _livsitLabels())
           + '<div class="grid2">' + wf('Phone', 'w_phone', p.phone, 'tel') + wf('Email', 'w_email', p.email, 'email') + '</div>'
           + '<h4 style="margin:16px 0 2px;">Current address</h4>'
-          + wf('Street address', 'w_street', p.street)
-          + '<div class="grid2">' + wf('City / community', 'w_city', p.city) + wf('Province', 'w_province', p.province) + '</div>'
+          + wf('Street address *', 'w_street', p.street)
+          + '<div class="grid2">' + wf('City / community *', 'w_city', p.city) + wf('Province', 'w_province', p.province) + '</div>'
           + '<div class="grid2">' + wf('Postal code', 'w_postal', p.postal) + wf('Date you need housing by', 'w_occDate', p.occDate, 'date') + '</div>'
           + '<div style="margin:12px 0;">' + wf('I am currently homeless / have no fixed address', 'w_homeless', p.homeless, 'checkbox') + '</div>'
           + '<div style="margin:12px 0;">' + wf('I currently have a house on reserve', 'w_haveHouse', p.haveHouse, 'checkbox') + '</div>'
@@ -452,13 +469,21 @@
         p.pets = wfCollectRepeater('rep_pet', ['name', 'type', 'size']);
       } },
     { title: 'Income', render: function (p) {
+        // Migrate rows saved under the old label-valued type list so their
+        // select renders pre-picked (the canonical value persists on next save).
+        (p.incomes || []).forEach(function (r) { if (r && _INC_CANON[r.incomeType]) r.incomeType = _INC_CANON[r.incomeType]; });
         return '<h4 style="margin:0 0 6px;">Household income</h4>'
           + '<p class="sub" style="margin:0 0 10px;">Add each source of income for the household.</p>'
           + wfRepeater('rep_inc', p.incomes || [], [
               { k: 'person', label: 'Who' }, { k: 'incomeType', label: 'Type', type: 'select', opts: INCOME_OPTS },
               { k: 'employer', label: 'Employer / source' }, { k: 'primaryAmt', label: 'Monthly amount ($)', type: 'number' }
             ], 'wizAddInc');
-      }, collect: function (p) { p.incomes = wfCollectRepeater('rep_inc', ['person', 'incomeType', 'employer', 'primaryAmt']); } },
+      }, collect: function (p) {
+        p.incomes = wfCollectRepeater('rep_inc', ['person', 'incomeType', 'employer', 'primaryAmt']);
+        // The amount field is labeled "Monthly amount" — stamp the period so
+        // the staff form's Person/Type/Amount/Period all arrive filled.
+        p.incomes.forEach(function (r) { if (r.primaryAmt) r.incomePeriod = 'month'; });
+      } },
     { title: 'Contacts', render: function (p) {
         return '<h4 style="margin:0 0 6px;">References / emergency contacts</h4>'
           + '<p class="sub" style="margin:0 0 10px;">People we can contact about your application.</p>'
@@ -500,10 +525,13 @@
           +   line('Documents', (p._docs || []).length ? (p._docs.length + ' uploaded') : '')
           + '</div>'
           + '<p class="sub" style="margin:0 0 10px;">You can add or change documents on the previous step, or bring them to the Housing office later.</p>'
+          + '<h4 style="margin:16px 0 2px;">Comments for the Housing office (optional)</h4>'
+          + wf('Anything else you would like us to know about your situation?', 'w_comments', p.applicantComments, 'textarea')
           + '<div style="margin:12px 0;">' + wf('I consent to the Housing office collecting and reviewing this information for my application.', 'w_consent', p.consentShareCLFN, 'checkbox') + '</div>'
           + wf('Type your full name to sign', 'w_sig', (p.sig || {}).typed, 'text', null, 'Your full legal name')
           + wf('Date', 'w_sigdate', (p.sig || {}).date || new Date().toISOString().slice(0, 10), 'date');
       }, collect: function (p) {
+        p.applicantComments = wfVal('w_comments');
         p.consentShareCLFN = wfVal('w_consent');
         p.sig = { typed: wfVal('w_sig'), date: wfVal('w_sigdate') };
       } }
@@ -612,10 +640,17 @@
     p.band = band;
     return '';
   }
+  // Current address is required — unless the applicant checked the homeless /
+  // no fixed address box, which is exactly the case where there is none.
+  function _addrError(p) {
+    if (p.homeless) return '';
+    if (!p.street || !p.city) return 'Please enter your current address (street and city/community), or check the "currently homeless / no fixed address" box.';
+    return '';
+  }
   window.wizNav = async function (dir) {
     wizCollect();
     if (dir > 0 && _wiz.step === 0) {
-      var bErr = _bandError(_wiz.payload);
+      var bErr = _bandError(_wiz.payload) || _addrError(_wiz.payload);
       if (bErr) { var bm = document.getElementById('wmsg'); if (bm) { bm.className = 'msg err'; bm.textContent = bErr; } return; }
     }
     if (dir > 0) { var btn = _evtBtn(); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; } await wizPersist(); }
@@ -628,7 +663,7 @@
     wizCollect();
     var p = _wiz.payload;
     if (!p.fn || !p.ln) { var m = document.getElementById('wmsg'); if (m) { m.className = 'msg err'; m.textContent = 'Please enter your first and last name (Applicant step).'; } return; }
-    var bandErr = _bandError(p);
+    var bandErr = _bandError(p) || _addrError(p);
     if (bandErr) { var mb = document.getElementById('wmsg'); if (mb) { mb.className = 'msg err'; mb.textContent = bandErr + ' (Applicant step)'; } return; }
     if (!p.consentShareCLFN) { var m2 = document.getElementById('wmsg'); if (m2) { m2.className = 'msg err'; m2.textContent = 'Please check the consent box to submit.'; } return; }
     var btn = _evtBtn(); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }

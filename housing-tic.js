@@ -662,7 +662,16 @@
         html += '</tbody></table>';
       }
       html += '<div class="tic-form-actions"><button type="button" class="btn btn-primary" data-tic-action="inc-add">+ Add Income Record</button></div>';
-      var personOpts = TIC_INCOME_PERSONS.map(function(p){ return '<option value="' + _ticEsc(p) + '">' + _ticEsc(p) + '</option>'; }).join('');
+      // Person options: Applicant/Co-Applicant plus every named household
+      // member. Portal submissions record income against the member's NAME
+      // (the online form's "Who" is free text), so without these options an
+      // online record's person could never be shown or re-selected here.
+      var personNames = TIC_INCOME_PERSONS.slice();
+      (( app && _ticIsArray(app.habitants)) ? app.habitants : []).forEach(function(h){
+        var nm = [h && h.fn, h && h.ln].filter(Boolean).join(' ').trim();
+        if(nm && personNames.indexOf(nm) < 0) personNames.push(nm);
+      });
+      var personOpts = personNames.map(function(p){ return '<option value="' + _ticEsc(p) + '">' + _ticEsc(p) + '</option>'; }).join('');
       var typeOpts   = TIC_INCOME_TYPES.map(function(t){ return '<option value="' + _ticEsc(t) + '">' + _ticEsc(t) + '</option>'; }).join('');
       // Form mirrors the application form's persisted income shape:
       // {person, incomeType, employer, primaryAmt}. Employer field reveals
@@ -1208,6 +1217,28 @@
   // the application form hides the Employer Details group.
   var TIC_INCOME_EMPLOYER_TYPES = ['Employed','Self-Employment'];
 
+  // Records that came in through the applicant portal used its old friendly
+  // type labels; normalize the unambiguous ones to the canonical staff values
+  // so the OW/ODSP household-rent machinery recognizes them.
+  var TIC_INCOME_TYPE_ALIASES = {
+    'Employment': 'Employed', 'Self-employed': 'Self-Employment',
+    'Employment Insurance': 'EI', 'Disability (ODSP)': 'ODSP',
+    'Social Assistance': 'OW', 'Ontario Works': 'OW', 'Child Benefit': 'Other'
+  };
+  // Set a <select>'s value; if the stored value isn't among its options
+  // (a portal person name, an unmapped type), inject it as a real option so
+  // Edit shows the record's actual data instead of a silently blank select.
+  function _ticSelectSet(el, val){
+    if(!el) return;
+    var v = String(val == null ? '' : val);
+    el.value = v;
+    if(v && el.value !== v){
+      var o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      el.appendChild(o); el.value = v;
+    }
+  }
+
   function _ticIncApplyDynamic(){
     var typeEl = _ticEl('tic_inc_type');
     var empRow = document.querySelector('#tic_inc_form .tic-inc-employer-row');
@@ -1234,8 +1265,10 @@
     var form = _ticEl('tic_inc_form');
     form.setAttribute('data-tic-inc-mode','edit');
     form.setAttribute('data-tic-inc-idx', String(i));
-    _ticEl('tic_inc_person').value   = r.person     || '';
-    _ticEl('tic_inc_type').value     = r.incomeType || '';
+    var t = r.incomeType || '';
+    if(TIC_INCOME_TYPE_ALIASES[t]) t = TIC_INCOME_TYPE_ALIASES[t];
+    _ticSelectSet(_ticEl('tic_inc_person'), r.person || '');
+    _ticSelectSet(_ticEl('tic_inc_type'), t);
     _ticEl('tic_inc_employer').value = r.employer   || '';
     _ticEl('tic_inc_amount').value   = (r.primaryAmt != null ? r.primaryAmt : '');
     _ticEl('tic_inc_period').value   = r.incomePeriod || '';
