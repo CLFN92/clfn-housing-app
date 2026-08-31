@@ -1459,6 +1459,13 @@ function showLanding() {
   if (typeof renderRecentActivity === 'function') renderRecentActivity(role);
 }
 
+// An application "done by a tenant/member" — created from an applicant-portal
+// submission (source stamped by _appSubApprove), or an existing application a
+// portal update/transfer was merged into (_appSubMerge stamps last_portal_merge).
+function _appIsPortal(a){
+  return !!(a && (a.source === 'portal' || a.portal_submission_id || a.last_portal_merge));
+}
+
 // _renderLandingKpis — Open Apps · Critical · Vacant · Awaiting Match.
 // All counts come from the in-memory `applications` and `housingUnits`
 // arrays so no extra Supabase round-trips run on every landing render.
@@ -1551,6 +1558,23 @@ function _renderLandingKpis(){
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
+  // Online (self-serve) applications — submitted or updated by members through
+  // the applicant portal. Same population rules as the type card (non-archived,
+  // not declined/deceased/BCR-blocked), but housed apps stay counted: a portal
+  // application that got someone housed is still a self-serve application.
+  function _portalOfType(pred){
+    return apps.filter(function(a){
+      if(!a || a.archived || a.status === 'declined' || a.deceased) return false;
+      if(_bcrBlocked(a)) return false;
+      if(!(typeof _appIsPortal === 'function' ? _appIsPortal(a) : (a.source === 'portal' || a.portal_submission_id || a.last_portal_merge))) return false;
+      return !pred || pred(a.appType || 'new_housing');
+    }).length;
+  }
+  var portalTotal     = _portalOfType(null);
+  var portalNew       = _portalOfType(appIsWaitlistType);
+  var portalUpdates   = _portalOfType(function(t){ return t === 'existing_tenant'; });
+  var portalTransfers = _portalOfType(function(t){ return t === 'transfer_request'; });
+
   setKpi('kpi_open_apps',       openApps);
   setKpi('kpi_vacant',          vacant);
   setKpi('kpi_under_repair',    underRepairN);
@@ -1560,6 +1584,10 @@ function _renderLandingKpis(){
   setKpi('kpi_doubled_apps',    doubledApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
+  setKpi('kpi_portal_apps',      portalTotal);
+  setKpi('kpi_portal_new',       portalNew);
+  setKpi('kpi_portal_updates',   portalUpdates);
+  setKpi('kpi_portal_transfers', portalTransfers);
 
   // (Likely-Housed / Reconcile / Archived-Applications quick actions moved to
   // the Operations nav dropdown's Data Health section — housing-init.js.)
@@ -1685,14 +1713,21 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">'+_unitCfg.empty+'</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps' || type === 'deceased_apps' || type === 'doubled_apps') {
+  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests' || type === 'draft_apps' || type === 'deceased_apps' || type === 'doubled_apps'
+          || type === 'portal_apps' || type === 'portal_new' || type === 'portal_updates' || type === 'portal_transfers') {
     var _typeCfg = {
       new_apps:       { title:'New Applications',                          pred:appIsWaitlistType, empty:'No active new applications.' },
       draft_apps:     { title:'New Applications — In Draft',               pred:appIsWaitlistType, empty:'No draft applications.' },
       doubled_apps:   { title:'New Applications — Doubled Up (on reserve)', pred:appIsWaitlistType, empty:'No doubled-up applicants on file.' },
       file_updates:   { title:'File Updates — Existing Tenant',            pred:function(t){ return t==='existing_tenant'; },   empty:'No active file updates.' },
       house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' },
-      deceased_apps:  { title:'Applications — Deceased',                   pred:function(){ return true; },                     empty:'No deceased-flagged applications.' }
+      deceased_apps:  { title:'Applications — Deceased',                   pred:function(){ return true; },                     empty:'No deceased-flagged applications.' },
+      // Online (self-serve) groups — the portal KPI card. Same population
+      // rules as _portalOfType in _renderLandingKpis (housed apps included).
+      portal_apps:      { title:'Online Applications — Submitted by Members',    pred:function(){ return true; },                    empty:'No online applications yet.' },
+      portal_new:       { title:'Online Applications — New Housing',             pred:appIsWaitlistType,                             empty:'No online new applications.' },
+      portal_updates:   { title:'Online Applications — File Updates',            pred:function(t){ return t==='existing_tenant'; },  empty:'No online file updates.' },
+      portal_transfers: { title:'Online Applications — Transfer Requests',       pred:function(t){ return t==='transfer_request'; }, empty:'No online transfer requests.' }
     }[type];
     title = _typeCfg.title;
     // New Applications drilldown excludes housed (linked) apps, matching the KPI.
@@ -1709,6 +1744,7 @@ function showHousingKpiDrilldown(type) {
       if ((type === 'new_apps' || type === 'draft_apps' || type === 'doubled_apps') && _isHoused2(a)) return false;
       if (type === 'draft_apps' && a.status !== 'draft') return false;
       if (type === 'doubled_apps' && (a.status === 'draft' || a.livingSituation !== 'family_on_reserve')) return false;
+      if (type.indexOf('portal_') === 0 && !_appIsPortal(a)) return false;
       return _typeCfg.pred(a.appType || 'new_housing');
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
     exportHeaders = ['Applicant','App ID','Tier','Score','Status','Days Waiting'];

@@ -214,6 +214,29 @@
         </div>
       </div>
     </div>
+    <div class="kpi-card kpi-clickable" data-kpi="portal-apps" onclick="showHousingKpiDrilldown('portal_apps')" role="button" tabindex="0">
+      <span class="kpi-icon">🌐</span>
+      <div class="kpi-label">Online (Self-Serve)</div>
+      <div class="kpi-value" id="kpi_portal_apps">—</div>
+      <div class="kpi-meta">Applications members submitted themselves</div>
+      <div class="kpi-breakdown" style="display:flex;flex-direction:column;margin-top:6px;">
+        <div onclick="event.stopPropagation();showHousingKpiDrilldown('portal_new')" role="button" tabindex="0" title="Seeking a new unit — submitted online"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:12px;color:var(--text);">New Applications</span>
+          <span style="font-size:15px;font-weight:800;color:var(--text);" id="kpi_portal_new">—</span>
+        </div>
+        <div onclick="event.stopPropagation();showHousingKpiDrilldown('portal_updates')" role="button" tabindex="0" title="Existing tenant file updates — submitted or merged from the portal"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:12px;color:var(--text);">File Updates</span>
+          <span style="font-size:15px;font-weight:800;color:var(--text);" id="kpi_portal_updates">—</span>
+        </div>
+        <div onclick="event.stopPropagation();showHousingKpiDrilldown('portal_transfers')" role="button" tabindex="0" title="Transfer requests — submitted or merged from the portal"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:4px 0;">
+          <span style="font-size:12px;color:var(--text);">Transfer Requests</span>
+          <span style="font-size:15px;font-weight:800;color:var(--text);" id="kpi_portal_transfers">—</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Quick row: Lookup + Quick Actions -->
