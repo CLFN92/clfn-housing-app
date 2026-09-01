@@ -894,10 +894,15 @@
     review.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Matching against tenants and prior imports…</div>';
     Promise.all([
       window.arrearsLoad(),
-      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=description,tenant_id&limit=8000')
+      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=description,tenant_id&limit=8000'),
+      _get('housing_settings?key=eq.ar_cleanup&select=value&limit=1')
     ]).then(function (res) {
       IMP.imported = {};
       IMP.remembered = {};
+      // Merge saved-over-local, local wins: a re-parse fired before the 800ms
+      // classification debounce has flushed must not wipe just-typed edits.
+      var clsSaved = (res[2] && res[2][0] && res[2][0].value) || {};
+      IMP.cleanup = Object.assign({}, clsSaved.accounts || {}, IMP.cleanup || {});
       (res[1] || []).forEach(function (r) {
         var m = String(r.description || '').match(/\[AR-IMPORT:([^\]:]+)(?::([^\]]+))?\]/);
         if (m) {
@@ -953,6 +958,126 @@
     return opts;
   }
 
+  // ── A/R cleanup classification ───────────────────────────────────────────
+  // The 20-years-of-A/R cleanup exercise: each ledger account can be tagged
+  // with an income program (OW/ODSP), an account flag (Deceased / Write Off /
+  // Staff / Other), and a free-text note. Stored in housing_settings key
+  // 'ar_cleanup' as {accounts:{custno:{income,flag,note,name,tenantId,total,
+  // current,by,at}}} — keyed by the Sage customer number so classifications
+  // survive re-imports and re-matches; totals are snapshotted at classify
+  // time so the report works without re-parsing the ledger.
+  var _CLS_FLAGS = { deceased: 'Deceased', write_off: 'Write Off', staff: 'Staff', other: 'Other' };
+  var _clsSaveTimer = null;
+  function _arClsPersist() {
+    clearTimeout(_clsSaveTimer);
+    _clsSaveTimer = setTimeout(function () {
+      if (typeof sbSaveSetting === 'function') {
+        sbSaveSetting('ar_cleanup', { accounts: IMP.cleanup || {}, updatedAt: new Date().toISOString() });
+      }
+    }, 800);
+  }
+  // Deliberately does NOT re-render the table: a re-render mid-typing would
+  // throw focus out of the note box. The inputs hold their own state.
+  window._arClsSet = function (i, key, value) {
+    var r = IMP.rows[i]; if (!r) return;
+    if (!_can('manageArrears')) { showToast('You are not authorized to classify arrears accounts.', { type: 'error' }); return; }
+    IMP.cleanup = IMP.cleanup || {};
+    var e = IMP.cleanup[r.custno] = IMP.cleanup[r.custno] || {};
+    var flagChanged = (key === 'flag' && value !== (e.flag || ''));
+    e[key] = value;
+    e.name = _cleanDisplayName(r.rawName);
+    if (r.tenantId) e.tenantId = r.tenantId;
+    e.total = r.total; e.current = r.current;
+    e.by = (window.HOUSING_SESSION || {}).email || 'staff';
+    e.at = new Date().toISOString();
+    if (!e.income && !e.flag && !e.note) delete IMP.cleanup[r.custno];
+    _arClsPersist();
+    if (flagChanged && value && typeof auditEntry === 'function') {
+      auditEntry(r.tenantId ? ('TENANT:' + r.tenantId) : 'SETTINGS', 'ar_account_flagged',
+        'A/R cleanup: ' + _cleanDisplayName(r.rawName) + ' (' + r.custno + ', ' + _money(r.total) + ') flagged ' + (_CLS_FLAGS[value] || value),
+        window.currentRole || 'staff');
+    }
+  };
+
+  // Cleanup report — every classified account with per-flag $ subtotals.
+  // Reads the SAVED dataset (fetches it if the import modal hasn't), so the
+  // report can be generated any time, not only right after a parse.
+  window._arClsReport = async function (format) {
+    var accounts = IMP.cleanup;
+    if (!accounts || !Object.keys(accounts).length) {
+      try {
+        var sv = await _get('housing_settings?key=eq.ar_cleanup&select=value&limit=1');
+        accounts = (sv && sv[0] && sv[0].value && sv[0].value.accounts) || {};
+        IMP.cleanup = accounts;
+      } catch (e) { accounts = IMP.cleanup || {}; }
+    }
+    var keys = Object.keys(accounts).filter(function (k) { var e = accounts[k]; return e && (e.income || e.flag || e.note); });
+    if (!keys.length) { showToast('Nothing classified yet — tag accounts in the Import Arrears Ledger table first.', { type: 'error' }); return; }
+    var rows = keys.map(function (k) { var e = accounts[k]; return {
+      custno: k, name: e.name || '', income: e.income || '',
+      flag: e.flag ? (_CLS_FLAGS[e.flag] || e.flag) : '', note: e.note || '',
+      total: Number(e.total || 0), by: e.by || '', at: String(e.at || '').slice(0, 10)
+    }; });
+    rows.sort(function (a, b) { return (a.flag || 'zz').localeCompare(b.flag || 'zz') || b.total - a.total; });
+    var sum = { count: rows.length, flags: {}, ow: 0, odsp: 0, flaggedTotal: 0 };
+    rows.forEach(function (r) {
+      if (r.income === 'OW') sum.ow++; if (r.income === 'ODSP') sum.odsp++;
+      if (r.flag) {
+        var f = sum.flags[r.flag] = sum.flags[r.flag] || { n: 0, total: 0 };
+        f.n++; f.total = Math.round((f.total + r.total) * 100) / 100;
+        sum.flaggedTotal = Math.round((sum.flaggedTotal + r.total) * 100) / 100;
+      }
+    });
+    var asOf = _todayISO();
+    var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
+    var money = function (v) { return '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 }); };
+    if (format === 'csv') {
+      var head = ['Customer #', 'Name', 'Income (OW/ODSP)', 'Account Flag', 'Note', 'Ledger Total', 'Classified By', 'Date'];
+      var csv = [head.join(',')].concat(rows.map(function (r) {
+        return [r.custno, r.name, r.income, r.flag, r.note, r.total.toFixed(2), r.by, r.at]
+          .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+      })).join('\n');
+      var a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+      a.download = ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Cleanup_' + asOf + '.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_cleanup_report_generated', 'A/R cleanup report exported (CSV) — ' + rows.length + ' classified accounts', window.currentRole || 'staff');
+      return;
+    }
+    _loadJsPdf().then(function () {
+      var doc = new window.jspdf.jsPDF();
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(nation, 14, 16);
+      doc.setFontSize(12); doc.text('A/R Cleanup Classification Report', 14, 24);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      doc.text('As of ' + asOf + ' · classifications recorded during the arrears ledger reconciliation', 14, 30);
+      var lines = [rows.length + ' account(s) classified · flagged accounts total ' + money(sum.flaggedTotal)];
+      Object.keys(sum.flags).forEach(function (f) {
+        lines.push(f + ': ' + sum.flags[f].n + ' account(s) · ' + money(sum.flags[f].total));
+      });
+      lines.push('Income classified: ' + sum.ow + ' OW · ' + sum.odsp + ' ODSP');
+      doc.setFontSize(10);
+      lines.forEach(function (t, i) { doc.text(t, 14, 40 + i * 6); });
+      doc.autoTable({
+        startY: 44 + lines.length * 6,
+        head: [['Cust #', 'Name', 'OW/ODSP', 'Flag', 'Note', 'Ledger Total', 'By', 'Date']],
+        body: rows.map(function (r) { return [r.custno, r.name, r.income, r.flag, r.note, money(r.total), r.by, r.at]; }),
+        styles: { fontSize: 8, cellPadding: 1.6 },
+        headStyles: { fillColor: [40, 40, 40] },
+        columnStyles: { 5: { halign: 'right' } },
+        didDrawPage: function () {
+          var page = doc.internal.getNumberOfPages();
+          doc.setFontSize(8);
+          doc.text(nation + ' — A/R Cleanup ' + asOf + ' — Page ' + page, 14, doc.internal.pageSize.getHeight() - 8);
+        }
+      });
+      doc.save(((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Cleanup_' + asOf + '.pdf');
+      if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_cleanup_report_generated', 'A/R cleanup report generated (PDF) — ' + rows.length + ' classified accounts', window.currentRole || 'staff');
+    }).catch(function (e2) {
+      showToast('PDF library unavailable (' + e2.message + ') — use the CSV export.', { type: 'error' });
+    });
+  };
+
   function _rowResolved(r) { return !!(r.tenantId || (r.kind === 'unit' && r.unitId) || (r.kind === 'application' && r.appId)); }
   function _arImpRender() {
     var review = document.getElementById('ar_import_review');
@@ -987,6 +1112,19 @@
         : '';
       if (!r.already && !isAmb && _rowResolved(r) && r.inSync) counts.insync = (counts.insync || 0) + 1;
       var canRow = _rowResolved(r) && !isAmb && !r.already && !r.inSync;
+      // Cleanup classification cells — active on EVERY row (already-imported
+      // and in-sync included; classifying is the point of the exercise).
+      var cls = (IMP.cleanup || {})[r.custno] || {};
+      if (cls.income || cls.flag || cls.note) counts.classified = (counts.classified || 0) + 1;
+      var clsHtml =
+          '<td><select data-ar-cls="' + i + '" data-cls-k="income" style="font-size:11px;padding:3px 4px;">'
+        +   ['', 'OW', 'ODSP'].map(function (o) { return '<option value="' + o + '"' + ((cls.income || '') === o ? ' selected' : '') + '>' + (o || '—') + '</option>'; }).join('')
+        + '</select></td>'
+        + '<td><select data-ar-cls="' + i + '" data-cls-k="flag" style="font-size:11px;padding:3px 4px;">'
+        +   '<option value=""' + (!cls.flag ? ' selected' : '') + '>—</option>'
+        +   Object.keys(_CLS_FLAGS).map(function (f) { return '<option value="' + f + '"' + (cls.flag === f ? ' selected' : '') + '>' + _CLS_FLAGS[f] + '</option>'; }).join('')
+        + '</select></td>'
+        + '<td><input data-ar-cls="' + i + '" data-cls-k="note" value="' + _esc(cls.note || '') + '" placeholder="note…" style="width:130px;font-size:11px;padding:3px 6px;"/></td>';
       return '<tr' + (r.already ? ' style="opacity:.5;"' : '') + '>'
         + '<td style="font-family:ui-monospace,monospace;font-size:10px;">' + _esc(r.custno) + '</td>'
         + '<td style="font-weight:600;font-size:12px;">' + _esc(r.rawName) + '</td>'
@@ -997,6 +1135,7 @@
         + '<td style="text-align:right;font-size:11px;color:var(--muted);">' + (_rowResolved(r) && !isAmb ? _money(r.appBalance) : '') + '</td>'
         + '<td style="text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">' + (r.already ? '' : isAmb || !_rowResolved(r) ? '' : (r.inSync ? '<span style="color:var(--success);">in sync</span>' : ((r.delta > 0 ? '+' : '') + _money(r.delta).replace('$-','-$')))) + '</td>'
         + '<td style="font-size:10px;color:var(--muted);white-space:nowrap;">' + (willSetRent ? 'rent → ' + _money(r.current) : (unit && Number(unit.monthlyRent) > 0 ? 'rent set' : '')) + '</td>'
+        + clsHtml
         + '<td>' + (canRow ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-import-one="' + i + '">Import</button>' : '') + '</td>'
         + '</tr>';
     }).join('');
@@ -1004,11 +1143,13 @@
       + '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">' + IMP.rows.length + ' rows — '
       + counts.tenant + ' tenant · ' + counts.unit + ' unit · ' + counts.application + ' applicant · '
       + counts.none + ' unmatched · ' + counts.ambiguous + ' ambiguous · ' + counts.already + ' imported · '
-      + (counts.insync || 0) + ' already in sync · ' + counts.rentSets + ' unit rents will be set. Each import writes the DIFFERENCE between the report total and the app balance (first import = opening balance; monthly re-imports = adjustments), so re-running the monthly A/R keeps balances synced. Unit/Applicant matches create the missing tenant record on import (find-first, audited). ~ marks a fuzzy name match; ✓ marks a customer remembered from a prior import (matched by customer number, not name).</div>'
-      + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Cust #</th><th>Ledger name</th><th>Match</th><th>Matched to</th><th style="text-align:right;">Current</th><th style="text-align:right;">Ledger Total</th><th style="text-align:right;">App Balance</th><th style="text-align:right;">Will Write</th><th></th><th></th></tr></thead><tbody>'
+      + (counts.insync || 0) + ' already in sync · ' + counts.rentSets + ' unit rents will be set · ' + (counts.classified || 0) + ' classified for cleanup. Each import writes the DIFFERENCE between the report total and the app balance (first import = opening balance; monthly re-imports = adjustments), so re-running the monthly A/R keeps balances synced. Unit/Applicant matches create the missing tenant record on import (find-first, audited). ~ marks a fuzzy name match; ✓ marks a customer remembered from a prior import (matched by customer number, not name). OW/ODSP, Flag and Note save automatically as you set them and feed the A/R Cleanup Report.</div>'
+      + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Cust #</th><th>Ledger name</th><th>Match</th><th>Matched to</th><th style="text-align:right;">Current</th><th style="text-align:right;">Ledger Total</th><th style="text-align:right;">App Balance</th><th style="text-align:right;">Will Write</th><th></th><th>OW/ODSP</th><th>Flag</th><th>Note</th><th></th></tr></thead><tbody>'
       + body + '</tbody></table></div>'
       + '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" onclick="_arImpRun()">Import all matched rows</button>'
+      + '<button class="btn btn-ghost" onclick="_arClsReport(\'pdf\')">📄 Cleanup Report (PDF)</button>'
+      + '<button class="btn btn-ghost" onclick="_arClsReport(\'csv\')">Cleanup CSV</button>'
       + '<span id="ar_import_progress" style="font-size:12px;color:var(--muted);"></span></div>';
     review.querySelectorAll('[data-ar-row]').forEach(function (inp) {
       inp.addEventListener('change', function () {
@@ -1026,6 +1167,11 @@
     });
     review.querySelectorAll('[data-ar-import-one]').forEach(function (btn) {
       btn.addEventListener('click', function () { _arImpImportOne(Number(btn.getAttribute('data-ar-import-one'))); });
+    });
+    review.querySelectorAll('[data-ar-cls]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        window._arClsSet(Number(inp.getAttribute('data-ar-cls')), inp.getAttribute('data-cls-k'), inp.value.trim());
+      });
     });
   }
 
