@@ -914,6 +914,7 @@
       // classification debounce has flushed must not wipe just-typed edits.
       var clsSaved = (res[2] && res[2][0] && res[2][0].value) || {};
       IMP.cleanup = Object.assign({}, clsSaved.accounts || {}, IMP.cleanup || {});
+      if (clsSaved.flags && clsSaved.flags.length) IMP.flags = clsSaved.flags;
       (res[1] || []).forEach(function (r) {
         var m = String(r.description || '').match(/\[AR-IMPORT:([^\]:]+)(?::([^\]]+))?\]/);
         if (m) {
@@ -977,16 +978,91 @@
   // current,by,at}}} — keyed by the Sage customer number so classifications
   // survive re-imports and re-matches; totals are snapshotted at classify
   // time so the report works without re-parsing the ledger.
-  var _CLS_FLAGS = { deceased: 'Deceased', write_off: 'Write Off', staff: 'Staff', employed: 'Employed', retired: 'Retired', rent_to_own: 'Rent to Own', other: 'Other' };
+  // Default flag set — a nation can edit the list from the import screen
+  // ("Edit Flags"); the saved list lives in the same ar_cleanup settings row
+  // (value.flags as [{k,label}]). Stored classifications keep their key, so
+  // removing/renaming a flag never orphans data — unknown keys still render.
+  var _CLS_FLAGS_DEFAULT = [
+    { k: 'deceased', label: 'Deceased' }, { k: 'write_off', label: 'Write Off' },
+    { k: 'staff', label: 'Staff' }, { k: 'employed', label: 'Employed' },
+    { k: 'retired', label: 'Retired' }, { k: 'rent_to_own', label: 'Rent to Own' },
+    { k: 'other', label: 'Other' }
+  ];
+  function _clsFlagList() {
+    return (IMP.flags && IMP.flags.length) ? IMP.flags : _CLS_FLAGS_DEFAULT;
+  }
+  function _clsFlagMap() {
+    var m = {};
+    _clsFlagList().forEach(function (f) { if (f && f.k) m[f.k] = f.label || f.k; });
+    return m;
+  }
   var _clsSaveTimer = null;
   function _arClsPersist() {
     clearTimeout(_clsSaveTimer);
     _clsSaveTimer = setTimeout(function () {
       if (typeof sbSaveSetting === 'function') {
-        sbSaveSetting('ar_cleanup', { accounts: IMP.cleanup || {}, updatedAt: new Date().toISOString() });
+        var payload = { accounts: IMP.cleanup || {}, updatedAt: new Date().toISOString() };
+        if (IMP.flags && IMP.flags.length) payload.flags = IMP.flags;
+        sbSaveSetting('ar_cleanup', payload);
       }
     }, 800);
   }
+
+  // ── Flag list editor (per-nation) ────────────────────────────────────────
+  window._arClsEditFlags = function () {
+    if (!_can('manageArrears')) { showToast('You are not authorized to edit the cleanup flags.', { type: 'error' }); return; }
+    var ex = document.getElementById('arClsFlagsModal'); if (ex) ex.remove();
+    var mo = document.createElement('div');
+    mo.id = 'arClsFlagsModal';
+    mo.className = 'modal-ov on';
+    mo.style.zIndex = '10050';
+    function draw() {
+      var list = _clsFlagList();
+      mo.innerHTML =
+          '<div class="modal" style="max-width:420px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">'
+        + '<div class="modal-hdr"><div><h2 style="font-size:16px;">Cleanup Flags</h2>'
+        +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">The choices in the Flag dropdown. Accounts already flagged with a removed option keep it.</div></div>'
+        +   '<button class="modal-close" onclick="var m=document.getElementById(\'arClsFlagsModal\');if(m)m.remove();">&#x2715;</button></div>'
+        + '<div style="padding:14px 16px;overflow-y:auto;flex:1;">'
+        + list.map(function (f, i) {
+            return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">'
+              + '<span style="flex:1;font-size:13px;">' + _esc(f.label || f.k) + '</span>'
+              + '<button data-flag-rm="' + i + '" title="Remove from the dropdown" style="background:none;border:none;color:var(--danger);font-size:17px;line-height:1;cursor:pointer;padding:0 4px;">&times;</button>'
+              + '</div>';
+          }).join('')
+        + '<div style="display:flex;gap:8px;margin-top:12px;">'
+        +   '<input id="ar_flag_new" type="text" placeholder="New flag (e.g. Estate File)" style="flex:1;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"/>'
+        +   '<button id="ar_flag_add" class="btn btn-primary" style="padding:7px 14px;font-size:12px;">+ Add</button>'
+        + '</div>'
+        + '<div style="margin-top:10px;"><button id="ar_flag_reset" class="btn btn-ghost" style="padding:5px 12px;font-size:11px;">Reset to defaults</button></div>'
+        + '</div></div>';
+      mo.querySelectorAll('[data-flag-rm]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var arr = _clsFlagList().slice();
+          arr.splice(Number(b.getAttribute('data-flag-rm')), 1);
+          IMP.flags = arr; _arClsPersist(); draw(); _arImpRender();
+        });
+      });
+      var addEl = mo.querySelector('#ar_flag_add');
+      if (addEl) addEl.addEventListener('click', function () {
+        var inp = mo.querySelector('#ar_flag_new');
+        var label = (inp && inp.value || '').trim().slice(0, 40);
+        if (!label) return;
+        var key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'flag';
+        var arr = _clsFlagList().slice();
+        while (arr.some(function (f) { return f.k === key; })) key += '2';
+        arr.push({ k: key, label: label });
+        IMP.flags = arr; _arClsPersist(); draw(); _arImpRender();
+      });
+      var resetEl = mo.querySelector('#ar_flag_reset');
+      if (resetEl) resetEl.addEventListener('click', function () {
+        IMP.flags = _CLS_FLAGS_DEFAULT.slice(); _arClsPersist(); draw(); _arImpRender();
+      });
+    }
+    mo.addEventListener('click', function (e) { if (e.target === mo) mo.remove(); });
+    draw();
+    document.body.appendChild(mo);
+  };
   // Deliberately does NOT re-render the table: a re-render mid-typing would
   // throw focus out of the note box. The inputs hold their own state.
   window._arClsSet = function (i, key, value) {
@@ -1005,7 +1081,7 @@
     _arClsPersist();
     if (flagChanged && value && typeof auditEntry === 'function') {
       auditEntry(r.tenantId ? ('TENANT:' + r.tenantId) : 'SETTINGS', 'ar_account_flagged',
-        'A/R cleanup: ' + _cleanDisplayName(r.rawName) + ' (' + r.custno + ', ' + _money(r.total) + ') flagged ' + (_CLS_FLAGS[value] || value),
+        'A/R cleanup: ' + _cleanDisplayName(r.rawName) + ' (' + r.custno + ', ' + _money(r.total) + ') flagged ' + (_clsFlagMap()[value] || value),
         window.currentRole || 'staff');
     }
   };
@@ -1020,13 +1096,15 @@
         var sv = await _get('housing_settings?key=eq.ar_cleanup&select=value&limit=1');
         accounts = (sv && sv[0] && sv[0].value && sv[0].value.accounts) || {};
         IMP.cleanup = accounts;
+        var svFlags = sv && sv[0] && sv[0].value && sv[0].value.flags;
+        if (svFlags && svFlags.length) IMP.flags = svFlags;
       } catch (e) { accounts = IMP.cleanup || {}; }
     }
     var keys = Object.keys(accounts).filter(function (k) { var e = accounts[k]; return e && (e.income || e.flag || e.note); });
     if (!keys.length) { showToast('Nothing classified yet — tag accounts in the Import Arrears Ledger table first.', { type: 'error' }); return; }
     var rows = keys.map(function (k) { var e = accounts[k]; return {
       custno: k, name: e.name || '', income: e.income || '',
-      flag: e.flag ? (_CLS_FLAGS[e.flag] || e.flag) : '', note: e.note || '',
+      flag: e.flag ? (_clsFlagMap()[e.flag] || e.flag) : '', note: e.note || '',
       total: Number(e.total || 0), by: e.by || '', at: String(e.at || '').slice(0, 10)
     }; });
     rows.sort(function (a, b) { return (a.flag || 'zz').localeCompare(b.flag || 'zz') || b.total - a.total; });
@@ -1164,7 +1242,8 @@
         + '</select></td>'
         + '<td><select data-ar-cls="' + i + '" data-cls-k="flag" style="font-size:11px;padding:3px 4px;">'
         +   '<option value=""' + (!cls.flag ? ' selected' : '') + '>—</option>'
-        +   Object.keys(_CLS_FLAGS).map(function (f) { return '<option value="' + f + '"' + (cls.flag === f ? ' selected' : '') + '>' + _CLS_FLAGS[f] + '</option>'; }).join('')
+        +   _clsFlagList().map(function (f) { return '<option value="' + f.k + '"' + (cls.flag === f.k ? ' selected' : '') + '>' + _esc(f.label || f.k) + '</option>'; }).join('')
+        +   ((cls.flag && !_clsFlagMap()[cls.flag]) ? '<option value="' + _esc(cls.flag) + '" selected>' + _esc(cls.flag) + '</option>' : '')
         + '</select></td>'
         + '<td><input data-ar-cls="' + i + '" data-cls-k="note" value="' + _esc(cls.note || '') + '" placeholder="note…" style="width:130px;font-size:11px;padding:3px 6px;"/></td>';
       return '<tr' + (r.already ? ' style="opacity:.5;"' : '') + '>'
@@ -1196,6 +1275,7 @@
       + '<button class="btn btn-primary" onclick="_arImpRun()">Import all matched rows</button>'
       + '<button class="btn btn-ghost" onclick="_arClsReport(\'pdf\')">📄 Cleanup Report (PDF)</button>'
       + '<button class="btn btn-ghost" onclick="_arClsReport(\'csv\')">Cleanup CSV</button>'
+      + '<button class="btn btn-ghost" onclick="_arClsEditFlags()">✎ Edit Flags</button>'
       + '<span id="ar_import_progress" style="font-size:12px;color:var(--muted);"></span></div>';
     review.querySelectorAll('[data-ar-row]').forEach(function (inp) {
       inp.addEventListener('change', function () {

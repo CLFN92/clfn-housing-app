@@ -3070,6 +3070,26 @@ async function _appSubLinkProfile(uid, appId){
   } catch(e){ console.warn('[app-sub] link profile failed:', e); }
 }
 
+// Arrears warning for the submission review modal: a person record with this
+// exact name carrying a balance (e.g. minted by the A/R import for a FORMER
+// tenancy) is matched by name — the same rule the good-standing allocation
+// gate applies later — so staff see the debt at APPROVAL time, not first at
+// unit assignment. Best-effort: silent when the arrears cache isn't loaded.
+function _appSubArrearsWarn(p, esc){
+  try {
+    if (typeof arrearsTenantByName !== 'function' || !window._arrearsCache || !_arrearsCache.loaded) return '';
+    var t = arrearsTenantByName([p.fn, p.ln].filter(Boolean).join(' '));
+    var st = (t && typeof arrearsStateForTenant === 'function') ? arrearsStateForTenant(t.id) : null;
+    if (!st || !(st.balance > 0)) return '';
+    return '<div style="margin-top:12px;font-size:13px;border:1px solid var(--danger);border-left:3px solid var(--danger);border-radius:6px;padding:8px 10px;">'
+      + '<b>⚠ Arrears on file:</b> ' + esc('$' + st.balance.toFixed(2)) + ' owed by a person record with this exact name'
+      + (st.hasApproved
+          ? ' (approved repayment arrangement in place).'
+          : ' — no approved repayment arrangement. Approving adds them to the wait list as usual, but the good-standing gate will block unit assignment until an arrangement is approved.')
+      + '</div>';
+  } catch(_ae){ return ''; }
+}
+
 var _APPSUB_TYPE_LABEL = { new:'New application', update:'Application update', transfer:'Transfer request' };
 
 function openApplicationSubmissionReview(id){
@@ -3146,6 +3166,7 @@ function openApplicationSubmissionReview(id){
           ? '<div class="tic-field-lbl" style="margin-top:12px;">Applicant comments</div>'
             + '<div style="font-size:13px;white-space:pre-wrap;border:1px solid var(--border);border-left:3px solid var(--warn-amber-text);border-radius:6px;padding:8px 10px;">' + e(p.applicantComments) + '</div>'
           : '')
+    +   _appSubArrearsWarn(p, e)
     +   docsHtml
     +   linkSection
     +   '<div class="tic-field-lbl" style="margin-top:14px;">Review note (shown to the applicant if you request changes)</div>'
