@@ -111,6 +111,28 @@
   }
   window.arrearsTenantByName = _resolveTenantByName;
 
+  // Joint-account detection: A/R accounts like "Brandon Williams & Margaret
+  // Ineese" import as ONE person record, so an individual's exact-name lookup
+  // misses them. This finds records whose name contains a joiner (& / and)
+  // AND every token of the person's own name — WARNING-ONLY material (token
+  // matching can hit the wrong person; it must never auto-block).
+  window.arrearsJointMatches = function (name) {
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim(); };
+    var toks = norm(name).split(' ').filter(Boolean);
+    if (toks.length < 2) return [];
+    var out = [];
+    (CACHE.tenants || []).forEach(function (t) {
+      var raw = String(t.full_name || '');
+      if (!/&|\band\b/i.test(raw)) return;
+      var tToks = norm(raw).split(' ');
+      var all = toks.every(function (k) { return tToks.indexOf(k) >= 0; });
+      if (!all) return;
+      var bal = (CACHE.byTenant[t.id] && CACHE.byTenant[t.id].balance) || 0;
+      if (bal > 0) out.push({ tenant: t, balance: bal });
+    });
+    return out;
+  };
+
   // ── The state machine per tenant ─────────────────────────────────────────
   // Returns the full Policy s.12 view: balance, the current arrangement, its
   // compliance, window + review timing, and stamps. Sync — reads the cache.
@@ -380,14 +402,27 @@
     mount.innerHTML = '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Arrears &amp; Repayment</div><div style="font-size:12px;color:var(--muted);padding:6px 0;">Loading finance data…</div></div>';
     window.arrearsLoad().then(function () {
       var t = _resolveTenantByName(tenantName);
-      if (!t) { mount.innerHTML = ''; return; }
-      return window.arrearsLoadStamps([t.id]).then(function () { _paint(mount, t.id, monthlyRent); });
+      if (!t) {
+        // No exact record — surface possible JOINT accounts ("Brandon
+        // Williams & Margaret Ineese") containing this person's name.
+        var jm = window.arrearsJointMatches(tenantName);
+        mount.innerHTML = jm.length
+          ? '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Arrears &amp; Repayment</div>'
+            + '<div style="font-size:12px;color:var(--warn-amber-text);padding:6px 0;"><strong>⚠ Possible joint account:</strong> '
+            + jm.map(function (x) { return '&ldquo;' + _esc(x.tenant.full_name) + '&rdquo; owes ' + _money(x.balance); }).join(' · ')
+            + ' — this person’s name appears in the joint account name (name-token match only; verify before acting).</div></div>'
+          : '';
+        return;
+      }
+      return window.arrearsLoadStamps([t.id]).then(function () { _paint(mount, t.id, monthlyRent, tenantName); });
     }).catch(function () { mount.innerHTML = ''; });
   };
 
-  function _paint(mount, tid, monthlyRent) {
+  function _paint(mount, tid, monthlyRent, tenantName) {
     var st = window.arrearsStateForTenant(tid);
     if (!st) { mount.innerHTML = ''; return; }
+    // A person can have their own record AND appear in a joint account.
+    var _joint = tenantName ? window.arrearsJointMatches(tenantName) : [];
     var canManage = _can('manageArrears');
     var canApprove = _can('approveArrangement');
     var canEvict = _can('authorizeEviction');
@@ -415,6 +450,9 @@
     } else if (st.balance > 0) {
       rows.push('<div style="font-size:12px;color:var(--muted);margin-top:4px;">No repayment arrangement on file. Policy minimum: rent + ' + pct + '% = <strong>' + _money(minPay) + '/month</strong>.</div>');
     }
+    if (_joint.length) rows.push('<div style="font-size:11px;color:var(--warn-amber-text);margin-top:3px;"><strong>⚠ Possible joint account:</strong> '
+      + _joint.map(function (x) { return '&ldquo;' + _esc(x.tenant.full_name) + '&rdquo; owes ' + _money(x.balance); }).join(' · ')
+      + ' (name-token match only — verify).</div>');
     if (st.stamps.arrears_final_notice) rows.push('<div style="font-size:11px;color:var(--warn-amber-text);margin-top:3px;">Final notice recorded ' + _esc(String(st.stamps.arrears_final_notice.created_at).slice(0, 10)) + '</div>');
     if (st.stamps.arrears_eviction_authorized) rows.push('<div style="font-size:11px;color:var(--danger);font-weight:700;margin-top:3px;">Arrears eviction AUTHORIZED ' + _esc(String(st.stamps.arrears_eviction_authorized.created_at).slice(0, 10)) + '</div>');
     var btns = [];
@@ -905,7 +943,7 @@
     review.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Matching against tenants and prior imports…</div>';
     Promise.all([
       window.arrearsLoad(),
-      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=description,tenant_id&limit=8000'),
+      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=id,description,tenant_id,voids_id&limit=8000'),
       _get('housing_settings?key=eq.ar_cleanup&select=value&limit=1')
     ]).then(function (res) {
       IMP.imported = {};
@@ -915,7 +953,14 @@
       var clsSaved = (res[2] && res[2][0] && res[2][0].value) || {};
       IMP.cleanup = Object.assign({}, clsSaved.accounts || {}, IMP.cleanup || {});
       if (clsSaved.flags && clsSaved.flags.length) IMP.flags = clsSaved.flags;
+      // Undo support: an undone import is VOIDED (a reversing entry whose
+      // voids_id points at the original). Voided originals count for neither
+      // the period-skip map nor the customer→tenant memory, so the row is
+      // importable again — against a corrected match.
+      var voided = {};
+      (res[1] || []).forEach(function (r) { if (r.voids_id) voided[r.voids_id] = true; });
       (res[1] || []).forEach(function (r) {
+        if (r.voids_id || voided[r.id]) return;   // void entries + voided originals
         var m = String(r.description || '').match(/\[AR-IMPORT:([^\]:]+)(?::([^\]]+))?\]/);
         if (m) {
           (IMP.imported[m[1]] = IMP.imported[m[1]] || {})[m[2] || 'initial'] = true;
@@ -1259,7 +1304,9 @@
         + clsHtml
         + '<td>' + (canRow
             ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-import-one="' + i + '">Import</button>'
-            : (!r.already && !isAmb && !_rowResolved(r)
+            : r.already
+              ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-undo="' + i + '" title="Void this period\'s import (reversing entry) and re-open the row so the match can be corrected and re-imported">↺ Undo</button>'
+              : (!isAmb && !_rowResolved(r)
                 ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-new-person="' + i + '" title="Create a person record with no unit or application (arrears from a former tenancy) and import this balance">+ New person</button>'
                 : '')) + '</td>'
         + '</tr>';
@@ -1301,6 +1348,9 @@
     });
     review.querySelectorAll('[data-ar-new-person]').forEach(function (btn) {
       btn.addEventListener('click', function () { window._arImpCreatePerson(Number(btn.getAttribute('data-ar-new-person'))); });
+    });
+    review.querySelectorAll('[data-ar-undo]').forEach(function (btn) {
+      btn.addEventListener('click', function () { window._arImpUndoOne(Number(btn.getAttribute('data-ar-undo'))); });
     });
   }
 
@@ -1364,6 +1414,70 @@
       if (prog) prog.textContent = '';
       showToast('Import failed for ' + r.rawName + ': ' + err.message, { type: 'error' });
       return false;
+    }
+  };
+
+  // Undo one row's import for THIS period — the fix-a-mistake path (wrong
+  // person picked, wrong amount source, etc.). Finance convention: ledger
+  // rows are never deleted; a VOID entry reverses the original (voids_id FK),
+  // the balance nets to zero, and the parse maps skip voided originals, so
+  // the row becomes importable again with the picker active for a re-match.
+  window._arImpUndoOne = async function (i) {
+    var r = IMP.rows[i];
+    if (!r || !r.already) return;
+    if (!_can('manageArrears')) { showToast('You are not authorized to undo imports.', { type: 'error' }); return; }
+    var period = r.period || _todayISO();
+    var go = (typeof showConfirm === 'function')
+      ? await showConfirm({ title: 'Undo import for ' + _cleanDisplayName(r.rawName) + '?',
+          message: 'Writes a reversing (void) entry for this row’s ' + period + ' import so the balance nets to zero, and re-opens the row so you can fix the match and import again. The original entry stays in the ledger for the audit trail. (If this import also set the unit’s monthly rent, that rent is left as-is — adjust it on the unit card if needed.)',
+          confirmText: 'Undo Import', cancelText: 'Cancel' })
+      : window.confirm('Undo the ' + period + ' import for ' + r.rawName + '?');
+    if (!go) return;
+    try {
+      var tag = '[AR-IMPORT:' + r.custno + ':' + period + ']';
+      var origs = await _get('finance_rent_ledger?description=like.*'
+        + encodeURIComponent('AR-IMPORT:' + r.custno + ':' + period) + '*&select=id,amount,entry_type,tenant_id,unit_id,voids_id');
+      var voidedIds = {};
+      (origs || []).forEach(function (o) { if (o.voids_id) voidedIds[o.voids_id] = true; });
+      var live = (origs || []).filter(function (o) { return !o.voids_id && !voidedIds[o.id] && o.entry_type !== 'void'; });
+      if (!live.length) { showToast('No un-voided ledger entry found for ' + r.custno + ' (' + period + ').', { type: 'error' }); return; }
+      for (var k = 0; k < live.length; k++) {
+        var o = live[k];
+        var resp = await fetch(SUPABASE_URL + '/rest/v1/finance_rent_ledger', {
+          method: 'POST',
+          headers: _hdrs({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+          body: JSON.stringify([{
+            id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+            nation_id: (window.NATION_CONFIG && NATION_CONFIG.id) || 'default',
+            tenant_id: o.tenant_id,
+            unit_id: o.unit_id || null,
+            entry_type: 'void',
+            amount: -Number(o.amount || 0),
+            entry_date: _todayISO(),
+            voids_id: o.id,
+            void_reason: 'A/R import correction',
+            description: 'Void of A/R import ' + r.custno + ' (' + period + ') [AR-IMPORT-UNDO:' + r.custno + ':' + period + ']',
+            created_by: (window.HOUSING_SESSION && HOUSING_SESSION.email) || 'ar-import'
+          }])
+        });
+        if (!resp.ok) throw new Error('void insert HTTP ' + resp.status);
+        var e2 = CACHE.byTenant[o.tenant_id];
+        if (e2) e2.balance = Math.round((e2.balance - Number(o.amount || 0)) * 100) / 100;
+        if (typeof auditEntry === 'function') auditEntry('TENANT:' + o.tenant_id, 'arrears_import_undone',
+          'A/R import undone: ' + _money(Number(o.amount || 0)) + ' voided for ' + _cleanDisplayName(r.rawName) + ' (' + r.custno + ', ' + period + ')', window.currentRole || 'staff');
+      }
+      // Re-open the row: period no longer counts as imported, the custno
+      // memory is dropped so the picker/name cascade decides fresh.
+      if (IMP.imported[r.custno]) delete IMP.imported[r.custno][period];
+      delete IMP.remembered[r.custno];
+      r.already = false; r.forceCreate = false;
+      r.appBalance = r.tenantId && CACHE.byTenant[r.tenantId] ? CACHE.byTenant[r.tenantId].balance : 0;
+      r.delta = Math.round((r.total - r.appBalance) * 100) / 100;
+      r.inSync = Math.abs(r.delta) < 0.005;
+      _arImpRender();
+      showToast('Import undone for ' + _cleanDisplayName(r.rawName) + ' — fix the match and import again.', { type: 'info' });
+    } catch (err) {
+      showToast('Undo failed for ' + r.rawName + ': ' + err.message, { type: 'error' });
     }
   };
 

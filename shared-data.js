@@ -3078,15 +3078,31 @@ async function _appSubLinkProfile(uid, appId){
 function _appSubArrearsWarn(p, esc){
   try {
     if (typeof arrearsTenantByName !== 'function' || !window._arrearsCache || !_arrearsCache.loaded) return '';
-    var t = arrearsTenantByName([p.fn, p.ln].filter(Boolean).join(' '));
+    var fullName = [p.fn, p.ln].filter(Boolean).join(' ');
+    var t = arrearsTenantByName(fullName);
     var st = (t && typeof arrearsStateForTenant === 'function') ? arrearsStateForTenant(t.id) : null;
-    if (!st || !(st.balance > 0)) return '';
-    return '<div style="margin-top:12px;font-size:13px;border:1px solid var(--danger);border-left:3px solid var(--danger);border-radius:6px;padding:8px 10px;">'
-      + '<b>⚠ Arrears on file:</b> ' + esc('$' + st.balance.toFixed(2)) + ' owed by a person record with this exact name'
-      + (st.hasApproved
-          ? ' (approved repayment arrangement in place).'
-          : ' — no approved repayment arrangement. Approving adds them to the wait list as usual, but the good-standing gate will block unit assignment until an arrangement is approved.')
-      + '</div>';
+    if (st && st.balance > 0) {
+      return '<div style="margin-top:12px;font-size:13px;border:1px solid var(--danger);border-left:3px solid var(--danger);border-radius:6px;padding:8px 10px;">'
+        + '<b>⚠ Arrears on file:</b> ' + esc('$' + st.balance.toFixed(2)) + ' owed by a person record with this exact name'
+        + (st.hasApproved
+            ? ' (approved repayment arrangement in place).'
+            : ' — no approved repayment arrangement. Approving adds them to the wait list as usual, but the good-standing gate will block unit assignment until an arrangement is approved.')
+        + '</div>';
+    }
+    // No exact match — check joint ("&") accounts containing this person's
+    // name. Warning-only: token matching is not conclusive identification.
+    if (typeof arrearsJointMatches === 'function') {
+      var jm = arrearsJointMatches(fullName);
+      if (jm.length) {
+        return '<div style="margin-top:12px;font-size:13px;border:1px solid var(--warn-amber-text);border-left:3px solid var(--warn-amber-text);border-radius:6px;padding:8px 10px;">'
+          + '<b>⚠ Possible joint account:</b> ' + jm.map(function(x){
+              return '"' + esc(x.tenant.full_name) + '" owes ' + esc('$' + x.balance.toFixed(2));
+            }).join(' · ')
+          + '. This applicant\'s name appears in the joint account name — verify whether they are a party to that debt before approving. (Name-token match only; the good-standing gate does not block on joint accounts.)'
+          + '</div>';
+      }
+    }
+    return '';
   } catch(_ae){ return ''; }
 }
 
