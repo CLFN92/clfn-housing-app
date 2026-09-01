@@ -2659,7 +2659,11 @@
     }
     var tn = _ticState.tenant || {};
     var u  = _ticState.unit || {};
-    var oldName = tn[TIC_C.full_name] || u.assignedName || '';
+    // Fall back to the linked APPLICATION's name — applicants on the waitlist
+    // have no tenant row or unit yet, and their misspellings need fixing too.
+    var app0 = _ticState.application || null;
+    var oldName = tn[TIC_C.full_name] || u.assignedName
+      || (app0 ? [app0.fn, app0.ln].filter(Boolean).join(' ') : '') || '';
     if(!oldName){ if(typeof showToast === 'function') showToast('No name on file to correct.', {type:'error'}); return; }
     var parts = String(oldName).trim().split(/\s+/);
     var ex = document.getElementById('ticRenameModal'); if(ex) ex.remove();
