@@ -977,7 +977,7 @@
   // current,by,at}}} — keyed by the Sage customer number so classifications
   // survive re-imports and re-matches; totals are snapshotted at classify
   // time so the report works without re-parsing the ledger.
-  var _CLS_FLAGS = { deceased: 'Deceased', write_off: 'Write Off', staff: 'Staff', retired: 'Retired', rent_to_own: 'Rent to Own', other: 'Other' };
+  var _CLS_FLAGS = { deceased: 'Deceased', write_off: 'Write Off', staff: 'Staff', employed: 'Employed', retired: 'Retired', rent_to_own: 'Rent to Own', other: 'Other' };
   var _clsSaveTimer = null;
   function _arClsPersist() {
     clearTimeout(_clsSaveTimer);
