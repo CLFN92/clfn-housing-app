@@ -1170,15 +1170,17 @@
       total: Number(e.total || 0), by: e.by || '', at: String(e.at || '').slice(0, 10)
     }; });
     // Group BY FLAG, then BY TENANT: a member often has several Sage accounts
-    // (RENT + MORT etc.) — one line per tenant with their cust #s listed and
-    // a per-tenant total, per-flag subtotals, largest debt first.
+    // (RENT + MORT etc.) — each account prints as its OWN row with its own
+    // amount, followed by a bold per-person total row; per-flag subtotals,
+    // largest debt first.
     var byFlag = {};
     rows.forEach(function (r) {
       var fk = r.flag || 'Unclassified flag';
       var g = byFlag[fk] = byFlag[fk] || { tenants: {}, total: 0, n: 0 };
       var tKey = r.name || r.custno;
-      var t = g.tenants[tKey] = g.tenants[tKey] || { name: tKey, custnos: [], income: '', notes: [], total: 0, by: r.by, at: r.at };
+      var t = g.tenants[tKey] = g.tenants[tKey] || { name: tKey, custnos: [], accounts: [], income: '', notes: [], total: 0, by: r.by, at: r.at };
       t.custnos.push(r.custno);
+      t.accounts.push({ custno: r.custno, total: r.total, note: r.note || '', income: r.income || '' });
       if (r.income) t.income = r.income;
       if (r.note && t.notes.indexOf(r.note) < 0) t.notes.push(r.note);
       t.total = Math.round((t.total + r.total) * 100) / 100;
@@ -1207,11 +1209,14 @@
     var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
     var money = function (v) { return '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 }); };
     if (format === 'csv') {
-      var head = ['Account Flag', 'Tenant', 'Cust #(s)', 'Income (OW/ODSP)', 'Note', 'Tenant Total', 'Classified By', 'Date'];
+      var head = ['Account Flag', 'Tenant', 'Cust #', 'Income (OW/ODSP)', 'Note', 'Amount', 'Classified By', 'Date'];
       var csvRows = [];
       flagOrder.forEach(function (fk) {
         byFlag[fk].list.forEach(function (t) {
-          csvRows.push([fk, t.name, t.custnos.join(' '), t.income, t.notes.join('; '), t.total.toFixed(2), t.by, t.at]);
+          t.accounts.forEach(function (a) {
+            csvRows.push([fk, t.name, a.custno, a.income || t.income, a.note, a.total.toFixed(2), t.by, t.at]);
+          });
+          csvRows.push([fk, t.name + ' — TOTAL', '', '', '', t.total.toFixed(2), '', '']);
         });
         csvRows.push([fk + ' — SUBTOTAL', '', '', '', '', byFlag[fk].total.toFixed(2), '', '']);
       });
@@ -1253,12 +1258,27 @@
         doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
         doc.text(fk + ' — ' + g.n + ' tenant(s) · ' + money(g.total), 14, y);
         doc.setFont('helvetica', 'normal');
+        // One row PER ACCOUNT (a person can hold several Sage accounts that
+        // make up their debt), then a bold per-person TOTAL row.
+        var body = [];
+        g.list.forEach(function (t) {
+          var multi = t.accounts.length > 1;
+          t.accounts.forEach(function (a, ai) {
+            body.push([ai === 0 ? t.name : '', a.custno, a.income || t.income, a.note, money(a.total), t.by, t.at]);
+          });
+          if (multi) {
+            body.push([
+              { content: t.name + ' — total', styles: { fontStyle: 'bold' } }, '', '', '',
+              { content: money(t.total), styles: { fontStyle: 'bold', halign: 'right' } }, '', ''
+            ]);
+          }
+        });
+        body.push([{ content: fk + ' subtotal', styles: { fontStyle: 'bold' } }, '', '', '',
+          { content: money(g.total), styles: { fontStyle: 'bold', halign: 'right' } }, '', '']);
         doc.autoTable({
           startY: y + 3,
-          head: [['Tenant', 'Cust #(s)', 'OW/ODSP', 'Note', 'Tenant Total', 'By', 'Date']],
-          body: g.list.map(function (t) {
-            return [t.name, t.custnos.join(', '), t.income, t.notes.join('; '), money(t.total), t.by, t.at];
-          }).concat([[{ content: fk + ' subtotal', styles: { fontStyle: 'bold' } }, '', '', '', { content: money(g.total), styles: { fontStyle: 'bold', halign: 'right' } }, '', '']]),
+          head: [['Tenant', 'Cust #', 'OW/ODSP', 'Note', 'Amount', 'By', 'Date']],
+          body: body,
           styles: { fontSize: 8, cellPadding: 1.6 },
           headStyles: { fillColor: [40, 40, 40] },
           columnStyles: { 4: { halign: 'right' } },
