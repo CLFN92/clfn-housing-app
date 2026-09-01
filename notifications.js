@@ -143,6 +143,25 @@ var EMAIL_EVENT_REGISTRY = [
     }
   },
   {
+    key:                   'application_approved_waitlist',
+    label:                 'Applicant Approved — Added to Wait List',
+    description:           'Sent to the applicant when staff approve their application (checkbox on the portal-submission review). Wording is deliberate: approval means the application joined the housing wait list — it is NOT an offer of housing.',
+    recipientType:         'applicant',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','nationShort'],
+    defaults: {
+      subject:  '{nationShort} Housing — Application {applicantId} Approved: You Are on the Wait List',
+      bodyHtml: '<p>Hello {applicantName},</p>'
+              + '<p>The {nationShort} Housing Department has reviewed and <strong>approved</strong> your housing application (reference <strong>{applicantId}</strong>).</p>'
+              + '<p><strong>What approval means:</strong> your application has been added to the housing <strong>wait list</strong>. Approval is not an offer of housing, and it does not mean a home is available for you at this time. Homes are offered as they become available, based on the Housing Policy’s priority ranking, so we are not able to say how long the wait will be.</p>'
+              + '<p>While you wait, please keep your file up to date &mdash; sign in to the applicant portal any time to update your contact information, household members, or income. A current file makes sure your application is ranked fairly.</p>'
+              + '<p>If your situation changes, or you have any questions, contact the Housing office.</p>'
+              + '<p>Thank you,<br/>{nationShort} Housing</p>'
+    }
+  },
+  {
     key:                   'sow_tenant_copy',
     label:                 'Tenant Copy of Maintenance Request (PDF)',
     description:           'Sent to the tenant when a request is submitted (only if the tenant has an email on file and the preparer ticks the inline checkbox). PDF of the request is attached.',
@@ -857,6 +876,35 @@ async function notifyContractorStatusChange(ct, action, notes) {
 // submitted application as a PDF to the applicant's email (and the
 // co-applicant's email if it's set and different). Silent skip if the
 // applicant didn't provide an email — the audit log records the no-op.
+// Applicant "approved → wait list" email — fired from the portal-submission
+// review (Approve & create / Merge) when the reviewer leaves the email
+// checkbox ticked. Wording is policy-sensitive: approval means the applicant
+// joined the WAIT LIST — never an offer of housing. Silent skip when the
+// application has no valid email.
+async function notifyApplicationApprovedWaitlist(app) {
+  if (!app) return;
+  var eventKey = 'application_approved_waitlist';
+  var email = String(app.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    console.log('[notify] approved-waitlist skipped - no applicant email on ' + (app.id || 'app'));
+    return;
+  }
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForApp(app));
+  if (!rendered) return;
+  await _sendSerially([{ email: email }], function (rcp) {
+    return {
+      to:          rcp.email,
+      to_name:     ((app.fn || '') + ' ' + (app.ln || '')).trim(),
+      subject:     rendered.subject,
+      bodyHtml:    rendered.bodyHtml,
+      event:       eventKey,
+      entity_type: 'application',
+      entity_id:   app.id || '—'
+    };
+  }, eventKey);
+}
+window.notifyApplicationApprovedWaitlist = notifyApplicationApprovedWaitlist;
+
 async function notifyApplicationConfirmation(app) {
   if (!app) return;
   var eventKey = 'application_confirmation_to_applicant';

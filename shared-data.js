@@ -3150,6 +3150,14 @@ function openApplicationSubmissionReview(id){
     +   linkSection
     +   '<div class="tic-field-lbl" style="margin-top:14px;">Review note (shown to the applicant if you request changes)</div>'
     +   '<textarea id="app_sub_note" rows="2" placeholder="Optional note for the applicant / record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
+    // Approval email checkbox — only when the applicant has an email and this
+    // isn't a file update (a file update joins no wait list). The email's
+    // wording is deliberate: approval = added to the WAIT LIST, not a house.
+    +   ((p.email && s.submission_type !== 'update')
+          ? '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px;cursor:pointer;">'
+            + '<input type="checkbox" id="app_sub_email_ok" checked style="width:auto;"/> '
+            + 'On approval, email ' + e(p.email) + ': application approved &amp; added to the wait list (states this is not an offer of housing)</label>'
+          : '')
     + '</div>'
     + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;flex-shrink:0;">'
     +   '<div style="display:flex;gap:8px;">'
@@ -3198,6 +3206,8 @@ function _appSubApprove(id){
   var s = (window._appSubmissions || []).find(function(x){ return x.id === id; });
   if(!s) return;
   var note = (document.getElementById('app_sub_note') || {}).value || '';
+  // Read the checkbox BEFORE the modal is torn down by _appSubClose().
+  var emailOk = !!((document.getElementById('app_sub_email_ok') || {}).checked);
   var p = s.payload || {};
   var staffEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
   var staffName  = (window.HOUSING_SESSION && HOUSING_SESSION.name) || '';
@@ -3215,6 +3225,9 @@ function _appSubApprove(id){
       return _appSubResolve(id, 'approved', note, appId).then(function(){
         _appSubLinkProfile(s.applicant_uid, appId);
         _appSubCarryDocs(appId, p._docs);
+        if(emailOk && typeof notifyApplicationApprovedWaitlist === 'function'){
+          try { notifyApplicationApprovedWaitlist(app); } catch(_ne){}
+        }
         if(typeof auditEntry === 'function') auditEntry(appId, 'application_created_from_portal', 'Created from applicant portal submission ' + s.id + ' — ' + ([p.fn, p.ln].filter(Boolean).join(' ')), staffEmail);
         if(typeof applications !== 'undefined' && Array.isArray(applications)) applications.push(app);
         _appSubClose();
@@ -3262,6 +3275,9 @@ function _appSubMerge(id, targetAppId){
   var target = (window.applications || []).find(function(a){ return a.id === targetAppId; });
   if(!target){ if(typeof showToast === 'function') showToast('Application ' + targetAppId + ' not found', {type:'error'}); return; }
   var note = (document.getElementById('app_sub_note') || {}).value || '';
+  // Read the checkbox BEFORE the modal is torn down by _appSubClose().
+  // (Hidden for file-update submissions, so it reads false there.)
+  var emailOk = !!((document.getElementById('app_sub_email_ok') || {}).checked);
   var p = s.payload || {};
   var staffEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
   // Merge onto a CLONE, save, and only adopt onto the live app after the save
@@ -3285,6 +3301,9 @@ function _appSubMerge(id, targetAppId){
     return _appSubResolve(id, 'approved', note, targetAppId).then(function(){
       _appSubLinkProfile(s.applicant_uid, targetAppId);
       _appSubCarryDocs(targetAppId, p._docs);
+      if(emailOk && s.submission_type !== 'update' && typeof notifyApplicationApprovedWaitlist === 'function'){
+        try { notifyApplicationApprovedWaitlist(target); } catch(_ne){}
+      }
       if(typeof auditEntry === 'function') auditEntry(targetAppId, 'application_updated_from_portal', 'Merged portal ' + s.submission_type + ' submission ' + s.id + ' into ' + targetAppId + (note ? ' — ' + note : ''), staffEmail);
       _appSubClose();
       if(typeof showToast === 'function') showToast('✓ Merged into ' + targetAppId, {type:'info'});

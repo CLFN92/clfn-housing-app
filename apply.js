@@ -206,10 +206,20 @@
     }
   }
 
+  // 'approved' deliberately does NOT say "Approved": acceptance means the
+  // application entered the housing registry queue, not that a house has been
+  // offered — a bare "Approved" pill invited that misread. Wording is
+  // per-type via _statusLabel (a file update isn't "in the queue").
   var STATUS_LABEL = {
     draft: 'Draft', submitted: 'Submitted', in_review: 'In review',
-    changes_requested: 'Changes requested', approved: 'Approved', rejected: 'Not approved', withdrawn: 'Withdrawn'
+    changes_requested: 'Changes requested', approved: 'Accepted — in the housing queue', rejected: 'Not approved', withdrawn: 'Withdrawn'
   };
+  var _ACCEPTED_BY_TYPE = { update: 'Processed — file updated', transfer: 'Accepted — in the housing queue', new: 'Accepted — in the housing queue' };
+  function _statusLabel(s) {
+    var st = s.status || 'draft';
+    if (st === 'approved' && _ACCEPTED_BY_TYPE[s.submission_type]) return _ACCEPTED_BY_TYPE[s.submission_type];
+    return STATUS_LABEL[st] || st;
+  }
   var TYPE_LABEL = { new: 'New application', update: 'Application update', transfer: 'Transfer request' };
 
   // Whether this nation requires a 10-digit band (registry) number. The
@@ -256,7 +266,7 @@
             : '';
           return '<li style="flex-wrap:wrap;"><span>' + esc(TYPE_LABEL[s.submission_type] || 'Application')
             + (s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleDateString() : '')
-            + '</span><span class="pill ' + esc(st) + '">' + esc(STATUS_LABEL[st] || st) + '</span>'
+            + '</span><span class="pill ' + esc(st) + '">' + esc(_statusLabel(s)) + '</span>'
             + noteLine + '</li>';
         }).join('') + '</ul>'
       : '<div class="empty">You have no applications yet.</div>';
