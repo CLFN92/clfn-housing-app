@@ -2566,6 +2566,14 @@
         && APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole);
       del.style.display = canDel ? '' : 'none';
     }
+    // Correct Name — management only. A deliberate action (not a field edit)
+    // because renaming touches tenants + housing_units + the application, and
+    // a bare unit rename would trip the sync trigger into splitting history.
+    var ren = _ticEl('tic_act_rename');
+    if(ren){
+      var canRen = (typeof ROLE !== 'undefined') && ROLE.isManagement && ROLE.isManagement(window.currentRole);
+      ren.style.display = canRen ? '' : 'none';
+    }
   }
 
   // CM5 — commercial-tailored TIC. For a business/department tenant (or a
@@ -2632,9 +2640,145 @@
       return '';
     }).catch(function(){ return ''; });
   }
+  // ── Correct Name (spelling fix across ALL linked records) ─────────────────
+  // Field edits can't fix a misspelled name safely: renaming the unit's
+  // assigned_name alone makes the DB sync trigger mark the real tenant row
+  // "moved out" and mint a brand-new row under the corrected spelling —
+  // splitting arrears/notes history. This action repairs everything in the
+  // right order:
+  //   1. rename the tenants row FIRST (history + finance FKs stay on it),
+  //   2. rename housing_units.assigned_name (the trigger then finds no
+  //      active old-name row to retire, but still mints a duplicate —
+  //      which step 3 folds away via merged_into),
+  //   3. fix the linked application's fn/ln,
+  // and audits the correction. Management only.
+  function _ticCorrectName(){
+    if(!(typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(window.currentRole))){
+      if(typeof showToast === 'function') showToast('Only management can correct names.', {type:'error'});
+      return;
+    }
+    var tn = _ticState.tenant || {};
+    var u  = _ticState.unit || {};
+    var oldName = tn[TIC_C.full_name] || u.assignedName || '';
+    if(!oldName){ if(typeof showToast === 'function') showToast('No name on file to correct.', {type:'error'}); return; }
+    var parts = String(oldName).trim().split(/\s+/);
+    var ex = document.getElementById('ticRenameModal'); if(ex) ex.remove();
+    var mo = document.createElement('div');
+    mo.id = 'ticRenameModal';
+    mo.className = 'modal-ov on';
+    mo.style.zIndex = '10060';
+    mo.innerHTML =
+        '<div class="modal" style="max-width:440px;">'
+      + '<div class="modal-hdr"><div><h2 style="font-size:16px;">Correct Name</h2>'
+      +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">Fixes the spelling on the tenant record, the unit, and the application together, and keeps all history on the same file.</div></div>'
+      +   '<button class="modal-close" onclick="var m=document.getElementById(\'ticRenameModal\');if(m)m.remove();">&#x2715;</button></div>'
+      + '<div style="padding:16px;">'
+      +   '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Currently on file: <strong>' + _ticEsc(oldName) + '</strong></div>'
+      +   '<div style="display:flex;gap:8px;">'
+      +     '<div style="flex:1;"><label style="font-size:11px;font-weight:700;">First name</label><input id="tic_ren_fn" type="text" value="' + _ticEsc(parts[0] || '') + '" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"/></div>'
+      +     '<div style="flex:1;"><label style="font-size:11px;font-weight:700;">Last name</label><input id="tic_ren_ln" type="text" value="' + _ticEsc(parts.slice(1).join(' ')) + '" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"/></div>'
+      +   '</div>'
+      +   '<div style="font-size:11px;color:var(--muted);margin-top:10px;">Note: the BCR registry is name-keyed — if this person is listed there, update that entry separately.</div>'
+      +   '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">'
+      +     '<button class="btn btn-ghost" onclick="var m=document.getElementById(\'ticRenameModal\');if(m)m.remove();">Cancel</button>'
+      +     '<button class="btn btn-primary" id="tic_ren_save">Save Corrected Name</button>'
+      +   '</div>'
+      + '</div></div>';
+    mo.addEventListener('click', function(e){ if(e.target === mo) mo.remove(); });
+    document.body.appendChild(mo);
+    var saveBtn = mo.querySelector('#tic_ren_save');
+    saveBtn.addEventListener('click', function(){ _ticRunRename(oldName, mo); });
+  }
+  async function _ticRunRename(oldName, mo){
+    var fn = ((document.getElementById('tic_ren_fn')||{}).value || '').trim();
+    var ln = ((document.getElementById('tic_ren_ln')||{}).value || '').trim();
+    var newFull = (fn + ' ' + ln).trim();
+    if(!newFull){ if(typeof showToast === 'function') showToast('Enter the corrected name.', {type:'error'}); return; }
+    if(newFull === oldName){ mo.remove(); return; }
+    var tn = _ticState.tenant || {};
+    var u  = _ticState.unit || {};
+    var hdrs = function(extra){ return Object.assign({}, (window.HOUSING_HEADERS||{}), extra||{}); };
+    try {
+      // 1) tenants row first — keeps id (finance ledger FK) and history.
+      if(tn.id){
+        var r1 = await fetch(SUPABASE_URL + '/rest/v1/tenants?id=eq.' + encodeURIComponent(tn.id), {
+          method:'PATCH', headers:hdrs({'Content-Type':'application/json','Prefer':'return=minimal'}),
+          body: JSON.stringify({ full_name: newFull })
+        });
+        if(!r1.ok) throw new Error('tenant rename HTTP ' + r1.status);
+        tn[TIC_C.full_name] = newFull;
+      }
+      // 2) unit assignment (fires the sync trigger — duplicate handled below).
+      if(u.id && u.assignedName === oldName){
+        var r2 = await fetch(SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + encodeURIComponent(u.id), {
+          method:'PATCH', headers:hdrs({'Content-Type':'application/json','Prefer':'return=minimal'}),
+          body: JSON.stringify({ assigned_name: newFull })
+        });
+        if(!r2.ok) throw new Error('unit rename HTTP ' + r2.status);
+        u.assignedName = newFull;
+        var mem = (window.housingUnits||[]).find(function(x){ return x && x.id === u.id; });
+        if(mem) mem.assignedName = newFull;
+        // Fold away the trigger-minted duplicate (keep the original row).
+        if(tn.id){
+          try {
+            var dups = await (await fetch(SUPABASE_URL + '/rest/v1/tenants?full_name=eq.' + encodeURIComponent(newFull)
+              + '&current_unit_id=eq.' + encodeURIComponent(u.id) + '&merged_into=is.null&select=id', { headers: hdrs() })).json();
+            for(var di=0; di<(dups||[]).length; di++){
+              if(dups[di].id && dups[di].id !== tn.id){
+                await fetch(SUPABASE_URL + '/rest/v1/tenants?id=eq.' + encodeURIComponent(dups[di].id), {
+                  method:'PATCH', headers:hdrs({'Content-Type':'application/json','Prefer':'return=minimal'}),
+                  body: JSON.stringify({ merged_into: tn.id, status: 'former', current_unit_id: null })
+                });
+              }
+            }
+            // Make sure the original stayed active on the unit (belt & suspenders
+            // against trigger ordering differences between deployments).
+            await fetch(SUPABASE_URL + '/rest/v1/tenants?id=eq.' + encodeURIComponent(tn.id), {
+              method:'PATCH', headers:hdrs({'Content-Type':'application/json','Prefer':'return=minimal'}),
+              body: JSON.stringify({ status: 'active', current_unit_id: u.id, moved_out_at: null })
+            });
+          } catch(_de){ /* duplicate cleanup is best-effort */ }
+        }
+      }
+      // 3) linked application fn/ln (in-memory + persisted via the normal save).
+      var appId = await _ticFindApplicationForTenant();
+      if(appId){
+        var appMem = (typeof applications !== 'undefined' && applications || []).find(function(a){ return a && a.id === appId; });
+        if(appMem){
+          appMem.fn = fn; appMem.ln = ln;
+          if(typeof sbSaveApplication === 'function') await sbSaveApplication(appMem);
+        } else {
+          // App not loaded on this page — surgical jsonb update.
+          try {
+            var rows = await (await fetch(SUPABASE_URL + '/rest/v1/housing_applications?id=eq.' + encodeURIComponent(appId) + '&select=data', { headers: hdrs() })).json();
+            if(rows && rows[0]){
+              var d = rows[0].data || {};
+              d.fn = fn; d.ln = ln;
+              await fetch(SUPABASE_URL + '/rest/v1/housing_applications?id=eq.' + encodeURIComponent(appId), {
+                method:'PATCH', headers:hdrs({'Content-Type':'application/json','Prefer':'return=minimal'}),
+                body: JSON.stringify({ data: d })
+              });
+            }
+          } catch(_ape){ /* best-effort */ }
+        }
+      }
+      if(typeof auditEntry === 'function') auditEntry(appId || (tn.id ? ('TENANT:' + tn.id) : 'SETTINGS'), 'name_corrected',
+        'Name corrected: "' + oldName + '" → "' + newFull + '" (tenant record' + (u.id && u.assignedName === newFull ? ' + unit' : '') + (appId ? ' + application ' + appId : '') + ')',
+        window.currentRole || 'staff');
+      mo.remove();
+      _ticRenderHero();
+      if(typeof _ticRenderOverview === 'function') try { _ticRenderOverview(); } catch(_re){}
+      if(typeof showToast === 'function') showToast('Name corrected to ' + newFull + ' across tenant, unit and application records.', {type:'info'});
+      if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+    } catch(err){
+      if(typeof showToast === 'function') showToast('Name correction failed: ' + err.message, {type:'error'});
+    }
+  }
+
   function _ticOnFooterClick(ev){
     var t = ev.target;
     if(!t || !t.id) return;
+    if(t.id === 'tic_act_rename'){ _ticCorrectName(); return; }
     if(t.id === 'tic_act_view_app'){
       _ticFindApplicationForTenant().then(function(appId){
         if(!appId){
