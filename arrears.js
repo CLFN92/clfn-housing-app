@@ -752,6 +752,9 @@
     var insert = { full_name: display, created_at: new Date().toISOString() };
     if (row.kind === 'unit' && row.unitId) { insert.status = 'active'; insert.current_unit_id = row.unitId; }
     else if (row.kind === 'application' && row.appId) { insert.status = 'applicant'; insert.application_id = row.appId; }
+    // "+ New person": arrears from a FORMER tenancy — the person has no
+    // current unit and no application on file, but the debt follows them.
+    else if (row.forceCreate) { insert.status = 'former'; }
     else return null;
     var r = await fetch(SUPABASE_URL + '/rest/v1/tenants', {
       method: 'POST',
@@ -764,7 +767,9 @@
       CACHE.tenants.push(saved);
       CACHE.byTenant[saved.id] = { tenant: saved, balance: 0, arrangements: [], payments: [] };
       if (typeof auditEntry === 'function') auditEntry('TENANT:' + saved.id, 'tenant_created',
-        'Tenant record minted by A/R import (' + row.kind + ' match, ' + row.custno + ')', window.currentRole || 'staff');
+        row.forceCreate
+          ? 'Person record created by A/R import — former tenancy arrears, no unit or application on file (' + row.custno + ')'
+          : 'Tenant record minted by A/R import (' + row.kind + ' match, ' + row.custno + ')', window.currentRole || 'staff');
       row.tenantId = saved.id;
       return saved.id;
     }
@@ -776,11 +781,16 @@
     var ex = document.getElementById('modalArImport'); if (ex) ex.remove();
     var mo = document.createElement('div');
     mo.className = 'modal-ov'; mo.id = 'modalArImport';
-    mo.innerHTML = '<div class="modal" style="max-width:1000px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
+    // Full-screen: the review table carries 13 columns (match + balances +
+    // cleanup classification), so it gets the whole viewport.
+    mo.innerHTML = '<div class="modal" style="max-width:none;width:100vw;height:100vh;max-height:100vh;margin:0;border-radius:0;display:flex;flex-direction:column;overflow:hidden;">'
       + '<div class="modal-hdr"><div><h2>Import Arrears Ledger (A/R)</h2>'
       + '<div style="font-size:11px;opacity:.7;margin-top:2px;">Paste the A/R Aged Trial Balance text. Totals become opening balances in the rent ledger; the Current column sets unit rent where none is recorded. Already-imported rows are skipped automatically.</div></div>'
       + '<button class="modal-close" onclick="var m=document.getElementById(\'modalArImport\');if(m)m.remove();">&#x2715;</button></div>'
-      + '<div class="modal-body" style="padding:14px 16px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;">'
+      // max-width/margin overrides: housing.css redefines .modal-body as a
+      // 680px centered card (its own modal system) — full-screen needs the
+      // whole width for the 13-column review table.
+      + '<div class="modal-body" style="padding:14px 16px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;max-width:none;margin:0;box-shadow:none;border-radius:0;">'
       +   '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'
       +     '<label class="btn btn-ghost" style="padding:6px 12px;font-size:12px;cursor:pointer;">📄 Upload PDF / text file'
       +       '<input type="file" id="ar_import_file" accept=".pdf,.txt,.csv,application/pdf,text/plain,text/csv" style="display:none;" onchange="_arImpFile(this)"/></label>'
@@ -795,6 +805,7 @@
       +   '<div id="ar_import_review"></div>'
       + '</div></div>';
     mo.addEventListener('click', function (e) { if (e.target === mo) mo.remove(); });
+    mo.style.padding = '0';   // .modal-ov's 20px inset would frame the full-screen card
     document.body.appendChild(mo); mo.style.display = ''; mo.classList.add('on');
     window.arrearsLoad();
   };
@@ -966,7 +977,7 @@
   // current,by,at}}} — keyed by the Sage customer number so classifications
   // survive re-imports and re-matches; totals are snapshotted at classify
   // time so the report works without re-parsing the ledger.
-  var _CLS_FLAGS = { deceased: 'Deceased', write_off: 'Write Off', staff: 'Staff', other: 'Other' };
+  var _CLS_FLAGS = { deceased: 'Deceased', write_off: 'Write Off', staff: 'Staff', retired: 'Retired', rent_to_own: 'Rent to Own', other: 'Other' };
   var _clsSaveTimer = null;
   function _arClsPersist() {
     clearTimeout(_clsSaveTimer);
@@ -1078,6 +1089,37 @@
     });
   };
 
+  // "+ New person" on an UNMATCHED row: many old A/R accounts belong to people
+  // with no application and no current house — arrears carried from a former
+  // tenancy. This creates their person record (tenants row, status 'former',
+  // no unit/application — find-first, so an existing same-name record is
+  // linked instead of duplicated) and imports the balance in one step. The
+  // import's [AR-IMPORT:custno] tag then auto-matches them every month after.
+  window._arImpCreatePerson = async function (i) {
+    var r = IMP.rows[i];
+    if (!r || r.already || _rowResolved(r) || r.how === 'ambiguous') return;
+    if (!_can('manageArrears')) { showToast('You are not authorized to import arrears.', { type: 'error' }); return; }
+    var display = _cleanDisplayName(r.rawName);
+    var go = (typeof showConfirm === 'function')
+      ? await showConfirm({ title: 'Create person record for ' + display + '?',
+          message: 'No tenant, unit or application matches this ledger account. This creates a person record with NO unit and NO application — arrears carried from a former tenancy — and imports their balance of ' + _money(r.total) + ' against it. If a record with this exact name already exists it is linked instead of duplicated.',
+          confirmText: 'Create & Import', cancelText: 'Cancel' })
+      : window.confirm('Create person record for ' + display + ' and import ' + _money(r.total) + '?');
+    if (!go) return;
+    try {
+      r.forceCreate = true;
+      var tid = await _arImpEnsureTenant(r);
+      if (!tid) { showToast('Could not create a person record for ' + display + '.', { type: 'error' }); return; }
+      r.kind = 'tenant'; r.how = 'created'; r.targetName = display; r.targetDetail = '';
+      r.appBalance = (CACHE.byTenant[tid] && CACHE.byTenant[tid].balance) || 0;
+      r.delta = Math.round((r.total - r.appBalance) * 100) / 100;
+      r.inSync = Math.abs(r.delta) < 0.005;
+      await window._arImpImportOne(i);   // re-renders the table on success
+    } catch (err) {
+      showToast('Create failed for ' + display + ': ' + err.message, { type: 'error' });
+    }
+  };
+
   function _rowResolved(r) { return !!(r.tenantId || (r.kind === 'unit' && r.unitId) || (r.kind === 'application' && r.appId)); }
   function _arImpRender() {
     var review = document.getElementById('ar_import_review');
@@ -1106,7 +1148,7 @@
         ? '<span style="font-size:10px;font-weight:700;color:var(--muted);">Imported ✓</span>'
         : isAmb
           ? '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:var(--danger);background:var(--danger-bg);">' + r.ambiguous + ' matches — pick one</span>'
-          : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:' + c[1] + ';background:' + c[2] + ';"' + (r.how === 'remembered' ? ' title="Matched from a prior import of this customer number"' : '') + '>' + c[0] + (r.how === 'fuzzy' ? ' ~' : r.how === 'remembered' ? ' ✓' : '') + '</span>';
+          : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;color:' + c[1] + ';background:' + c[2] + ';"' + (r.how === 'remembered' ? ' title="Matched from a prior import of this customer number"' : r.how === 'created' ? ' title="Person record created from this row (former tenancy — no unit or application)"' : '') + '>' + c[0] + (r.how === 'fuzzy' ? ' ~' : r.how === 'remembered' ? ' ✓' : r.how === 'created' ? ' +' : '') + '</span>';
       var pickerVal = _rowResolved(r) && !isAmb
         ? r.targetName + (r.kind === 'unit' ? '  [unit ' + _esc(r.targetDetail) + ']' : r.kind === 'application' ? '  [' + _esc(r.targetDetail) + ']' : '  [tenant]')
         : '';
@@ -1136,14 +1178,18 @@
         + '<td style="text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">' + (r.already ? '' : isAmb || !_rowResolved(r) ? '' : (r.inSync ? '<span style="color:var(--success);">in sync</span>' : ((r.delta > 0 ? '+' : '') + _money(r.delta).replace('$-','-$')))) + '</td>'
         + '<td style="font-size:10px;color:var(--muted);white-space:nowrap;">' + (willSetRent ? 'rent → ' + _money(r.current) : (unit && Number(unit.monthlyRent) > 0 ? 'rent set' : '')) + '</td>'
         + clsHtml
-        + '<td>' + (canRow ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-import-one="' + i + '">Import</button>' : '') + '</td>'
+        + '<td>' + (canRow
+            ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-import-one="' + i + '">Import</button>'
+            : (!r.already && !isAmb && !_rowResolved(r)
+                ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-new-person="' + i + '" title="Create a person record with no unit or application (arrears from a former tenancy) and import this balance">+ New person</button>'
+                : '')) + '</td>'
         + '</tr>';
     }).join('');
     review.innerHTML = dl
       + '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">' + IMP.rows.length + ' rows — '
       + counts.tenant + ' tenant · ' + counts.unit + ' unit · ' + counts.application + ' applicant · '
       + counts.none + ' unmatched · ' + counts.ambiguous + ' ambiguous · ' + counts.already + ' imported · '
-      + (counts.insync || 0) + ' already in sync · ' + counts.rentSets + ' unit rents will be set · ' + (counts.classified || 0) + ' classified for cleanup. Each import writes the DIFFERENCE between the report total and the app balance (first import = opening balance; monthly re-imports = adjustments), so re-running the monthly A/R keeps balances synced. Unit/Applicant matches create the missing tenant record on import (find-first, audited). ~ marks a fuzzy name match; ✓ marks a customer remembered from a prior import (matched by customer number, not name). OW/ODSP, Flag and Note save automatically as you set them and feed the A/R Cleanup Report.</div>'
+      + (counts.insync || 0) + ' already in sync · ' + counts.rentSets + ' unit rents will be set · ' + (counts.classified || 0) + ' classified for cleanup. Each import writes the DIFFERENCE between the report total and the app balance (first import = opening balance; monthly re-imports = adjustments), so re-running the monthly A/R keeps balances synced. Unit/Applicant matches create the missing tenant record on import (find-first, audited). ~ marks a fuzzy name match; ✓ marks a customer remembered from a prior import (matched by customer number, not name). OW/ODSP, Flag and Note save automatically as you set them and feed the A/R Cleanup Report. Unmatched rows offer "+ New person" — creates a person record with no unit or application (arrears from a former tenancy) and imports the balance against it.</div>'
       + '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Cust #</th><th>Ledger name</th><th>Match</th><th>Matched to</th><th style="text-align:right;">Current</th><th style="text-align:right;">Ledger Total</th><th style="text-align:right;">App Balance</th><th style="text-align:right;">Will Write</th><th></th><th>OW/ODSP</th><th>Flag</th><th>Note</th><th></th></tr></thead><tbody>'
       + body + '</tbody></table></div>'
       + '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
@@ -1172,6 +1218,9 @@
       inp.addEventListener('change', function () {
         window._arClsSet(Number(inp.getAttribute('data-ar-cls')), inp.getAttribute('data-cls-k'), inp.value.trim());
       });
+    });
+    review.querySelectorAll('[data-ar-new-person]').forEach(function (btn) {
+      btn.addEventListener('click', function () { window._arImpCreatePerson(Number(btn.getAttribute('data-ar-new-person'))); });
     });
   }
 
