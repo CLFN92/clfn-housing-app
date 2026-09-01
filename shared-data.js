@@ -3201,7 +3201,9 @@ function _appSubApprove(id){
   var p = s.payload || {};
   var staffEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
   var staffName  = (window.HOUSING_SESSION && HOUSING_SESSION.name) || '';
-  if(typeof showToast === 'function') showToast('Creating application…', {type:'info'});
+  // No "Creating…" progress toast: showToast rows are persistent (nothing
+  // auto-dismisses), so a progress + result pair leaves two stacked messages
+  // for one action. The ✓ result toast below is the only message.
   _appSubNextAppId().then(function(appId){
     var app = Object.assign({}, p, {
       id: appId, status: 'submitted', appType: p.appType || 'new_housing',
@@ -3276,7 +3278,8 @@ function _appSubMerge(id, targetAppId){
   ['habitants','incomes','references','pets'].forEach(function(k){ if(Array.isArray(p[k]) && p[k].length) merged[k] = p[k]; });
   if(s.submission_type === 'transfer'){ merged.appType = 'transfer_request'; merged.transferPending = true; }
   merged.last_portal_merge = { submission_id: s.id, type: s.submission_type, at: new Date().toISOString(), by: staffEmail };
-  if(typeof showToast === 'function') showToast('Merging into ' + targetAppId + '…', {type:'info'});
+  // No "Merging…" progress toast — same persistent-msgbox reasoning as the
+  // create path above; the ✓ Merged toast is the only message.
   sbSaveApplication(merged).then(function(){
     Object.assign(target, merged);   // save confirmed — adopt onto the live app
     return _appSubResolve(id, 'approved', note, targetAppId).then(function(){
