@@ -702,6 +702,10 @@
   }
   function _parseArText(text) {
     var rows = [];
+    // Reconciliation tallies: what the report says vs what becomes rows —
+    // rendered under the table so a mismatch against the dashboard A/R KPI
+    // is explainable instead of mysterious.
+    var meta = { reportGrandTotal: null, interestTotal: 0, interestCount: 0 };
     String(text || '').split(/\r?\n/).forEach(function (line) {
       var l = line.trim();
       if (!l) return;
@@ -710,13 +714,26 @@
       var last6 = moneys.slice(-6).map(function (m) { return parseFloat(m.replace(/,/g, '')); });
       var headEnd = l.indexOf(moneys[moneys.length - 6]);
       var head = l.slice(0, headEnd).trim();
+      // The report's own totals line ("Report Total ...") is NOT a customer —
+      // capture its grand total for reconciliation and skip the row (it used
+      // to render as a classifiable row with dropdowns at the bottom).
+      if (/^(report|grand|page)?\s*totals?:?$/i.test(head)) {
+        meta.reportGrandTotal = last6[5];
+        return;
+      }
       var mHead = head.match(/^(\S+)\s+(.+)$/);
       if (!mHead) return;
       var custno = mHead[1], name = mHead[2].replace(/[-–]\s*$/, '').trim();
-      if (/interest/i.test(name) || /^HYDRO/i.test(custno)) return;   // non-tenant accounts
+      if (/^(report|grand)\s+totals?:?$/i.test(custno + ' ' + name)) { meta.reportGrandTotal = last6[5]; return; }
+      if (/interest/i.test(name) || /^HYDRO/i.test(custno)) {          // non-tenant accounts
+        meta.interestTotal = Math.round((meta.interestTotal + last6[5]) * 100) / 100;
+        meta.interestCount++;
+        return;
+      }
       rows.push({ custno: custno, rawName: name, name: _normName(name),
                   current: last6[0], total: last6[5] });
     });
+    IMP.parseMeta = meta;
     return rows;
   }
   // Display name for minted tenant rows: the ledger name minus account
@@ -1152,7 +1169,31 @@
       flag: e.flag ? (_clsFlagMap()[e.flag] || e.flag) : '', note: e.note || '',
       total: Number(e.total || 0), by: e.by || '', at: String(e.at || '').slice(0, 10)
     }; });
-    rows.sort(function (a, b) { return (a.flag || 'zz').localeCompare(b.flag || 'zz') || b.total - a.total; });
+    // Group BY FLAG, then BY TENANT: a member often has several Sage accounts
+    // (RENT + MORT etc.) — one line per tenant with their cust #s listed and
+    // a per-tenant total, per-flag subtotals, largest debt first.
+    var byFlag = {};
+    rows.forEach(function (r) {
+      var fk = r.flag || 'Unclassified flag';
+      var g = byFlag[fk] = byFlag[fk] || { tenants: {}, total: 0, n: 0 };
+      var tKey = r.name || r.custno;
+      var t = g.tenants[tKey] = g.tenants[tKey] || { name: tKey, custnos: [], income: '', notes: [], total: 0, by: r.by, at: r.at };
+      t.custnos.push(r.custno);
+      if (r.income) t.income = r.income;
+      if (r.note && t.notes.indexOf(r.note) < 0) t.notes.push(r.note);
+      t.total = Math.round((t.total + r.total) * 100) / 100;
+      if (r.at > t.at) { t.at = r.at; t.by = r.by; }
+      g.total = Math.round((g.total + r.total) * 100) / 100;
+    });
+    Object.keys(byFlag).forEach(function (fk) {
+      byFlag[fk].list = Object.keys(byFlag[fk].tenants).map(function (k2) { return byFlag[fk].tenants[k2]; })
+        .sort(function (a, b) { return b.total - a.total; });
+      byFlag[fk].n = byFlag[fk].list.length;
+    });
+    var flagOrder = Object.keys(byFlag).sort(function (a, b) {
+      if (a === 'Unclassified flag') return 1; if (b === 'Unclassified flag') return -1;
+      return a.localeCompare(b);
+    });
     var sum = { count: rows.length, flags: {}, ow: 0, odsp: 0, flaggedTotal: 0 };
     rows.forEach(function (r) {
       if (r.income === 'OW') sum.ow++; if (r.income === 'ODSP') sum.odsp++;
@@ -1166,10 +1207,16 @@
     var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
     var money = function (v) { return '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 }); };
     if (format === 'csv') {
-      var head = ['Customer #', 'Name', 'Income (OW/ODSP)', 'Account Flag', 'Note', 'Ledger Total', 'Classified By', 'Date'];
-      var csv = [head.join(',')].concat(rows.map(function (r) {
-        return [r.custno, r.name, r.income, r.flag, r.note, r.total.toFixed(2), r.by, r.at]
-          .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+      var head = ['Account Flag', 'Tenant', 'Cust #(s)', 'Income (OW/ODSP)', 'Note', 'Tenant Total', 'Classified By', 'Date'];
+      var csvRows = [];
+      flagOrder.forEach(function (fk) {
+        byFlag[fk].list.forEach(function (t) {
+          csvRows.push([fk, t.name, t.custnos.join(' '), t.income, t.notes.join('; '), t.total.toFixed(2), t.by, t.at]);
+        });
+        csvRows.push([fk + ' — SUBTOTAL', '', '', '', '', byFlag[fk].total.toFixed(2), '', '']);
+      });
+      var csv = [head.join(',')].concat(csvRows.map(function (r) {
+        return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
       })).join('\n');
       var a = document.createElement('a');
       a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
@@ -1192,18 +1239,32 @@
       lines.push('Income classified: ' + sum.ow + ' OW · ' + sum.odsp + ' ODSP');
       doc.setFontSize(10);
       lines.forEach(function (t, i) { doc.text(t, 14, 40 + i * 6); });
-      doc.autoTable({
-        startY: 44 + lines.length * 6,
-        head: [['Cust #', 'Name', 'OW/ODSP', 'Flag', 'Note', 'Ledger Total', 'By', 'Date']],
-        body: rows.map(function (r) { return [r.custno, r.name, r.income, r.flag, r.note, money(r.total), r.by, r.at]; }),
-        styles: { fontSize: 8, cellPadding: 1.6 },
-        headStyles: { fillColor: [40, 40, 40] },
-        columnStyles: { 5: { halign: 'right' } },
-        didDrawPage: function () {
-          var page = doc.internal.getNumberOfPages();
-          doc.setFontSize(8);
-          doc.text(nation + ' — A/R Cleanup ' + asOf + ' — Page ' + page, 14, doc.internal.pageSize.getHeight() - 8);
-        }
+      // One section per flag: tenants grouped (all their Sage cust #s on one
+      // line, per-tenant total), flag subtotal as the section's final row.
+      var y = 46 + lines.length * 6;
+      var footer = function () {
+        var page = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.text(nation + ' — A/R Cleanup ' + asOf + ' — Page ' + page, 14, doc.internal.pageSize.getHeight() - 8);
+      };
+      flagOrder.forEach(function (fk) {
+        var g = byFlag[fk];
+        if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20; }
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+        doc.text(fk + ' — ' + g.n + ' tenant(s) · ' + money(g.total), 14, y);
+        doc.setFont('helvetica', 'normal');
+        doc.autoTable({
+          startY: y + 3,
+          head: [['Tenant', 'Cust #(s)', 'OW/ODSP', 'Note', 'Tenant Total', 'By', 'Date']],
+          body: g.list.map(function (t) {
+            return [t.name, t.custnos.join(', '), t.income, t.notes.join('; '), money(t.total), t.by, t.at];
+          }).concat([[{ content: fk + ' subtotal', styles: { fontStyle: 'bold' } }, '', '', '', { content: money(g.total), styles: { fontStyle: 'bold', halign: 'right' } }, '', '']]),
+          styles: { fontSize: 8, cellPadding: 1.6 },
+          headStyles: { fillColor: [40, 40, 40] },
+          columnStyles: { 4: { halign: 'right' } },
+          didDrawPage: footer
+        });
+        y = doc.lastAutoTable.finalY + 10;
       });
       doc.save(((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Cleanup_' + asOf + '.pdf');
       if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_cleanup_report_generated', 'A/R cleanup report generated (PDF) — ' + rows.length + ' classified accounts', window.currentRole || 'staff');
@@ -1311,7 +1372,25 @@
                 : '')) + '</td>'
         + '</tr>';
     }).join('');
+    // Reconciliation vs the dashboard A/R KPI: the KPI totals BALANCES IN THE
+    // APP, so until every row is imported the two won't match. Show the math.
+    var pm = IMP.parseMeta || {};
+    var recTotals = { parsed: 0, inApp: 0, pending: 0 };
+    IMP.rows.forEach(function (r2) {
+      recTotals.parsed = Math.round((recTotals.parsed + (r2.total || 0)) * 100) / 100;
+      if (r2.already || r2.inSync) recTotals.inApp = Math.round((recTotals.inApp + (r2.total || 0)) * 100) / 100;
+      else recTotals.pending = Math.round((recTotals.pending + (r2.total || 0)) * 100) / 100;
+    });
+    var recLine = '<div style="font-size:12px;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border);border-left:3px solid var(--info-blue);border-radius:6px;">'
+      + '<strong>Reconciliation:</strong> parsed rows total ' + _money(recTotals.parsed)
+      + (pm.reportGrandTotal != null ? ' · report’s own grand total ' + _money(pm.reportGrandTotal) : '')
+      + (pm.interestCount ? ' · interest/utility lines excluded ' + _money(pm.interestTotal) + ' (' + pm.interestCount + ')' : '')
+      + ' · imported / in sync ' + _money(recTotals.inApp)
+      + ' · not yet imported ' + _money(recTotals.pending)
+      + '. The dashboard A/R KPI counts only balances already in the app (plus any other ledger activity), so it will match the report once every row is imported.'
+      + '</div>';
     review.innerHTML = dl
+      + recLine
       + '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">' + IMP.rows.length + ' rows — '
       + counts.tenant + ' tenant · ' + counts.unit + ' unit · ' + counts.application + ' applicant · '
       + counts.none + ' unmatched · ' + counts.ambiguous + ' ambiguous · ' + counts.already + ' imported · '
