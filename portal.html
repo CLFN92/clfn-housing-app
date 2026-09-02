@@ -54,6 +54,19 @@
   .empty{color:var(--muted);font-size:13px;font-style:italic;padding:8px 0}
   .foot{color:var(--muted);font-size:11px;text-align:center;margin-top:26px}
   .center{text-align:center;padding:34px 18px}
+  /* Guided maintenance report */
+  .choice{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--hair);
+    border-radius:10px;padding:13px 14px;font-size:15px;font-family:inherit;color:var(--ink);cursor:pointer;margin-bottom:8px}
+  .choice:active{border-color:var(--accent)}
+  .choice.on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(248,228,26,.35);font-weight:700}
+  .photos{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .thumb{position:relative;width:86px;height:86px;border-radius:9px;overflow:hidden;border:1px solid var(--hair)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .rm{position:absolute;top:3px;right:3px;width:22px;height:22px;border:none;border-radius:50%;
+    background:rgba(0,0,0,.65);color:#fff;font-size:14px;line-height:1;cursor:pointer}
+  .addphoto{width:86px;height:86px;border:2px dashed var(--hair);border-radius:9px;display:grid;place-items:center;
+    font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;padding:4px}
+  .crumb{font-size:12px;color:var(--muted);margin:0 0 10px}
 </style>
 </head>
 <body>
@@ -66,6 +79,7 @@
     <div class="center"><p class="sub">Loading&hellip;</p></div>
   </div>
   <script src="shared-config.js"></script>
+<script src="mrq-tree.js"></script>
   <script src="apply.js"></script>
 </body>
 </html>

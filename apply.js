@@ -297,10 +297,29 @@
     // "My Home" -- shown only when the server resolved a unit for this
     // member (tenant record email match, or a linked application's unit).
     window._portalUnit = (res.data && res.data.unit) || null;
+    var mrs = (res.data && res.data.maintenance) || [];
+    var MR_STATUS = {
+      'new':      { label: 'Received \u2014 waiting for review', cls: 'submitted' },
+      'approved': { label: 'Accepted \u2014 work order issued',  cls: 'approved' },
+      'rejected': { label: 'Reviewed \u2014 not proceeding',     cls: 'rejected' }
+    };
+    var mrListHtml = mrs.length
+      ? '<div style="margin-top:14px;"><b style="font-size:13px;">Your maintenance requests</b><ul class="sublist" style="margin-top:8px;">'
+        + mrs.map(function (m) {
+            var st = MR_STATUS[m.status] || { label: m.status || 'Received', cls: 'submitted' };
+            var noteLine = (m.status === 'rejected' && m.review_notes)
+              ? '<div class="msg err" style="display:block;width:100%;margin-top:6px;font-size:12px;padding:7px 9px;">' + esc(m.review_notes) + '</div>'
+              : '';
+            return '<li style="flex-wrap:wrap;"><span>' + esc(m.category || 'Maintenance')
+              + (m.created_at ? ' \u00b7 ' + new Date(m.created_at).toLocaleDateString() : '')
+              + '</span><span class="pill ' + esc(st.cls) + '">' + esc(st.label) + '</span>' + noteLine + '</li>';
+          }).join('') + '</ul></div>'
+      : '';
     var homeHtml = window._portalUnit
       ? '<div class="card"><h3>My home</h3>'
         + '<p class="sub" style="margin:4px 0 12px;">' + esc(window._portalUnit.address || 'Your unit') + '</p>'
         + '<button class="btn" type="button" style="margin-top:0;" onclick="mrStart()">\uD83D\uDD27 Report a maintenance problem</button>'
+        + mrListHtml
         + '</div>'
       : '';
 
@@ -313,45 +332,208 @@
   }
 
   // -- Maintenance request (member portal) ------------------------------------
-  // Same categories + staging queue as the QR flow; the unit is resolved
-  // SERVER-side from the signed-in member, so no unit is ever picked here.
-  var MR_CATS = ['Plumbing', 'Heating / Furnace', 'Electrical', 'Appliance', 'Doors / Windows / Locks', 'Structural', 'Water / Leak', 'Pests', 'Other'];
+  // GUIDED report, mirroring the staff Renovation Questionnaire: the shared
+  // data tree (mrq-tree.js) drives Category -> Area -> Component -> Issues
+  // (multi-select) steps; several problems can be added before sending. The
+  // unit is resolved SERVER-side from the signed-in member. Photos use the
+  // same compress-to-JPEG widget as the QR report form (max 3).
+  var MRQ = (window.MRQ_TREE || { TRADES: [], ROOMS: [] });
+  var MR_MAX_PHOTOS = 3;
+  var _mrq = null;   // { items:[{cat,room,component,issues[]}], cur:{}, photos:[] }
+
+  function _mrCompress(file, cb) {
+    if (!file || !/^image\//.test(file.type)) { cb(null); return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var MAX = 1600, w = img.width, h = img.height;
+        if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        else if (h >= w && h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+        try {
+          var c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          cb(c.toDataURL('image/jpeg', 0.7));
+        } catch (e) { cb(null); }
+      };
+      img.onerror = function () { cb(null); };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { cb(null); };
+    reader.readAsDataURL(file);
+  }
+  function _mrRenderPhotos() {
+    var wrap = document.getElementById('mr_photos'); if (!wrap || !_mrq) return;
+    var html = _mrq.photos.map(function (srcU, i) {
+      return '<div class="thumb"><img src="' + srcU + '" alt=""/>'
+        + '<button type="button" class="rm" data-rm="' + i + '" aria-label="Remove photo">&times;</button></div>';
+    }).join('');
+    if (_mrq.photos.length < MR_MAX_PHOTOS) {
+      html += '<label class="addphoto" id="mr_addbtn">+ Add photo<input id="mr_file" type="file" accept="image/*" hidden/></label>';
+    }
+    wrap.innerHTML = html;
+    var f = document.getElementById('mr_file');
+    if (f) f.addEventListener('change', function (ev) {
+      var file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      var btn = document.getElementById('mr_addbtn'); if (btn) btn.textContent = 'Adding\u2026';
+      _mrCompress(file, function (dataUrl) {
+        if (dataUrl && _mrq.photos.length < MR_MAX_PHOTOS) _mrq.photos.push(dataUrl);
+        _mrRenderPhotos();
+      });
+    });
+    wrap.querySelectorAll('[data-rm]').forEach(function (b) {
+      b.addEventListener('click', function () { _mrq.photos.splice(Number(b.getAttribute('data-rm')), 1); _mrRenderPhotos(); });
+    });
+  }
+
+  function _mrCrumb() {
+    var c = _mrq.cur;
+    var bits = [];
+    if (c.cat) bits.push(c.cat);
+    if (c.room) bits.push(c.room);
+    if (c.component) bits.push(c.component);
+    return bits.length ? '<p class="crumb">' + esc(bits.join(' \u203a ')) + '</p>' : '';
+  }
+  function _mrChoices(list, fn) {
+    return list.map(function (o, i) {
+      return '<button type="button" class="choice" onclick="' + fn + '(' + i + ')">' + esc(o) + '</button>';
+    }).join('');
+  }
+
   window.mrStart = function () {
     var u = window._portalUnit;
     if (!u) { showDashboard(); return; }
-    app.innerHTML =
-      '<h1>Report a maintenance problem</h1>'
-      + '<p class="sub">For <b>' + esc(u.address || 'your unit') + '</b>. The Housing office will review your request.</p>'
-      + '<label>What is the problem with? *</label>'
-      + '<select id="mr_cat"><option value="">Select a category\u2026</option>'
-      +   MR_CATS.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select>'
+    _mrq = { items: [], cur: {}, photos: [], urgency: 'routine', notes: '', phone: '' };
+    _mrStepCat();
+  };
+  function _mrHeader(title, subtitle) {
+    return '<h1>' + title + '</h1><p class="sub">' + subtitle + '</p>';
+  }
+  function _mrStepCat() {
+    _mrq.cur = {};
+    app.innerHTML = _mrHeader('What is the problem with?', 'For <b>' + esc((window._portalUnit || {}).address || 'your unit') + '</b>. Pick the closest match.')
+      + MRQ.TRADES.map(function (t, i) {
+          return '<button type="button" class="choice" onclick="_mrPickCat(' + i + ')">' + esc((t.icon ? t.icon + ' ' : '') + t.cat) + '</button>';
+        }).join('')
+      + '<button class="btn ghost" type="button" onclick="' + (_mrq.items.length ? 'window._mrReview()' : 'showDashboardPublic()') + '">' + (_mrq.items.length ? '&larr; Back to your report' : 'Cancel') + '</button>';
+  }
+  window._mrPickCat = function (i) {
+    var t = MRQ.TRADES[i]; if (!t) return;
+    _mrq.cur = { cat: t.cat, tradeIdx: i };
+    app.innerHTML = _mrHeader('Where is it?', 'Which room or area?') + _mrCrumb()
+      + _mrChoices(MRQ.ROOMS, '_mrPickRoom')
+      + '<button class="btn ghost" type="button" onclick="_mrStepCatBack()">&larr; Back</button>';
+  };
+  window._mrStepCatBack = function () { _mrStepCat(); };
+  window._mrPickRoom = function (i) {
+    _mrq.cur.room = MRQ.ROOMS[i] || '';
+    var t = MRQ.TRADES[_mrq.cur.tradeIdx] || { components: [] };
+    app.innerHTML = _mrHeader('What exactly?', 'Pick the closest item.') + _mrCrumb()
+      + t.components.map(function (c, ci) {
+          return '<button type="button" class="choice" onclick="_mrPickComp(' + ci + ')">' + esc(c.label) + '</button>';
+        }).join('')
+      + '<button type="button" class="choice" onclick="_mrPickCompOther()">Something else\u2026</button>'
+      + '<button class="btn ghost" type="button" onclick="_mrPickCat(' + _mrq.cur.tradeIdx + ')">&larr; Back</button>';
+  };
+  window._mrPickCompOther = function () {
+    _mrq.cur.component = 'Other';
+    _mrq.cur.issueOpts = [];
+    _mrIssuesStep();
+  };
+  window._mrPickComp = function (ci) {
+    var t = MRQ.TRADES[_mrq.cur.tradeIdx] || { components: [] };
+    var c = t.components[ci]; if (!c) return;
+    _mrq.cur.component = c.label;
+    _mrq.cur.issueOpts = c.issues || [];
+    _mrIssuesStep();
+  };
+  function _mrIssuesStep() {
+    _mrq.cur.issues = _mrq.cur.issues || [];
+    var opts = _mrq.cur.issueOpts || [];
+    app.innerHTML = _mrHeader('What is wrong with it?', 'Pick everything that applies, then continue.') + _mrCrumb()
+      + opts.map(function (o, i) {
+          var on = _mrq.cur.issues.indexOf(o) >= 0;
+          return '<button type="button" class="choice' + (on ? ' on' : '') + '" onclick="_mrToggleIssue(' + i + ')">' + (on ? '\u2713 ' : '') + esc(o) + '</button>';
+        }).join('')
+      + '<label style="margin-top:12px;">Anything else about it? (optional)</label>'
+      + '<input id="mr_issue_other" type="text" value="' + esc(_mrq.cur.other || '') + '" placeholder="Describe it in your own words"/>'
+      + '<div class="msg" id="mr_step_msg"></div>'
+      + '<button class="btn" type="button" onclick="_mrIssuesDone()">Continue</button>'
+      + '<button class="btn ghost" type="button" onclick="_mrPickRoom(' + Math.max(0, MRQ.ROOMS.indexOf(_mrq.cur.room)) + ')">&larr; Back</button>';
+  }
+  window._mrToggleIssue = function (i) {
+    var o = (_mrq.cur.issueOpts || [])[i]; if (o == null) return;
+    _mrq.cur.other = ((document.getElementById('mr_issue_other') || {}).value || '').trim();
+    var idx = _mrq.cur.issues.indexOf(o);
+    if (idx >= 0) _mrq.cur.issues.splice(idx, 1); else _mrq.cur.issues.push(o);
+    _mrIssuesStep();
+  };
+  window._mrIssuesDone = function () {
+    _mrq.cur.other = ((document.getElementById('mr_issue_other') || {}).value || '').trim();
+    if (!_mrq.cur.issues.length && !_mrq.cur.other) {
+      var m = document.getElementById('mr_step_msg');
+      if (m) { m.className = 'msg err'; m.textContent = 'Pick at least one problem, or describe it in your own words.'; }
+      return;
+    }
+    var issues = _mrq.cur.issues.slice();
+    if (_mrq.cur.other) issues.push(_mrq.cur.other);
+    _mrq.items.push({ cat: _mrq.cur.cat, room: _mrq.cur.room, component: _mrq.cur.component, issues: issues });
+    _mrq.cur = {};
+    window._mrReview();
+  };
+  window._mrRemoveItem = function (i) { _mrq.items.splice(i, 1); if (_mrq.items.length) window._mrReview(); else _mrStepCat(); };
+  window._mrReview = function () {
+    var itemsHtml = _mrq.items.map(function (it, i) {
+      return '<li style="flex-wrap:wrap;"><span><b>' + esc(it.room + ' \u2014 ' + it.component) + '</b><br/>'
+        + '<span style="color:var(--muted);font-size:13px;">' + esc(it.issues.join('; ')) + '</span></span>'
+        + '<button type="button" class="rm-item" onclick="_mrRemoveItem(' + i + ')" style="background:none;border:none;color:var(--danger);font-size:18px;cursor:pointer;">&times;</button></li>';
+    }).join('');
+    app.innerHTML = _mrHeader('Your maintenance report', 'For <b>' + esc((window._portalUnit || {}).address || 'your unit') + '</b>. Check it over, add photos, and send.')
+      + '<ul class="sublist">' + itemsHtml + '</ul>'
+      + '<button class="btn ghost" type="button" style="margin-top:4px;" onclick="_mrStepCat()">+ Add another problem</button>'
       + '<label>How urgent is it?</label>'
-      + '<select id="mr_urg"><option value="routine">Routine \u2014 can wait for a scheduled visit</option>'
-      +   '<option value="urgent">Urgent \u2014 needs attention soon</option>'
-      +   '<option value="emergency">Emergency \u2014 health or safety risk right now</option></select>'
-      + '<label>Describe the problem *</label>'
-      + '<textarea id="mr_desc" placeholder="e.g. The kitchen sink is leaking under the cabinet and the floor is getting wet."></textarea>'
+      + '<select id="mr_urg">'
+      +   '<option value="routine"' + (_mrq.urgency === 'routine' ? ' selected' : '') + '>Routine \u2014 can wait for a scheduled visit</option>'
+      +   '<option value="urgent"' + (_mrq.urgency === 'urgent' ? ' selected' : '') + '>Urgent \u2014 needs attention soon</option>'
+      +   '<option value="emergency"' + (_mrq.urgency === 'emergency' ? ' selected' : '') + '>Emergency \u2014 health or safety risk right now</option>'
+      + '</select>'
+      + '<label>Photos of the problem (optional, up to ' + MR_MAX_PHOTOS + ')</label>'
+      + '<div class="photos" id="mr_photos"></div>'
+      + '<label>Anything else the Housing office should know? (optional)</label>'
+      + '<textarea id="mr_notes" placeholder="e.g. best time to visit, pets in the home\u2026">' + esc(_mrq.notes || '') + '</textarea>'
       + '<label>Phone (optional \u2014 so we can reach you)</label>'
-      + '<input id="mr_phone" type="tel" autocomplete="tel"/>'
+      + '<input id="mr_phone" type="tel" autocomplete="tel" value="' + esc(_mrq.phone || '') + '"/>'
       + '<div class="msg" id="mr_msg"></div>'
       + '<button class="btn" type="button" id="mr_send" onclick="mrSubmit()">Send to the Housing office</button>'
       + '<button class="btn ghost" type="button" onclick="showDashboardPublic()">Cancel</button>';
+    _mrRenderPhotos();
   };
   window.mrSubmit = async function () {
-    var cat = ((document.getElementById('mr_cat') || {}).value || '').trim();
-    var desc = ((document.getElementById('mr_desc') || {}).value || '').trim();
-    var urg = ((document.getElementById('mr_urg') || {}).value || 'routine');
-    var phone = ((document.getElementById('mr_phone') || {}).value || '').trim();
+    if (!_mrq || !_mrq.items.length) { window._mrReview(); return; }
+    _mrq.urgency = ((document.getElementById('mr_urg') || {}).value || 'routine');
+    _mrq.notes = ((document.getElementById('mr_notes') || {}).value || '').trim();
+    _mrq.phone = ((document.getElementById('mr_phone') || {}).value || '').trim();
     var msg = document.getElementById('mr_msg');
     var setErr = function (t) { if (msg) { msg.className = 'msg err'; msg.textContent = t; } };
-    if (!cat || !desc) { setErr('Please choose a category and describe the problem.'); return; }
+    // Structured description staff can act on, one line per problem.
+    var desc = _mrq.items.map(function (it) {
+      return it.room + ' \u2014 ' + it.component + ': ' + it.issues.join('; ');
+    }).join('\n') + (_mrq.notes ? '\nNotes: ' + _mrq.notes : '');
     var btn = document.getElementById('mr_send');
     if (btn) { btn.disabled = true; btn.textContent = 'Sending\u2026'; }
-    var res = await api('report_mr', { category: cat, description: desc, urgency: urg, contact_phone: phone });
+    var res = await api('report_mr', {
+      category: (_mrq.items[0] && _mrq.items[0].cat) || 'Other',
+      description: desc,
+      urgency: _mrq.urgency,
+      contact_phone: _mrq.phone,
+      photos: _mrq.photos
+    });
     if (res.ok && res.data && res.data.ok) {
+      var urg = _mrq.urgency; _mrq = null;
       app.innerHTML = '<div class="center"><div class="check">\u2713</div><h1>Request sent</h1>'
         + '<p class="sub">The Housing office has received your maintenance request'
-        + (urg === 'emergency' ? ' and it is flagged as an emergency. If there is immediate danger, also phone the Housing office directly.' : ' and will follow up.')
+        + (urg === 'emergency' ? ' and it is flagged as an emergency. If there is immediate danger, also phone the Housing office directly.' : ' and will follow up. You can check its status on your portal any time.')
         + '</p>'
         + '<button class="btn" type="button" onclick="showDashboardPublic()">Back to my portal</button></div>';
     } else {

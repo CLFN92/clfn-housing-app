@@ -99,6 +99,46 @@ async function notifySubmission(admin: any, row: any, applicantEmail: string, ap
   }
 }
 
+// --- Portal maintenance-request photos (mirrors tenant-mr) ----------------
+const MRQ_MAX_PHOTOS = 3
+const MRQ_MAX_PHOTO_BYTES = 6 * 1024 * 1024
+const MRQ_PHOTO_MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+const MRQ_BUCKET = Deno.env.get('STORAGE_BUCKET') || 'housing-files'
+function mrqDecodePhoto(dataUrl: string): { bytes: Uint8Array; ext: string; contentType: string } | null {
+  if (typeof dataUrl !== 'string') return null
+  const m = dataUrl.match(/^data:([^;,]+);base64,([\s\S]+)$/)
+  if (!m) return null
+  const contentType = m[1].toLowerCase()
+  const ext = MRQ_PHOTO_MIME[contentType]
+  if (!ext) return null
+  let bin: string
+  try { bin = atob(m[2]) } catch { return null }
+  if (bin.length > MRQ_MAX_PHOTO_BYTES) return null
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return { bytes, ext, contentType }
+}
+// Same storage path convention as the QR flow, so staff review shows portal
+// photos identically. A failed photo is skipped, never sinks the request.
+async function mrqUploadPhotos(admin: any, unitId: string, submissionId: string, raw: unknown): Promise<string[]> {
+  let list: unknown[] = []
+  if (Array.isArray(raw)) list = raw
+  else if (typeof raw === 'string' && raw) list = [raw]
+  if (!list.length) return []
+  const paths: string[] = []
+  for (let i = 0; i < list.length && paths.length < MRQ_MAX_PHOTOS; i++) {
+    const dec = mrqDecodePhoto(String(list[i] || ''))
+    if (!dec) continue
+    const path = 'tenants/' + unitId + '/tenant-mr/' + submissionId + '/photo-' + (paths.length + 1) + '.' + dec.ext
+    try {
+      const { error } = await admin.storage.from(MRQ_BUCKET)
+        .upload(path, dec.bytes, { contentType: dec.contentType, upsert: true })
+      if (!error) paths.push(path)
+    } catch (_e) { /* skip this photo, keep the request */ }
+  }
+  return paths
+}
+
 // --- Member portal: resolve the signed-in member's UNIT -------------------
 // Email-matched tenants row first (the tenant file), then a linked
 // application's assigned unit. Server-side only: the portal never supplies a
@@ -401,7 +441,18 @@ serve(async (req) => {
       // Member portal: the signed-in member's unit (if any) powers the
       // "My Home" card + maintenance-request form on the dashboard.
       const memberUnit = await resolveMemberUnit(admin, email, ((prof && prof[0] && prof[0].linked_app_ids) || []))
-      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [], band_required: !!bandPrefix, unit: memberUnit })
+      // Recent maintenance requests for the member's unit -- powers the
+      // status list on the "My home" card.
+      let memberMrs: unknown[] = []
+      if (memberUnit) {
+        try {
+          const { data: mrs } = await admin.from('tenant_mr_submissions')
+            .select('id, created_at, category, urgency, status, review_notes, sow_project_number')
+            .eq('unit_id', memberUnit.id).order('created_at', { ascending: false }).limit(5)
+          memberMrs = mrs || []
+        } catch (_e) { /* list is optional */ }
+      }
+      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [], band_required: !!bandPrefix, unit: memberUnit, maintenance: memberMrs })
     }
 
     // --- save_draft: create or update the applicant's OWN draft ---
@@ -537,6 +588,14 @@ serve(async (req) => {
       // Contact email = the verified sign-in address (best-effort column, may
       // not exist pre-migration -- mirrors the QR flow's own handling).
       try { if (mrIns && mrIns[0]) await admin.from('tenant_mr_submissions').update({ contact_email: email }).eq('id', mrIns[0].id) } catch (_e) { /* optional column */ }
+      // Photos (optional, max 3 compressed data URLs) -- stored exactly like
+      // the QR flow's so the staff review modal renders them unchanged.
+      try {
+        if (mrIns && mrIns[0] && body.photos) {
+          const pPaths = await mrqUploadPhotos(admin, unit.id, mrIns[0].id, body.photos)
+          if (pPaths.length) await admin.from('tenant_mr_submissions').update({ photo_path: JSON.stringify(pPaths) }).eq('id', mrIns[0].id)
+        }
+      } catch (_e) { /* photos are best-effort */ }
       try { await notifyPortalMr(admin, { address: unit.address, category, description, urgency, contactName, email }) } catch (_e) { /* best-effort */ }
       try {
         await admin.from('housing_audit_log').insert({
