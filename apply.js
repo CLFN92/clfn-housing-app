@@ -364,12 +364,15 @@
   }
   function _mrRenderPhotos() {
     var wrap = document.getElementById('mr_photos'); if (!wrap || !_mrq) return;
-    var html = _mrq.photos.map(function (srcU, i) {
+    var thumbs = _mrq.photos.map(function (srcU, i) {
       return '<div class="thumb"><img src="' + srcU + '" alt=""/>'
         + '<button type="button" class="rm" data-rm="' + i + '" aria-label="Remove photo">&times;</button></div>';
     }).join('');
+    var html = (thumbs ? '<div class="photos">' + thumbs + '</div>' : '');
     if (_mrq.photos.length < MR_MAX_PHOTOS) {
-      html += '<label class="addphoto" id="mr_addbtn">+ Add photo<input id="mr_file" type="file" accept="image/*" hidden/></label>';
+      html += '<label class="addphoto" id="mr_addbtn">\uD83D\uDCF7 Add a photo'
+        + (_mrq.photos.length ? ' (' + _mrq.photos.length + ' of ' + MR_MAX_PHOTOS + ' added)' : '')
+        + '<input id="mr_file" type="file" accept="image/*" style="display:none;"/></label>';
     }
     wrap.innerHTML = html;
     var f = document.getElementById('mr_file');
@@ -499,7 +502,7 @@
       +   '<option value="emergency"' + (_mrq.urgency === 'emergency' ? ' selected' : '') + '>Emergency \u2014 health or safety risk right now</option>'
       + '</select>'
       + '<label>Photos of the problem (optional, up to ' + MR_MAX_PHOTOS + ')</label>'
-      + '<div class="photos" id="mr_photos"></div>'
+      + '<div id="mr_photos"></div>'
       + '<label>Anything else the Housing office should know? (optional)</label>'
       + '<textarea id="mr_notes" placeholder="e.g. best time to visit, pets in the home\u2026">' + esc(_mrq.notes || '') + '</textarea>'
       + '<label>Phone (optional \u2014 so we can reach you)</label>'
