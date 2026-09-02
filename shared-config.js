@@ -27,7 +27,19 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     primary_color: '#9A4A1F',
     logo:          '',   // set to HLH_LOGO_DATA_URL after that constant is defined below
     role_labels:   {},
-    portal_base:   'https://homelandhomes.ca',
+    // MUST stay blank. This entry resolves for any host that is not a mapped
+    // nation (the shared fnhub.app sign-in, previews, localhost), and
+    // nationPortalBase() falls back to location.origin when it is empty --
+    // i.e. the app the staff member is actually on, which serves report.html,
+    // /u/<slug> and apply.html. Pointing it at the marketing site instead
+    // breaks four things at once: maintenance QR codes and the short /u/
+    // labels 404, the staff sign-in link in reactivation emails goes to a
+    // sales page, and applicant portal invites silently lose their
+    // redirect_to (applicant-intake's isSafeRedirect allows only fnhub.app,
+    // *.fnhub.app and localhost -- so the member gets a link that does not
+    // land on their application). A real nation always sets its own
+    // portal_base below.
+    portal_base:   '',
     email_domain:  '',
     modules_licensed: null
   },
