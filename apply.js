@@ -486,6 +486,22 @@
     window._mrReview();
   };
   window._mrRemoveItem = function (i) { _mrq.items.splice(i, 1); if (_mrq.items.length) window._mrReview(); else _mrStepCat(); };
+  // Review-screen Back: reopen the LAST problem in the issues editor (its
+  // picks restored) instead of stranding the member between Send and Cancel.
+  window._mrReviewBack = function () {
+    var last = _mrq.items.pop();
+    if (!last) { _mrStepCat(); return; }
+    var ti = 0;
+    MRQ.TRADES.forEach(function (t, i) { if (t.cat === last.cat) ti = i; });
+    var t = MRQ.TRADES[ti] || { components: [] };
+    var comp = null;
+    (t.components || []).forEach(function (c) { if (c.label === last.component) comp = c; });
+    _mrq.cur = { cat: last.cat, tradeIdx: ti, room: last.room, component: last.component,
+                 issueOpts: comp ? (comp.issues || []) : [] };
+    _mrq.cur.issues = last.issues.filter(function (x) { return _mrq.cur.issueOpts.indexOf(x) >= 0; });
+    _mrq.cur.other = last.issues.filter(function (x) { return _mrq.cur.issueOpts.indexOf(x) < 0; }).join('; ');
+    _mrIssuesStep();
+  };
   window._mrReview = function () {
     var itemsHtml = _mrq.items.map(function (it, i) {
       return '<li style="flex-wrap:wrap;"><span><b>' + esc(it.room + ' \u2014 ' + it.component) + '</b><br/>'
@@ -509,6 +525,7 @@
       + '<input id="mr_phone" type="tel" autocomplete="tel" value="' + esc(_mrq.phone || '') + '"/>'
       + '<div class="msg" id="mr_msg"></div>'
       + '<button class="btn" type="button" id="mr_send" onclick="mrSubmit()">Send to the Housing office</button>'
+      + '<button class="btn ghost" type="button" onclick="_mrReviewBack()">&larr; Back</button>'
       + '<button class="btn ghost" type="button" onclick="showDashboardPublic()">Cancel</button>';
     _mrRenderPhotos();
   };
