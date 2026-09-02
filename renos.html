@@ -1624,7 +1624,7 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
         +'<button data-ra-sow="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);"> Request</button>'
-        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r))
+        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r)) && !_raJobAssigned(r)
           ? '<a href="rfq.html?unit='+encodeURIComponent(uid)+'&sow='+encodeURIComponent(pn)+'" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-flex;align-items:center;" title="Create Request for Quotes">RFQ</a>'
           : '')
         +'<button data-ra-prog="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">📊</button>'
@@ -1701,7 +1701,7 @@ function _raCardTileFor(r, role, hmLimit) {
     else if (APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
       actions.push({text:(appr.key==='pending_hm'?'Override →':'✓ Approve'), onclick:"event.stopPropagation();raQuickApprove('"+uid+"','ed',"+projArg+")"});
   }
-  if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r))) {
+  if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r)) && !_raJobAssigned(r)) {
     actions.push({html:'<a href="rfq.html?unit='+encodeURIComponent(u.id)+'&sow='+encodeURIComponent(pn)+'" onclick="event.stopPropagation();" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;text-align:center;white-space:nowrap;">RFQ</a>'});
   }
   // Dismiss placeholder units (no request); Archive/Restore real saved requests.
@@ -1773,6 +1773,13 @@ function _raRfqAwarded(r){
     return rfq && rfq.sow_unit_id === uid && (pn ? rfq.sow_project_number === pn : true)
       && (rfq.status === 'awarded' || rfq.awarded_contractor_id);
   });
+}
+// Job already ASSIGNED (contractor on the request, or in-house crew) — no
+// point offering to tender it; the RFQ button hides for these rows.
+function _raJobAssigned(r){
+  var s = r && r.sow;
+  if(!s) return false;
+  return !!((typeof sowContractorLabel === 'function') ? sowContractorLabel(s) : (s.contractor || s.contractorId));
 }
 function _raStageOf(r){
   var k = (r.appr && r.appr.key) || '';
