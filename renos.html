@@ -253,6 +253,7 @@
         <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;">
           <div id="rp_overall_bar" style="height:100%;background:var(--yellow);border-radius:5px;width:0%;transition:width .4s;"></div>
         </div>
+        <div id="rp_started_line" style="font-size:11px;color:var(--muted);margin-top:5px;"></div>
       </div>
 
       <!-- SOW summary -->
@@ -533,6 +534,9 @@ function openRenoProgress(unitId) {
   if(pctEl) pctEl.textContent = pct + '%';
   if(barEl) barEl.style.width = pct + '%';
   if(statusEl) statusEl.textContent = prog ? (prog.status||'In Progress') : 'Not Started';
+  // Start date = the day the work order was emailed (_sowMarkWorkStarted).
+  var startEl = document.getElementById('rp_started_line');
+  if(startEl) startEl.textContent = (prog && prog.startDate) ? ('Started ' + prog.startDate + ' — work order emailed') : '';
 
   // Populate editable fields
   var sel = document.getElementById('rp_status_select');
@@ -542,9 +546,23 @@ function openRenoProgress(unitId) {
   var notes = document.getElementById('rp_notes');
   if(sel) sel.value = prog ? (prog.status||'Not Started') : 'Not Started';
   if(pctIn) pctIn.value = pct||'';
-  if(contr) contr.value = prog ? (prog.contractor||'') : '';
+  // Contractor: auto-populate from the unit's Maintenance Request when the
+  // progress record doesn't carry one yet (the MR is where the assignment is
+  // made — in-house crews render via sowContractorLabel too).
+  var _rpCtName = prog ? (prog.contractor||'') : '';
+  var _rpCtId   = prog ? (prog.contractorId||'') : '';
+  if(!_rpCtName){
+    var _rpSows = (typeof getUnitSowList === 'function') ? getUnitSowList(unitId) : [];
+    var _rpSrc = _rpSows.filter(function(s){ return s && s.approval_status !== 'completed' && !s.cancelled && !s.archived; })
+      .sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); })[0] || _rpSows[0];
+    if(_rpSrc){
+      _rpCtName = (typeof sowContractorLabel === 'function') ? sowContractorLabel(_rpSrc) : (_rpSrc.contractor || '');
+      if(!_rpCtId && _rpSrc.contractorId) _rpCtId = _rpSrc.contractorId;
+    }
+  }
+  if(contr) contr.value = _rpCtName;
   var contrId = document.getElementById('rp_contractor_id');
-  if(contrId) contrId.value = prog ? (prog.contractorId||'') : '';
+  if(contrId) contrId.value = _rpCtId;
   if(tgt) tgt.value = prog ? (prog.targetDate||'') : '';
   if(notes) notes.value = '';  // Clear notes each time — it's for new updates
 
@@ -893,6 +911,12 @@ function initRenosPage() {
   if(view==='contractors') showContractors();
   else if(view==='approvals') showRenoApprovals();
   else showRenos();
+  // Deep link from the Maintenance Request form's "Progress Report" button on
+  // pages that don't host the progress modal (?progress=<unitId>).
+  var _pgUnit = params.get('progress');
+  if(_pgUnit){
+    setTimeout(function(){ try { openRenoProgress(_pgUnit); } catch(e){ console.warn('[RENOS] progress deep link failed:', e); } }, 400);
+  }
   // Cross-page handoff (Quick Lookup, or "Back to Maintenance Request" from an
   // RFQ): ?sow=<unitId> opens the SOW; optional &pn=<projectNumber> opens that
   // specific request rather than the unit's most recent one.

@@ -537,6 +537,7 @@ function _buildSowModalHTML() {
         '<button id="sow_new_request_btn" type="button" onclick="sowStartNewRequest()" class="btn btn-ghost" style="display:none;">🆕 New Request</button>' +
         '<button type="button" onclick="printWorkOrder()" class="btn btn-ghost">🏗 Work Order</button>' +
         '<button type="button" onclick="printSOW()" class="btn btn-ghost">🖨 Tenant form</button>' +
+        '<button type="button" id="sow_progress_btn" onclick="_sowOpenProgress()" class="btn btn-ghost">📊 Progress Report</button>' +
         '<button type="button" id="sow_rfq_btn" onclick="sowOpenRfq()" class="btn btn-ghost" style="display:none;">📋 RFQ</button>' +
         '<span class="tic-footer-spacer"></span>' +
         // Review progress label — populated by _updateSowSaveButtonState.
@@ -1401,7 +1402,10 @@ async function _sowPromptWorkOrderEmail(){
       });
       var ok  = (typeof r === 'object' && r) ? r.ok : r;
       var snd = (typeof r === 'object' && r) ? r.checked : false;
-      if(ok && snd) notifyWorkOrderToFieldEmployee(sow, unit);
+      if(ok && snd){
+        notifyWorkOrderToFieldEmployee(sow, unit);
+        _sowMarkWorkStarted(unit && unit.id, sow, sow.assignedToName || 'the assigned employee');
+      }
     } else if(sow.contractorId){
       if(typeof notifyWorkOrderToContractor !== 'function' || typeof _resolveContractorForEmail !== 'function') return;
       var ct = await _resolveContractorForEmail(sow.contractorId);
@@ -1436,12 +1440,68 @@ async function _sowPromptWorkOrderEmail(){
       var chosen = recips.filter(function(x){ return picked[x.id]; }).map(function(x){ return x.email; });
       if(!chosen.length){ if(typeof showToast === 'function') showToast('No recipients selected — nothing sent.', {type:'info'}); return; }
       notifyWorkOrderToContractor(sow, unit, ct, chosen);
+      _sowMarkWorkStarted(unit && unit.id, sow, ct.name || 'the contractor');
     } else {
       if(typeof showToast === 'function') showToast('Assign this request to a contractor or employee to email the work order.', {type:'info'});
     }
   }catch(e){ console.warn('[sow] work-order email prompt threw:', e); }
 }
 window._sowPromptWorkOrderEmail = _sowPromptWorkOrderEmail;
+
+// Emailing a work order STARTS the job: flip the unit's progress report to
+// In Progress and stamp startDate = the day the contractor/crew was emailed,
+// with a timeline entry saying so. Writes the same housing_reno_progress row
+// saveRenoProgress uses (merge-duplicates upsert), and mirrors status onto
+// the SOW's work-progress so the Renovations tables read In Progress.
+function _sowMarkWorkStarted(unitId, sow, whoLabel){
+  try {
+    if(!unitId) return;
+    window._renoProgress = window._renoProgress || {};
+    var prog = window._renoProgress[unitId] || { updates: [], photos: [] };
+    var today = new Date().toISOString().slice(0,10);
+    if(!prog.startDate) prog.startDate = today;
+    if(prog.status !== 'Completed') prog.status = 'In Progress';
+    if(!prog.contractor && typeof sowContractorLabel === 'function'){
+      var _cl = sowContractorLabel(sow);
+      if(_cl) prog.contractor = _cl;
+    }
+    if(sow && sow.contractorId && !prog.contractorId) prog.contractorId = sow.contractorId;
+    prog.updates = prog.updates || [];
+    prog.updates.push({ date: today, status: 'In Progress', pct: prog.overallPct || 0,
+      notes: 'Work order ' + ((sow && sow.project_number) || '') + ' emailed to ' + (whoLabel || 'the assignee') + ' — work started.' });
+    window._renoProgress[unitId] = prog;
+    fetch(SUPABASE_URL + '/rest/v1/housing_reno_progress', {
+      method: 'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ unit_id: unitId, data: prog, updated_at: new Date().toISOString() })
+    }).catch(function(e){ console.warn('[sow] progress start save failed:', e); });
+    if(sow){
+      sow.progress = sow.progress || {};
+      if(sow.progress.percent == null) sow.progress.percent = prog.overallPct || 0;
+      sow.progress.status = 'In Progress';
+      sow.progress.updated_at = new Date().toISOString();
+      if(typeof upsertSowInList === 'function') upsertSowInList(unitId, sow);
+    }
+    if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
+    if(typeof auditEntry === 'function') auditEntry('UNIT:' + unitId, 'reno_progress_started',
+      'Progress set to In Progress — work order emailed to ' + (whoLabel || 'assignee'), window.currentRole || 'staff');
+  } catch(e){ console.warn('[sow] mark work started threw:', e); }
+}
+
+// Footer "Progress Report" button: opens the unit's progress report. The
+// progress modal only exists on renos.html — elsewhere we navigate there
+// with a deep link the renos boot handles (?progress=<unitId>).
+function _sowOpenProgress(){
+  var uid = _sowUnitId;
+  if(!uid){ if(typeof showToast === 'function') showToast('Save the request first — progress reports attach to the unit.', {type:'info'}); return; }
+  if(typeof openRenoProgress === 'function' && document.getElementById('renoProgressModal')){
+    if(typeof closeSowModal === 'function') closeSowModal();
+    openRenoProgress(uid);
+  } else {
+    window.location.href = 'renos.html?progress=' + encodeURIComponent(uid);
+  }
+}
+window._sowOpenProgress = _sowOpenProgress;
 // Back-compat aliases: any (possibly cached) markup still calling the old
 // button handlers routes through the document functions, which now own both
 // printing and the email prompt.
@@ -1965,6 +2025,11 @@ function _wlApproveSow(uid, pn){
 }
 window._wlApproveSow = _wlApproveSow;
 
+// One-step completion: a single dialog carries the lock warning AND the
+// optional tenant-file note (they used to be two dialogs, followed by a
+// manual save + manual close — five steps for one action). Confirming marks
+// the request complete, saves the note if one was typed, CLOSES the modal,
+// and refreshes the lists behind it.
 function markSowComplete(){
   if(!_sowUnitId || !window._sowEditingProjectNumber){
     showToast('Save the request before marking complete.', {type:'error'});
@@ -1975,53 +2040,70 @@ function markSowComplete(){
     return;
   }
   var pn = window._sowEditingProjectNumber;
-  showConfirm({
-    title:       'Mark Request ' + pn + ' as Completed?',
-    message:     'This locks the Maintenance Request, work order, and progress reports from further edits. Only the Executive Director can reopen it.',
-    confirmText: 'Mark Complete'
-  }).then(function(ok){
-    if (!ok) return;
-    var sow = getSowByProjectNumber(_sowUnitId, pn);
-    if(!sow){ showToast('Request not found', {type:'error'}); return; }
-    sow.approval_status = 'completed';
-    sow.completed_at = new Date().toISOString();
-    sow.completed_by = window.currentUserName || _realRoleForPermissions();
-    upsertSowInList(_sowUnitId, sow);
-    auditEntry('SOW:'+_sowUnitId, 'sow_completed', 'SOW '+pn+' marked Completed', _realRoleForPermissions());
-    // If this completion drained the last active SOW on the unit, revert the
-    // unit's status back to whatever it was before the renovation kicked in.
-    try {
-      var _allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
-      var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
-      if(_u && typeof hasActiveSows === 'function' && !hasActiveSows(_sowUnitId)
-         && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(_u)){
-        saveUnitWithDraftFallback(_u);
-        auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+(_u.status||'updated')+' (SOW '+pn+' completed, no active SOWs remain)', _realRoleForPermissions());
-      }
-    } catch(e){ console.warn('[SOW] complete-revert threw:', e); }
-    showToast('✓ Request marked Completed', {type:'info'});
-    _applySowModalLock(sow);
-    // Re-render the surfaces that filter completed requests — without this
-    // the reno-approvals table kept showing the row despite "Hide completed"
-    // (the filter only applies at render time), and the worklist kept its
-    // approval entry.
-    if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
-    if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
-    // Optional completion note on the tenant file (outcome / follow-up).
-    try {
-      var _cu = (typeof housingUnits !== 'undefined' ? housingUnits : []).find(function(x){ return x.id === _sowUnitId; });
-      var _tn = _cu && _cu.assignedName;
-      if(_tn && typeof promptTenantNote === 'function'){
-        promptTenantNote(_tn, {
-          title: 'Work order note (optional)',
-          message: 'Add a note for ' + _tn + ' on the completed work (outcome, follow-up). Leave blank to skip.',
-          placeholder: 'e.g. Replaced furnace igniter, tested OK. Tenant advised…',
-          context: 'sow_complete',
-          prefix: '[Work order ' + pn + ']'
-        });
-      }
-    } catch(e){ console.warn('[SOW] completion note prompt threw:', e); }
+  var _cu = (typeof housingUnits !== 'undefined' ? housingUnits : []).find(function(x){ return x.id === _sowUnitId; });
+  var tenantName = (_cu && _cu.assignedName) || '';
+  var esc = function(s){ return (typeof escapeHtml === 'function') ? escapeHtml(s) : String(s == null ? '' : s); };
+  var ex = document.getElementById('sowCompleteModal'); if(ex) ex.remove();
+  var mo = document.createElement('div');
+  mo.id = 'sowCompleteModal';
+  mo.className = 'modal-ov on';
+  mo.style.zIndex = '10070';
+  mo.innerHTML =
+      '<div class="modal" style="max-width:470px;">'
+    + '<div class="modal-hdr"><div><h2 style="font-size:16px;">Mark ' + esc(pn) + ' Completed?</h2>'
+    +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">This locks the request, work order and progress reports. Only the Executive Director can reopen it.</div></div>'
+    +   '<button class="modal-close" onclick="var m=document.getElementById(\'sowCompleteModal\');if(m)m.remove();">&#x2715;</button></div>'
+    + '<div style="padding:16px;">'
+    +   (tenantName
+          ? '<div class="f"><label>Completion note for ' + esc(tenantName) + '\u2019s file (optional)</label>'
+            + '<textarea id="sow_complete_note" rows="3" placeholder="e.g. Replaced furnace igniter, tested OK. Tenant advised\u2026" style="width:100%;box-sizing:border-box;"></textarea></div>'
+          : '')
+    +   '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">'
+    +     '<button class="btn btn-ghost" onclick="var m=document.getElementById(\'sowCompleteModal\');if(m)m.remove();">Cancel</button>'
+    +     '<button class="btn btn-primary" id="sow_complete_go">&#10003; Mark Complete</button>'
+    +   '</div>'
+    + '</div></div>';
+  mo.addEventListener('click', function(e){ if(e.target === mo) mo.remove(); });
+  document.body.appendChild(mo);
+  mo.querySelector('#sow_complete_go').addEventListener('click', function(){
+    var note = ((document.getElementById('sow_complete_note')||{}).value || '').trim();
+    mo.remove();
+    _sowDoComplete(pn, tenantName, note);
   });
+}
+
+function _sowDoComplete(pn, tenantName, note){
+  var sow = getSowByProjectNumber(_sowUnitId, pn);
+  if(!sow){ showToast('Request not found', {type:'error'}); return; }
+  sow.approval_status = 'completed';
+  sow.completed_at = new Date().toISOString();
+  sow.completed_by = window.currentUserName || _realRoleForPermissions();
+  upsertSowInList(_sowUnitId, sow);
+  auditEntry('SOW:'+_sowUnitId, 'sow_completed', 'SOW '+pn+' marked Completed', _realRoleForPermissions());
+  // If this completion drained the last active SOW on the unit, revert the
+  // unit's status back to whatever it was before the renovation kicked in.
+  try {
+    var _allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+    var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
+    if(_u && typeof hasActiveSows === 'function' && !hasActiveSows(_sowUnitId)
+       && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(_u)){
+      saveUnitWithDraftFallback(_u);
+      auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' \u2192 '+(_u.status||'updated')+' (SOW '+pn+' completed, no active SOWs remain)', _realRoleForPermissions());
+    }
+  } catch(e){ console.warn('[SOW] complete-revert threw:', e); }
+  // Note typed in the completion dialog goes straight to the tenant file.
+  if(note && tenantName && typeof sbSaveTenantNote === 'function'){
+    try { sbSaveTenantNote(tenantName, note, { context: 'sow_complete', prefix: '[Work order ' + pn + ']' }); }
+    catch(e){ console.warn('[SOW] completion note save threw:', e); }
+  }
+  showToast('\u2713 Request ' + pn + ' marked Completed' + (note ? ' \u2014 note saved to the tenant file' : ''), {type:'info'});
+  // Done means DONE: close the request form and land back on the list.
+  if(typeof closeSowModal === 'function') closeSowModal();
+  // Re-render the surfaces that filter completed requests — the reno-approvals
+  // table ("Hide completed" only applies at render time) and the worklist.
+  if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
+  if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+  if(typeof udpRenderSowTable === 'function' && _sowUnitId && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(_sowUnitId);
 }
 
 function reopenSow(){
@@ -2441,9 +2523,9 @@ async function sowSaveClicked() {
   var mode = (btn && btn.dataset) ? btn.dataset.mode : 'draft';
   // "Save Changes" on an already-created request: plain save, no confusing
   // Submit dialog. data-mode stays 'submit' so saveSOW preserves approval_status.
-  // keepOpen — the user is editing an existing request, so leave the form open
-  // and just toast a confirmation instead of closing + navigating away.
-  if (btn && btn.dataset && btn.dataset.existing === '1') { saveSOW({keepOpen:true}); return; }
+  // NOT keepOpen — the form closes and the user lands back on the list they
+  // came from (renovations approvals / worklist), per staff feedback.
+  if (btn && btn.dataset && btn.dataset.existing === '1') { saveSOW(); return; }
   // "Save Draft" on a new/draft request: also stay open (still authoring).
   if (mode !== 'submit') { saveSOW({keepOpen:true}); return; }
 
