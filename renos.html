@@ -1377,6 +1377,10 @@ function _getRaApprovalStatusForSow(u, sow) {
   // Derive in-progress from the SOW's progress mirror (saveRenoProgress writes here).
   var pct = (sow.progress && typeof sow.progress.percent === 'number') ? sow.progress.percent : 0;
   if(pct >= 100) return {key:'complete',    label:'Complete',     bg:'#f0fdf4', c:'#15803d'};
+  // On Hold (progress report) overrides In Progress — one pill, not a stack.
+  // key 'in_progress' is kept so the kanban lane mapping is unchanged.
+  if(_raOnHold({prog: (window._renoProgress||{})[u.id], sow: sow}))
+    return {key:'in_progress', label:'\u23F8 On Hold', bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', onHold:true};
   if(pct > 0)    return {key:'in_progress', label:'In Progress',  bg:'#fffbeb', c:'#92400e'};
   // SOW-level approval flags (new).
   // System Approved: auto-approved by the tendering workflow (RFQ award), not a person.
@@ -1613,7 +1617,7 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 10px;word-break:break-word;">'+pnCell+'</td>'
       +'<td style="padding:10px 10px;white-space:nowrap;"><span style="font-size:14px;font-weight:800;color:var(--text);">'+rs.score+'</span> <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:'+tier.bg+';color:'+tier.c+';">'+tier.l+'</span></td>'
       +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div class="txt-info-bold" style="font-size:9px;">ED auth</div>':'')+'</td>'
-      +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span>'+(_raOnHold(r)?'<div style="margin-top:4px;">'+_raOnHoldBadge()+'</div>':'')+'</td>'
+      +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);word-break:break-word;max-width:160px;">'+((typeof sowContractorLabel==='function'&&sowContractorLabel(sow))?escapeHtml(sowContractorLabel(sow)):'—')+'</td>'
       +'<td style="padding:10px 10px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(_raOnHold(r)?'var(--warn-amber-text)':(pct>=100?'var(--success)':'var(--yellow)'))+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+pct+'%'+(_raOnHold(r)?' \u23F8':'')+'</span></div></td>'
       +'<td style="padding:10px 10px;">'+payCell+'</td>'
@@ -1690,7 +1694,6 @@ function _raCardTileFor(r, role, hmLimit) {
   var locked = sow && sow.approval_status === 'completed';
   var badges = ['<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+rs.score+' · '+tier.l+'</span>'];
   if (u.status==='condemned') badges.push('<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>');
-  if (_raOnHold(r)) badges.push(_raOnHoldBadge());
   var actions = [];
   if (sow && !locked) {
     if (APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
