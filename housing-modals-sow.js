@@ -2001,6 +2001,12 @@ function markSowComplete(){
     } catch(e){ console.warn('[SOW] complete-revert threw:', e); }
     showToast('✓ Request marked Completed', {type:'info'});
     _applySowModalLock(sow);
+    // Re-render the surfaces that filter completed requests — without this
+    // the reno-approvals table kept showing the row despite "Hide completed"
+    // (the filter only applies at render time), and the worklist kept its
+    // approval entry.
+    if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
+    if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
     // Optional completion note on the tenant file (outcome / follow-up).
     try {
       var _cu = (typeof housingUnits !== 'undefined' ? housingUnits : []).find(function(x){ return x.id === _sowUnitId; });

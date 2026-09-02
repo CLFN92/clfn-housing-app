@@ -44,6 +44,20 @@ function unitHasCompletedSow(unitId){
   return getUnitSowList(unitId).some(isSowCompleted);
 }
 
+// Display label for who's doing the work: the contractor's name, or the
+// nation's own crew for in-house assignments — those store assignedTeam
+// 'in_house' (+ assignedToName) and leave sow.contractor empty, which made
+// the Renovations lists show "(none)" for housing-department work orders.
+function sowContractorLabel(sow){
+  if(!sow) return '';
+  if(sow.assignedTeam === 'in_house'){
+    var nc = (typeof NATION_CONFIG !== 'undefined' && NATION_CONFIG) || {};
+    var base = (nc.short || 'Housing') + ' Housing';
+    return sow.assignedToName ? base + ' — ' + sow.assignedToName : base;
+  }
+  return sow.contractor || '';
+}
+
 // ── SOW lock / permission helpers ─────────────────────────────────────────
 // A SOW becomes immutable once its approval_status is 'completed'.
 // Only the ED can edit/reopen completed SOWs.

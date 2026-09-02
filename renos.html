@@ -1452,7 +1452,7 @@ function renderRenoApprovalsView() {
     priority:      { label: 'Priority',        accessor: function(r){ return r.rs && r.rs.score || 0; } },
     cost:          { label: 'Request Value',   accessor: function(r){ return r.cost || 0; } },
     approval:      { label: 'Approval Status', accessor: function(r){ return (r.appr && r.appr.label) || '(none)'; } },
-    contractor:    { label: 'Contractor',      accessor: function(r){ return (r.sow && r.sow.contractor) || '(none)'; } },
+    contractor:    { label: 'Contractor',      accessor: function(r){ return (typeof sowContractorLabel === 'function' ? sowContractorLabel(r.sow) : (r.sow && r.sow.contractor)) || '(none)'; } },
     progress:      { label: 'Progress',        accessor: function(r){ return (r.prog && r.prog.overallPct) || 0; } },
     payments:      { label: 'Payments',        accessor: function(r){ var pi = (typeof sowPaymentInfo==='function') ? sowPaymentInfo(r.sow) : {hasPo:false,percent:0}; return pi.hasPo ? pi.percent : -1; } }
   };
@@ -1586,7 +1586,7 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 10px;white-space:nowrap;"><span style="font-size:14px;font-weight:800;color:var(--text);">'+rs.score+'</span> <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:'+tier.bg+';color:'+tier.c+';">'+tier.l+'</span></td>'
       +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div class="txt-info-bold" style="font-size:9px;">ED auth</div>':'')+'</td>'
       +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);word-break:break-word;max-width:160px;">'+(sow&&sow.contractor?escapeHtml(sow.contractor):'—')+'</td>'
+      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);word-break:break-word;max-width:160px;">'+((typeof sowContractorLabel==='function'&&sowContractorLabel(sow))?escapeHtml(sowContractorLabel(sow)):'—')+'</td>'
       +'<td style="padding:10px 10px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+pct+'%</span></div></td>'
       +'<td style="padding:10px 10px;">'+payCell+'</td>'
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
@@ -1681,7 +1681,7 @@ function _raCardTileFor(r, role, hmLimit) {
     metas: [
       {k:'Project #',     v: pnShort || '—'},
       {k:'Request Value', v: costStr + (r.cost>hmLimit && r.cost>0 ? ' · ED auth' : '')},
-      {k:'Contractor',    v: esc((sow&&sow.contractor) || '—')},
+      {k:'Contractor',    v: esc((typeof sowContractorLabel==='function'?sowContractorLabel(sow):(sow&&sow.contractor)) || '—')},
       {k:'Progress',      v: pct+'%'}
     ],
     open: "openSowModal('"+uid+"',"+projArg+")",
@@ -1951,7 +1951,7 @@ function exportRenoApprovalsCSV() {
         sow.project_number||'',
         rs.score, tier, cost||'',
         cost>hmLimit?'Yes':'No', appr.label,
-        sow.contractor||'', pct
+        (typeof sowContractorLabel==='function'?sowContractorLabel(sow):sow.contractor)||'', pct
       ].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(','));
     });
   });
@@ -1993,7 +1993,7 @@ function exportRenoApprovalsPDF() {
     priority:      function(r){ return r.rs && r.rs.score || 0; },
     cost:          function(r){ return r.cost || 0; },
     approval:      function(r){ return (r.appr && r.appr.label) || '(none)'; },
-    contractor:    function(r){ return (r.sow && r.sow.contractor) || '(none)'; },
+    contractor:    function(r){ return (typeof sowContractorLabel === 'function' ? sowContractorLabel(r.sow) : (r.sow && r.sow.contractor)) || '(none)'; },
     progress:      function(r){ return r.pct || 0; }
   };
   // Pre-sort by priority desc so unsorted exports keep the default ordering.
@@ -2017,7 +2017,7 @@ function exportRenoApprovalsPDF() {
       +'<td style="padding:7px 8px;font-size:10px;font-weight:700;color:'+appr.c+';">'+appr.label+'</td>'
       +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+hmDecStr+'</td>'
       +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+edDecStr+'</td>'
-      +'<td style="padding:7px 8px;font-size:11px;color:var(--muted);">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
+      +'<td style="padding:7px 8px;font-size:11px;color:var(--muted);">'+((typeof sowContractorLabel==='function'&&sowContractorLabel(sow))?escapeHtml(sowContractorLabel(sow)):'—')+'</td>'
       +'<td style="padding:7px 8px;font-size:11px;text-align:center;">'+r.pct+'%</td>'
       +'</tr>';
   }).join('');
