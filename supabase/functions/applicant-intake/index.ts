@@ -99,6 +99,47 @@ async function notifySubmission(admin: any, row: any, applicantEmail: string, ap
   }
 }
 
+// --- Member portal: resolve the signed-in member's UNIT -------------------
+// Email-matched tenants row first (the tenant file), then a linked
+// application's assigned unit. Server-side only: the portal never supplies a
+// unit id, so a member can only ever file against their own home.
+async function resolveMemberUnit(admin: any, email: string, linkedAppIds: string[]): Promise<{ id: string; address: string } | null> {
+  try {
+    let unitId: string | null = null
+    const { data: ts } = await admin.from('tenants')
+      .select('current_unit_id').ilike('email', email).is('merged_into', null)
+      .not('current_unit_id', 'is', null).limit(1)
+    if (ts && ts[0] && ts[0].current_unit_id) unitId = ts[0].current_unit_id
+    if (!unitId && linkedAppIds && linkedAppIds.length) {
+      const { data: apps } = await admin.from('housing_applications')
+        .select('assigned_unit_id').in('id', linkedAppIds).not('assigned_unit_id', 'is', null).limit(1)
+      if (apps && apps[0] && apps[0].assigned_unit_id) unitId = apps[0].assigned_unit_id
+    }
+    if (!unitId) return null
+    const { data: us } = await admin.from('housing_units').select('id, num, street').eq('id', unitId).limit(1)
+    if (!us || !us[0]) return null
+    return { id: us[0].id, address: (String(us[0].num || '') + ' ' + String(us[0].street || '')).trim() }
+  } catch (_e) { return null }
+}
+
+// Staff notification for a portal-submitted maintenance request -- mirrors
+// the QR flow's (tenant-mr) email so both arrive the same way.
+async function notifyPortalMr(admin: any, info: { address: string; category: string; description: string; urgency: string; contactName: string; email: string }): Promise<void> {
+  if (!emailConfigured()) return
+  const recipients = await resolveHousingRecipients(admin)
+  if (!recipients.length) return
+  const urg = (info.urgency || 'routine').toLowerCase()
+  const subject = (urg === 'emergency' ? 'EMERGENCY ' : urg === 'urgent' ? 'Urgent ' : '')
+    + 'maintenance request - ' + (info.address || 'a unit')
+  const inner = '<p style="font-size:14px;color:#333;margin:0 0 6px;">A maintenance request was submitted through the member portal for <b>' + escapeHtml(info.address) + '</b>.</p>'
+    + (info.category ? '<p style="font-size:13px;color:#333;margin:0 0 4px;"><b>Category:</b> ' + escapeHtml(info.category) + '</p>' : '')
+    + '<p style="font-size:13px;color:#333;margin:0 0 4px;"><b>Urgency:</b> ' + escapeHtml(info.urgency) + '</p>'
+    + '<p style="font-size:13px;color:#333;margin:6px 0 4px;white-space:pre-wrap;">' + escapeHtml(String(info.description || '').slice(0, 2000)) + '</p>'
+    + '<p style="font-size:12px;color:#666;margin:10px 0 0;">Submitted by ' + escapeHtml(info.contactName || info.email) + ' (' + escapeHtml(info.email) + '). Review it in the Housing app under <b>Tenant Requests</b>.</p>'
+  const html = renderBrandedEmail(subject, inner)
+  await sendEmailSerially(recipients, () => ({ subject, html }))
+}
+
 // Nation band-number verification (opt-in via Settings -> Config in the staff
 // app). housing_settings key 'nation_band_number' holds the nation's 3-digit
 // band membership number. When set, a self-serve applicant's band (registry)
@@ -357,7 +398,10 @@ serve(async (req) => {
       // would hand a spoofer the exact format to fabricate; the prefix match
       // is enforced only server-side at submit, with a generic error.
       const bandPrefix = await nationBandPrefix(admin)
-      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [], band_required: !!bandPrefix })
+      // Member portal: the signed-in member's unit (if any) powers the
+      // "My Home" card + maintenance-request form on the dashboard.
+      const memberUnit = await resolveMemberUnit(admin, email, ((prof && prof[0] && prof[0].linked_app_ids) || []))
+      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [], band_required: !!bandPrefix, unit: memberUnit })
     }
 
     // --- save_draft: create or update the applicant's OWN draft ---
@@ -459,6 +503,48 @@ serve(async (req) => {
       }
       await admin.from('application_submissions')
         .update({ status: 'withdrawn', updated_at: new Date().toISOString() }).eq('id', subId)
+      return json({ ok: true })
+    }
+
+    // --- report_mr: authenticated member files a maintenance request against
+    // THEIR OWN unit (resolved server-side; the client sends no unit id).
+    // Writes the same staging queue as the QR flow (tenant_mr_submissions),
+    // same rate limit + staff notification, tagged with the member's email. ---
+    if (action === 'report_mr') {
+      const { data: pr2 } = await admin.from('applicant_profiles').select('linked_app_ids').eq('uid', uid).limit(1)
+      const linked2: string[] = (pr2 && pr2[0] && pr2[0].linked_app_ids) || []
+      const unit = await resolveMemberUnit(admin, email, linked2)
+      if (!unit) return json({ error: 'No unit is linked to your account yet. Contact the Housing office to have your home added to your file.' }, 400)
+      const description = String(body.description || '').trim().slice(0, 4000)
+      if (!description) return json({ error: 'Please describe the problem.' }, 400)
+      const category = String(body.category || '').trim().slice(0, 80)
+      const URG2 = ['routine', 'urgent', 'emergency']
+      const urgency = URG2.indexOf(String(body.urgency || '')) !== -1 ? String(body.urgency) : 'routine'
+      const contactName = String(body.contact_name || '').trim().slice(0, 120)
+      const contactPhone = String(body.contact_phone || '').trim().slice(0, 40)
+      const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+      const sinceIso = new Date(Date.now() - 10 * 60000).toISOString()
+      const { count: mrCount } = await admin.from('tenant_mr_submissions')
+        .select('id', { count: 'exact', head: true }).eq('unit_id', unit.id).gte('created_at', sinceIso)
+      if ((mrCount || 0) >= 3) {
+        return json({ error: 'A few requests were just submitted for this unit. Please try again in a little while.' }, 429)
+      }
+      const { data: mrIns, error: mrErr } = await admin.from('tenant_mr_submissions').insert({
+        unit_id: unit.id, unit_address: unit.address, category, description, urgency,
+        contact_name: contactName, contact_phone: contactPhone, status: 'new', source_ip: ip,
+      }).select('id').limit(1)
+      if (mrErr) return json({ error: 'Could not save your request. Please try again.' }, 500)
+      // Contact email = the verified sign-in address (best-effort column, may
+      // not exist pre-migration -- mirrors the QR flow's own handling).
+      try { if (mrIns && mrIns[0]) await admin.from('tenant_mr_submissions').update({ contact_email: email }).eq('id', mrIns[0].id) } catch (_e) { /* optional column */ }
+      try { await notifyPortalMr(admin, { address: unit.address, category, description, urgency, contactName, email }) } catch (_e) { /* best-effort */ }
+      try {
+        await admin.from('housing_audit_log').insert({
+          entity_type: 'unit', entity_id: unit.id, action: 'tenant_mr_submitted',
+          detail: 'Maintenance request submitted via member portal - ' + unit.address + (category ? ' (' + category + ')' : ''),
+          actor: email,
+        })
+      } catch (_e) { /* audit best-effort */ }
       return json({ ok: true })
     }
 

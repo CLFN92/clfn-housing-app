@@ -12,7 +12,11 @@
   var AUTH = SBASE ? SBASE + '/auth/v1' : '';
   var FN   = SBASE ? SBASE + '/functions/v1/applicant-intake' : '';
   var BUCKET = window.STORAGE_BUCKET || 'housing-files';
-  var REDIRECT = location.origin + location.pathname;   // where the magic link returns
+  // Magic links always return to apply.html -- the address in the Supabase
+  // Redirect URLs allowlist. portal.html serves this same app; apply.html
+  // forwards to it preserving the token hash, so links keep working from
+  // either door without any dashboard changes.
+  var REDIRECT = location.origin + '/apply.html';
 
   var LS_AT = 'clfn_apply_at', LS_RT = 'clfn_apply_rt';
   var app = document.getElementById('app');
@@ -290,12 +294,71 @@
       actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Start an application</button>';
     }
 
+    // "My Home" -- shown only when the server resolved a unit for this
+    // member (tenant record email match, or a linked application's unit).
+    window._portalUnit = (res.data && res.data.unit) || null;
+    var homeHtml = window._portalUnit
+      ? '<div class="card"><h3>My home</h3>'
+        + '<p class="sub" style="margin:4px 0 12px;">' + esc(window._portalUnit.address || 'Your unit') + '</p>'
+        + '<button class="btn" type="button" style="margin-top:0;" onclick="mrStart()">\uD83D\uDD27 Report a maintenance problem</button>'
+        + '</div>'
+      : '';
+
     app.innerHTML =
       '<h1>Welcome' + (name ? ', ' + esc(name.split(' ')[0]) : '') + '</h1>'
       + '<p class="sub">Signed in as ' + esc(email) + '</p>'
+      + homeHtml
       + '<div class="card"><h3>Your applications</h3>' + listHtml + '</div>'
       + '<div class="card"><h3>' + cardTitle + '</h3>' + cardHint + actionHtml + '</div>';
   }
+
+  // -- Maintenance request (member portal) ------------------------------------
+  // Same categories + staging queue as the QR flow; the unit is resolved
+  // SERVER-side from the signed-in member, so no unit is ever picked here.
+  var MR_CATS = ['Plumbing', 'Heating / Furnace', 'Electrical', 'Appliance', 'Doors / Windows / Locks', 'Structural', 'Water / Leak', 'Pests', 'Other'];
+  window.mrStart = function () {
+    var u = window._portalUnit;
+    if (!u) { showDashboard(); return; }
+    app.innerHTML =
+      '<h1>Report a maintenance problem</h1>'
+      + '<p class="sub">For <b>' + esc(u.address || 'your unit') + '</b>. The Housing office will review your request.</p>'
+      + '<label>What is the problem with? *</label>'
+      + '<select id="mr_cat"><option value="">Select a category\u2026</option>'
+      +   MR_CATS.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select>'
+      + '<label>How urgent is it?</label>'
+      + '<select id="mr_urg"><option value="routine">Routine \u2014 can wait for a scheduled visit</option>'
+      +   '<option value="urgent">Urgent \u2014 needs attention soon</option>'
+      +   '<option value="emergency">Emergency \u2014 health or safety risk right now</option></select>'
+      + '<label>Describe the problem *</label>'
+      + '<textarea id="mr_desc" placeholder="e.g. The kitchen sink is leaking under the cabinet and the floor is getting wet."></textarea>'
+      + '<label>Phone (optional \u2014 so we can reach you)</label>'
+      + '<input id="mr_phone" type="tel" autocomplete="tel"/>'
+      + '<div class="msg" id="mr_msg"></div>'
+      + '<button class="btn" type="button" id="mr_send" onclick="mrSubmit()">Send to the Housing office</button>'
+      + '<button class="btn ghost" type="button" onclick="showDashboardPublic()">Cancel</button>';
+  };
+  window.mrSubmit = async function () {
+    var cat = ((document.getElementById('mr_cat') || {}).value || '').trim();
+    var desc = ((document.getElementById('mr_desc') || {}).value || '').trim();
+    var urg = ((document.getElementById('mr_urg') || {}).value || 'routine');
+    var phone = ((document.getElementById('mr_phone') || {}).value || '').trim();
+    var msg = document.getElementById('mr_msg');
+    var setErr = function (t) { if (msg) { msg.className = 'msg err'; msg.textContent = t; } };
+    if (!cat || !desc) { setErr('Please choose a category and describe the problem.'); return; }
+    var btn = document.getElementById('mr_send');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending\u2026'; }
+    var res = await api('report_mr', { category: cat, description: desc, urgency: urg, contact_phone: phone });
+    if (res.ok && res.data && res.data.ok) {
+      app.innerHTML = '<div class="center"><div class="check">\u2713</div><h1>Request sent</h1>'
+        + '<p class="sub">The Housing office has received your maintenance request'
+        + (urg === 'emergency' ? ' and it is flagged as an emergency. If there is immediate danger, also phone the Housing office directly.' : ' and will follow up.')
+        + '</p>'
+        + '<button class="btn" type="button" onclick="showDashboardPublic()">Back to my portal</button></div>';
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send to the Housing office'; }
+      setErr((res.data && res.data.error) || 'Could not send the request. Please try again.');
+    }
+  };
 
   // ── Application-type chooser ────────────────────────────────────────────────
   // Mirrors the staff wizard's Application Type card: the member picks what

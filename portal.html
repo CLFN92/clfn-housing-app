@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Housing Member Portal</title>
+<style>
+  :root{
+    --accent:#f8e41a; --ink:#1b1a17; --muted:#6c6a62; --hair:#e5e3db;
+    --bg:#f6f5f1; --surface:#ffffff; --danger:#b91c1c; --ok:#15803d;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;
+    -webkit-text-size-adjust:100%;padding:0 0 40px}
+  .bar{background:var(--ink);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px}
+  .bar .logo{width:30px;height:30px;border-radius:7px;background:var(--accent);color:#111;
+    display:grid;place-items:center;font-weight:800;font-size:15px;flex-shrink:0}
+  .bar b{font-size:15px;font-weight:700}
+  .bar span{font-size:11px;opacity:.7;display:block;font-weight:500}
+  .bar .out{margin-left:auto;background:none;border:1px solid rgba(255,255,255,.3);color:#fff;
+    border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
+  .wrap{max-width:560px;margin:0 auto;padding:18px}
+  h1{font-size:20px;margin:6px 0 2px;font-weight:800}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+  label{display:block;font-size:12px;font-weight:700;color:var(--ink);margin:14px 0 5px}
+  input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--hair);border-radius:9px;
+    font-size:16px;font-family:inherit;background:var(--surface);color:var(--ink)}
+  textarea{min-height:70px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(248,228,26,.35)}
+  h4{margin:16px 0 2px;font-size:14px;font-weight:800}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:480px){.grid2{grid-template-columns:1fr}}
+  .check{width:64px;height:64px;border-radius:50%;background:#dcfce7;color:var(--ok);
+    display:grid;place-items:center;font-size:34px;margin:0 auto 16px}
+  .btn{width:100%;margin-top:20px;padding:15px;border:none;border-radius:11px;background:var(--accent);
+    color:#111;font-size:16px;font-weight:800;font-family:inherit;cursor:pointer}
+  .btn:disabled{opacity:.55;cursor:default}
+  .btn.ghost{background:transparent;border:1px solid var(--hair);color:var(--ink)}
+  .msg{margin-top:14px;padding:11px 14px;border-radius:9px;font-size:13px;display:none}
+  .msg.err{background:#fef2f2;border:1px solid #fecaca;color:var(--danger);display:block}
+  .msg.ok{background:#dcfce7;border:1px solid #bbf7d0;color:var(--ok);display:block}
+  .card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:16px 18px;margin-top:14px}
+  .card h3{margin:0 0 4px;font-size:15px}
+  .sublist{list-style:none;margin:8px 0 0;padding:0}
+  .sublist li{border:1px solid var(--hair);border-radius:9px;padding:11px 13px;margin-bottom:8px;font-size:14px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .pill{font-size:11px;font-weight:800;border-radius:999px;padding:3px 10px;text-transform:uppercase;letter-spacing:.4px}
+  .pill.draft{background:#f3f4f6;color:#555} .pill.submitted{background:#fef9c3;color:#854d0e}
+  .pill.approved{background:#dcfce7;color:#166534} .pill.rejected{background:#fee2e2;color:#991b1b}
+  .pill.changes_requested{background:#ffedd5;color:#9a3412} .pill.in_review{background:#e0f2fe;color:#075985}
+  .pill.withdrawn{background:#f3f4f6;color:#888}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:8px 0}
+  .foot{color:var(--muted);font-size:11px;text-align:center;margin-top:26px}
+  .center{text-align:center;padding:34px 18px}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="logo" id="nlogo">H</div>
+    <div><b id="nname">Housing</b><span>Member portal</span></div>
+    <button class="out" id="btn_out" style="display:none;" onclick="applyLogout()">Sign out</button>
+  </div>
+  <div class="wrap" id="app">
+    <div class="center"><p class="sub">Loading&hellip;</p></div>
+  </div>
+  <script src="shared-config.js"></script>
+  <script src="apply.js"></script>
+</body>
+</html>
