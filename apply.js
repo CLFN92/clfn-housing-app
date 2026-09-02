@@ -410,12 +410,13 @@
     _mrq = { items: [], cur: {}, photos: [], urgency: 'routine', notes: '', phone: '' };
     _mrStepCat();
   };
-  function _mrHeader(title, subtitle) {
-    return '<h1>' + title + '</h1><p class="sub">' + subtitle + '</p>';
+  function _mrHeader(title, subtitle, backJs) {
+    return (backJs ? '<button type="button" class="backlink" onclick="' + backJs + '">&larr; Back</button>' : '')
+      + '<h1>' + title + '</h1><p class="sub">' + subtitle + '</p>';
   }
   function _mrStepCat() {
     _mrq.cur = {};
-    app.innerHTML = _mrHeader('What is the problem with?', 'For <b>' + esc((window._portalUnit || {}).address || 'your unit') + '</b>. Pick the closest match.')
+    app.innerHTML = _mrHeader('What is the problem with?', 'For <b>' + esc((window._portalUnit || {}).address || 'your unit') + '</b>. Pick the closest match.', _mrq.items.length ? 'window._mrReview()' : 'showDashboardPublic()')
       + MRQ.TRADES.map(function (t, i) {
           return '<button type="button" class="choice" onclick="_mrPickCat(' + i + ')">' + esc((t.icon ? t.icon + ' ' : '') + t.cat) + '</button>';
         }).join('')
@@ -424,7 +425,7 @@
   window._mrPickCat = function (i) {
     var t = MRQ.TRADES[i]; if (!t) return;
     _mrq.cur = { cat: t.cat, tradeIdx: i };
-    app.innerHTML = _mrHeader('Where is it?', 'Which room or area?') + _mrCrumb()
+    app.innerHTML = _mrHeader('Where is it?', 'Which room or area?', '_mrStepCatBack()') + _mrCrumb()
       + _mrChoices(MRQ.ROOMS, '_mrPickRoom')
       + '<button class="btn ghost" type="button" onclick="_mrStepCatBack()">&larr; Back</button>';
   };
@@ -432,7 +433,7 @@
   window._mrPickRoom = function (i) {
     _mrq.cur.room = MRQ.ROOMS[i] || '';
     var t = MRQ.TRADES[_mrq.cur.tradeIdx] || { components: [] };
-    app.innerHTML = _mrHeader('What exactly?', 'Pick the closest item.') + _mrCrumb()
+    app.innerHTML = _mrHeader('What exactly?', 'Pick the closest item.', '_mrPickCat(' + _mrq.cur.tradeIdx + ')') + _mrCrumb()
       + t.components.map(function (c, ci) {
           return '<button type="button" class="choice" onclick="_mrPickComp(' + ci + ')">' + esc(c.label) + '</button>';
         }).join('')
@@ -454,7 +455,7 @@
   function _mrIssuesStep() {
     _mrq.cur.issues = _mrq.cur.issues || [];
     var opts = _mrq.cur.issueOpts || [];
-    app.innerHTML = _mrHeader('What is wrong with it?', 'Pick everything that applies, then continue.') + _mrCrumb()
+    app.innerHTML = _mrHeader('What is wrong with it?', 'Pick everything that applies, then continue.', '_mrPickRoom(' + Math.max(0, MRQ.ROOMS.indexOf(_mrq.cur.room)) + ')') + _mrCrumb()
       + opts.map(function (o, i) {
           var on = _mrq.cur.issues.indexOf(o) >= 0;
           return '<button type="button" class="choice' + (on ? ' on' : '') + '" onclick="_mrToggleIssue(' + i + ')">' + (on ? '\u2713 ' : '') + esc(o) + '</button>';
@@ -508,7 +509,7 @@
         + '<span style="color:var(--muted);font-size:13px;">' + esc(it.issues.join('; ')) + '</span></span>'
         + '<button type="button" class="rm-item" onclick="_mrRemoveItem(' + i + ')" style="background:none;border:none;color:var(--danger);font-size:18px;cursor:pointer;">&times;</button></li>';
     }).join('');
-    app.innerHTML = _mrHeader('Your maintenance report', 'For <b>' + esc((window._portalUnit || {}).address || 'your unit') + '</b>. Check it over, add photos, and send.')
+    app.innerHTML = _mrHeader('Your maintenance report', 'For <b>' + esc((window._portalUnit || {}).address || 'your unit') + '</b>. Check it over, add photos, and send.', '_mrReviewBack()')
       + '<ul class="sublist">' + itemsHtml + '</ul>'
       + '<button class="btn ghost" type="button" style="margin-top:4px;" onclick="_mrStepCat()">+ Add another problem</button>'
       + '<label>How urgent is it?</label>'
