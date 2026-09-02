@@ -14,6 +14,7 @@ import {
   emailConfigured, isValidEmail, escapeHtml, renderBrandedEmail, emailBrand,
   sendEmail, sendEmailSerially,
 } from '../_shared/email.ts'
+import { uploadMrPhotos, mrSubject, resolveStaffRecipients } from '../_shared/mr.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -40,46 +41,8 @@ const MR_NOTIFY_ROLES = (Deno.env.get('HOUSING_MR_NOTIFY_ROLES') || 'housing_man
   .split(',').map((r) => r.trim().toLowerCase()).filter(Boolean)
 const MR_NOTIFY_TO    = (Deno.env.get('HOUSING_MR_NOTIFY_TO') || '')
   .split(',').map((s) => s.trim()).filter((s) => isValidEmail(s))
-const MAX_PHOTOS     = 3               // max photos per submission
-const MAX_PHOTO_BYTES = 6 * 1024 * 1024 // per-photo decoded size cap (~6MB)
-const PHOTO_MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
-
-// Decode a data: URL into { bytes, ext, contentType }, or null if unusable.
-function decodePhoto(dataUrl: string): { bytes: Uint8Array; ext: string; contentType: string } | null {
-  if (typeof dataUrl !== 'string') return null
-  const m = dataUrl.match(/^data:([^;,]+);base64,([\s\S]+)$/)
-  if (!m) return null
-  const contentType = m[1].toLowerCase()
-  const ext = PHOTO_MIME[contentType]
-  if (!ext) return null
-  let bin: string
-  try { bin = atob(m[2]) } catch { return null }
-  if (bin.length > MAX_PHOTO_BYTES) return null
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return { bytes, ext, contentType }
-}
-
-// Upload validated photos with the service role. Returns the storage paths that
-// uploaded cleanly; a failed photo is skipped so it can never sink the request.
-async function uploadPhotos(admin: any, unitId: string, submissionId: string, raw: unknown): Promise<string[]> {
-  let list: unknown[] = []
-  if (Array.isArray(raw)) list = raw
-  else if (typeof raw === 'string' && raw) list = [raw]
-  if (!list.length) return []
-  const paths: string[] = []
-  for (let i = 0; i < list.length && paths.length < MAX_PHOTOS; i++) {
-    const dec = decodePhoto(String(list[i] || ''))
-    if (!dec) continue
-    const path = 'tenants/' + unitId + '/tenant-mr/' + submissionId + '/photo-' + (paths.length + 1) + '.' + dec.ext
-    try {
-      const { error } = await admin.storage.from(STORAGE_BUCKET)
-        .upload(path, dec.bytes, { contentType: dec.contentType, upsert: true })
-      if (!error) paths.push(path)
-    } catch (_e) { /* skip this photo, keep the request */ }
-  }
-  return paths
-}
+// Photo decode/upload lives in _shared/mr.ts (shared with the member portal
+// path in applicant-intake -- same caps, mime map, storage path convention).
 
 type MrInfo = {
   address: string; category: string; urgency: string; description: string;
@@ -87,27 +50,10 @@ type MrInfo = {
   photoCount: number; reference: string;
 }
 
-// Resolve the housing recipients (explicit secret list, else active staff in
-// the configured roles). Deduped, lowercased. Never throws.
-async function resolveHousingRecipients(admin: any): Promise<Array<{ to: string; to_name?: string }>> {
-  const seen = new Set<string>()
-  const out: Array<{ to: string; to_name?: string }> = []
-  for (const e of MR_NOTIFY_TO) {
-    const k = e.toLowerCase()
-    if (!seen.has(k)) { seen.add(k); out.push({ to: e }) }
-  }
-  try {
-    const { data } = await admin.from('staff').select('email, name, role, is_active').eq('is_active', true)
-    for (const s of (data || [])) {
-      const role = String(s.role || '').toLowerCase()
-      if (MR_NOTIFY_ROLES.indexOf(role) === -1) continue
-      if (!isValidEmail(s.email)) continue
-      const k = String(s.email).toLowerCase()
-      if (seen.has(k)) continue
-      seen.add(k); out.push({ to: s.email, to_name: s.name || undefined })
-    }
-  } catch (_e) { /* fall back to explicit list only */ }
-  return out
+// Resolve the housing recipients (shared resolver: explicit secret list,
+// else active staff in the configured roles).
+function resolveHousingRecipients(admin: any): Promise<Array<{ to: string; to_name?: string }>> {
+  return resolveStaffRecipients(admin, MR_NOTIFY_ROLES, MR_NOTIFY_TO, isValidEmail)
 }
 
 function mrDetailsBlock(info: MrInfo): string {
@@ -136,9 +82,7 @@ async function notifyMaintenanceRequest(admin: any, info: MrInfo): Promise<void>
   // 1) Housing team.
   const recipients = await resolveHousingRecipients(admin)
   if (recipients.length) {
-    const urg = (info.urgency || 'routine').toLowerCase()
-    const subject = (urg === 'emergency' ? 'EMERGENCY ' : urg === 'urgent' ? 'Urgent ' : '')
-      + 'maintenance request - ' + (info.address || 'a unit')
+    const subject = mrSubject(info.urgency, info.address)
     const link = APP_URL
       ? '<p style="font-size:13px;margin:14px 0 0;"><a href="' + APP_URL + '/housing.html" style="color:#0b6bcb;">Open the Housing app</a> and review it under <b>Tenant Requests</b>.</p>'
       : '<p style="font-size:13px;margin:14px 0 0;color:#666;">Review it in the Housing app under <b>Tenant Requests</b>.</p>'
@@ -248,7 +192,7 @@ serve(async (req) => {
       // A photo failure is non-fatal - the text request is already saved.
       let photoCount = 0
       if (subId && body.photos) {
-        const paths = await uploadPhotos(admin, unitId, subId, body.photos)
+        const paths = await uploadMrPhotos(admin, STORAGE_BUCKET, unitId, subId, body.photos)
         photoCount = paths.length
         if (paths.length) {
           await admin.from('tenant_mr_submissions')

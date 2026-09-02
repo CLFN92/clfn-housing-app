@@ -150,6 +150,30 @@ window.livingSituationLabel = function (key) {
 // OW and ODSP tables are SEPARATE records — initialized identically because
 // the business requirement is to use the supplied OW table for both, but an
 // admin can change either without touching the other.
+// Canonical income types — stable internal values (OW/ODSP feed the
+// shelter-rent model) with a staff label and a friendlier member-portal
+// label. The portal (apply.js), the TIC income CRUD, and future option lists
+// all render from this one list instead of keeping hand-synced copies.
+window.INCOME_TYPES = [
+  { v: 'Employed',        label: 'Employed',        memberLabel: 'Employment' },
+  { v: 'Self-Employment', label: 'Self-Employment', memberLabel: 'Self-employed' },
+  { v: 'OW',              label: 'OW',              memberLabel: 'Ontario Works (OW)' },
+  { v: 'ODSP',            label: 'ODSP',            memberLabel: 'ODSP (Disability)' },
+  { v: 'EI',              label: 'EI',              memberLabel: 'Employment Insurance (EI)' },
+  { v: 'CPP',             label: 'CPP',             memberLabel: 'CPP' },
+  { v: 'Pension',         label: 'Pension',         memberLabel: 'Pension' },
+  { v: 'Other',           label: 'Other',           memberLabel: 'Other (child benefit, support, ...)' },
+  { v: 'No Income',       label: 'No Income',       memberLabel: 'No income' }
+];
+// Legacy label -> canonical value migration map (records saved before the
+// portal/staff forms converged on canonical values). Union of the portal's
+// and the TIC's alias maps — the two had drifted.
+window.INCOME_TYPE_CANON = {
+  'Employment': 'Employed', 'Self-employed': 'Self-Employment',
+  'Employment Insurance': 'EI', 'Disability (ODSP)': 'ODSP',
+  'Social Assistance': 'OW', 'Ontario Works': 'OW', 'Child Benefit': 'Other'
+};
+
 window.RENT_MODEL_DEFAULTS = {
   // "35" means the tenant pays 65% of estimated market rent. The payable
   // percentage is ALWAYS derived from this — never hard-coded.

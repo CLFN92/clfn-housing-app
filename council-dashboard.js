@@ -233,10 +233,16 @@
     types.forEach(function (t) { grid[t] = buckets.map(function () { return 0; }); });
     var noDob = 0, placeholder = 0, counted = 0;
     apps.forEach(function (a) {
-      var raw = String(a.dob || '').slice(0, 10);
-      var d = raw ? new Date(raw + 'T12:00:00') : null;
-      if (!d || isNaN(d.getTime())) { noDob++; return; }
-      var age = Math.floor((Date.now() - d.getTime()) / 31557600000);
+      // Canonical age-from-DOB (policyAgeYears, policy-rules.js) — the local
+      // 365.25-day formula it replaced disagreed by 1 near leap-year edges.
+      var age = null;
+      if (typeof policyAgeYears === 'function') age = policyAgeYears(a.dob);
+      else {
+        var raw = String(a.dob || '').slice(0, 10);
+        var d = raw ? new Date(raw + 'T12:00:00') : null;
+        if (d && !isNaN(d.getTime())) age = Math.floor((Date.now() - d.getTime()) / 31557600000);
+      }
+      if (age == null) { noDob++; return; }
       if (age > 95 || age < 0) { placeholder++; return; }
       var bi = age < 25 ? 0 : age < 35 ? 1 : age < 45 ? 2 : age < 55 ? 3 : age < 65 ? 4 : age < 80 ? 5 : 6;
       var t = _appType(a);

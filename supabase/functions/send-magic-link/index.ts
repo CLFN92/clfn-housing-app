@@ -101,23 +101,30 @@ serve(async (req) => {
                     detail: gen.error ? gen.error.message : 'no action_link' }, 502)
     }
 
-    // Server-side audit for EVERY issued link (email and copy mode alike) -
+    // Server-side audit for every issued link (email and copy mode alike) -
     // written with the service role so a caller hitting the function directly
-    // cannot skip it.
-    try {
-      await admin.from('housing_audit_log').insert({
-        entity_type: 'auth', entity_id: email,
-        action: linkType === 'recovery' ? 'password_reset_issued' : 'magic_link_issued',
-        detail: (linkType === 'recovery' ? 'Password reset link' : 'Magic sign-in link')
-          + ' issued for ' + email + ' (' + (String(body.mode || '') === 'link' ? 'copy mode' : 'emailed') + ')',
-        actor: callerEmail,
-      })
-    } catch (_e) { /* audit is best-effort, never blocks the send */ }
+    // cannot skip it. The password_reset_issued rows double as the shared
+    // reset throttle, so the EMAIL path writes its row only AFTER the send
+    // succeeds (a failed provider call must not consume the budget - same
+    // rule as request-password-reset); copy mode audits immediately because
+    // handing the link out IS the issuance.
+    const writeIssueAudit = async (mode: string) => {
+      try {
+        await admin.from('housing_audit_log').insert({
+          entity_type: 'auth', entity_id: email,
+          action: linkType === 'recovery' ? 'password_reset_issued' : 'magic_link_issued',
+          detail: (linkType === 'recovery' ? 'Password reset link' : 'Magic sign-in link')
+            + ' issued for ' + email + ' (' + mode + ')',
+          actor: callerEmail,
+        })
+      } catch (_e) { /* audit is best-effort, never blocks the send */ }
+    }
 
     // --- Copy mode: hand the link back to the verified admin instead of
     //     emailing it. Same authorization + same target-account gates as the
     //     email path; the caller pastes it into their own email/message. ---
     if (String(body.mode || '') === 'link') {
+      await writeIssueAudit('copy mode')
       return json({ ok: true, link: actionLink, expiry: fmtDate(t.access_expires_at) })
     }
 
@@ -166,6 +173,7 @@ serve(async (req) => {
     if (!sendRes.ok) {
       return json({ error: 'Link generated but the email failed to send.', detail: (sendData as any).error || '' }, 502)
     }
+    await writeIssueAudit('emailed')
     return json({ ok: true })
   } catch (err) {
     return json({ error: (err as Error).message }, 500)

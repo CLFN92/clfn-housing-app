@@ -67,6 +67,16 @@ function _bcrIneligibleBadge(a) {
   return '<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 7px;border-radius:4px;white-space:nowrap;">🚫 Ineligible — BCR list</span>';
 }
 
+// Amber good-standing badge (Policy 8.5/12.5): arrears with no approved
+// repayment arrangement. Like the BCR badge the applicant stays VISIBLE on
+// Match — the block itself fires at the assignment actions
+// (appAssignabilityStatus with forAssignment), never as silent exclusion.
+function _arrearsWarnBadge(a) {
+  var msg = (typeof appArrearsWarning === 'function') ? appArrearsWarning(a) : null;
+  if (!msg) return '';
+  return '<span title="' + escapeHtml(msg) + '" style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber);padding:1px 7px;border-radius:4px;white-space:nowrap;">💰 Arrears — arrangement required</span>';
+}
+
 function _assignmentTypeBadge(u) {
   if (!u || !u.assignmentType) return '';
   if (u.assignmentType === 'temporary') return '<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 5px;border-radius:6px;">TEMPORARY</span>';
@@ -799,6 +809,7 @@ function renderMatchView(){
         +(isTransfer?'<div style="margin-top:4px;"><span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez'+(curAddr?' · '+curAddr:'')+'</span> <span style="font-size:10px;color:var(--muted);font-weight:600;">transfer</span></div>':'')
         +(!isTransfer && _livingSituationBadge(app) ? '<div style="margin-top:4px;">'+_livingSituationBadge(app)+'</div>' : '')
         +(_bcrIneligibleBadge(app) ? '<div style="margin-top:4px;">'+_bcrIneligibleBadge(app)+'</div>' : '')
+        +(_arrearsWarnBadge(app) ? '<div style="margin-top:4px;">'+_arrearsWarnBadge(app)+'</div>' : '')
       +'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:18px;font-weight:800;color:'+tCol+';">'+(app.score||0)+'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:11px;font-weight:700;color:'+tCol+';">'+tier+'</td>'
@@ -843,6 +854,7 @@ function renderMatchView(){
     if (isTransfer) badges.push('<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez'+(curAddr?' · '+curAddr:'')+'</span>');
     if (!isTransfer && _livingSituationBadge(app)) badges.push(_livingSituationBadge(app));
     if (_bcrIneligibleBadge(app)) badges.push(_bcrIneligibleBadge(app));
+    if (_arrearsWarnBadge(app)) badges.push(_arrearsWarnBadge(app));
     var metas = [
       {k:'Score',     v: app.score||0},
       {k:'Reserve',   v: app.reserve||''},
@@ -1785,7 +1797,7 @@ function showHousingKpiDrilldown(type) {
     '<div class="modal" style="max-width:860px;width:96%;">'
     + '<div class="modal-hdr modal-hdr-stack">'
     +   '<div><h2>' + title + '</h2>'
-    +   (exportRows && exportRows.length ? '<div style="font-size:11px;opacity:.7;margin-top:2px;">' + exportRows.length + ' record' + (exportRows.length===1?'':'s') + '</div>' : '')
+    +   (exportRows && exportRows.length ? '<div class="modal-hdr-sub">' + exportRows.length + ' record' + (exportRows.length===1?'':'s') + '</div>' : '')
     +   '</div>'
     +   '<div class="flex-gap8 flex-wrap" style="align-items:center;">'
     +     '<button class="btn btn-ghost-dark" onclick="_kpiDrillPrint()">&#128438; Print</button>'
@@ -1898,10 +1910,10 @@ function showLikelyHousedReport(){
       + '<td>'+esc(STATUS_LBL(a))+'</td>'
       + '<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
       + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'transfer_request\')">&rarr; Transfer</button>'
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'existing_tenant\')">&rarr; File Update</button>'
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" title="They live at this address but it is not their own home — unlink the unit, keep this a New Application, and return them to the waitlist" onclick="_lhMarkNotHoused(\''+sid+'\')">&#128101; Doubled up &mdash; not housed</button>'
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeLikelyHoused();window._appFormReturnDrill=\'likely_housed\';if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+      +   '<button class="btn btn-ghost btn-xs" onclick="_reclassifyApp(\''+sid+'\',\'transfer_request\')">&rarr; Transfer</button>'
+      +   '<button class="btn btn-ghost btn-xs" onclick="_reclassifyApp(\''+sid+'\',\'existing_tenant\')">&rarr; File Update</button>'
+      +   '<button class="btn btn-ghost btn-xs" title="They live at this address but it is not their own home — unlink the unit, keep this a New Application, and return them to the waitlist" onclick="_lhMarkNotHoused(\''+sid+'\')">&#128101; Doubled up &mdash; not housed</button>'
+      +   '<button class="btn btn-ghost btn-xs" onclick="_closeLikelyHoused();window._appFormReturnDrill=\'likely_housed\';if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
       + '</div></td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No new applications match an existing tenancy — your New Applications count looks clean.</td></tr>';
@@ -2174,7 +2186,7 @@ function showReconcileReport(){
           var types = p.apps.map(function(a){ return (a.appType||'new_housing').replace('_',' '); }).join(', ');
           var ids = p.apps.map(function(a){ return a.id; }).join(',');
           return '<tr><td style="font-weight:600;">'+esc(p.name)+'</td><td class="std-cell-right" style="font-weight:700;">'+p.apps.length+'</td><td class="std-cell-muted">'+esc(types)+'</td>'
-            + '<td><button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" onclick="_reconMergePrompt(\''+esc(ids)+'\')">&#8646; Merge</button></td></tr>';
+            + '<td><button class="btn btn-ghost btn-xs" onclick="_reconMergePrompt(\''+esc(ids)+'\')">&#8646; Merge</button></td></tr>';
         }).join('')
       + '</tbody></table>' + (R.dupPeople.length>80 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 80 of '+R.dupPeople.length+'. Export for the full list.</div>' : '')
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">No applicant has more than one active application.</div>';
@@ -2184,7 +2196,7 @@ function showReconcileReport(){
       + R.stale.map(function(s){
           var a=s.app; var sid=(a.id||'').replace(/'/g,"\\'");
           return '<tr><td style="font-weight:600;">'+esc((a.fn||'')+' '+(a.ln||''))+'</td><td class="std-cell-muted">'+esc(s.claimed)+'</td><td class="std-cell-muted">'+esc(s.why)+'</td>'
-            + '<td><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reconClearLink(\''+sid+'\')">Clear link</button></td></tr>';
+            + '<td><button class="btn btn-ghost btn-xs" onclick="_reconClearLink(\''+sid+'\')">Clear link</button></td></tr>';
         }).join('')
       + '</tbody></table>'
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">No stale unit links.</div>';
@@ -2209,8 +2221,8 @@ function showReconcileReport(){
             + '<td>'+lsLbl+'</td>'
             + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
             + (a.livingSituation === 'own_home' ? '' :
-               '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reconMarkDoubledUp(\''+sid+'\')">&#128101; Doubled Up</button>')
-            + '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeReconcile();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+               '<button class="btn btn-ghost btn-xs" onclick="_reconMarkDoubledUp(\''+sid+'\')">&#128101; Doubled Up</button>')
+            + '<button class="btn btn-ghost btn-xs" onclick="_closeReconcile();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
             + '</div></td></tr>';
         }).join('')
       + '</tbody></table>' + (_orN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_orN+'.</div>' : '')
@@ -2232,8 +2244,8 @@ function showReconcileReport(){
             + '<td class="std-cell-muted">'+esc(x.appAddr)+'</td>'
             + '<td style="font-weight:600;">'+esc(x.unitAddr)+'</td>'
             + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
-            + '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reconMergeAddress(\''+sid+'\')">&#8646; Merge &rarr; unit</button>'
-            + '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeReconcile();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+            + '<button class="btn btn-ghost btn-xs" onclick="_reconMergeAddress(\''+sid+'\')">&#8646; Merge &rarr; unit</button>'
+            + '<button class="btn btn-ghost btn-xs" onclick="_closeReconcile();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
             + '</div></td></tr>';
         }).join('')
       + '</tbody></table>' + (_amN>120 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 120 of '+_amN+'.</div>' : '')
@@ -2255,7 +2267,7 @@ function showReconcileReport(){
           return '<tr><td style="font-weight:600;">'+esc(b.full_name||'—')+'</td>'
             + '<td class="std-cell-muted">'+esc(b.reason||'—')+'</td>'
             + '<td class="std-cell-muted">'+esc(b.bcrd_date||'(missing)')+'</td>'
-            + '<td><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" data-bcr-complete="'+esc(b.full_name||'')+'">Complete &rarr;</button></td></tr>';
+            + '<td><button class="btn btn-ghost btn-xs" data-bcr-complete="'+esc(b.full_name||'')+'">Complete &rarr;</button></td></tr>';
         }).join('')
       + '</tbody></table>'
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every BCR entry has its details on file.</div>';
@@ -2307,7 +2319,7 @@ function showReconcileReport(){
     '<div class="modal" style="max-width:960px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
     + '<div class="modal-hdr modal-hdr-stack" style="flex-shrink:0;">'
     +   '<div><h2>Unit &amp; Application Reconciliation</h2>'
-    +     '<div style="font-size:11px;opacity:.7;margin-top:2px;">Accounts for every unit, and finds the duplicate/stale applications that inflate the counts.</div>'
+    +     '<div class="modal-hdr-sub">Accounts for every unit, and finds the duplicate/stale applications that inflate the counts.</div>'
     +   '</div>'
     +   '<div class="flex-gap8 flex-wrap" style="align-items:center;">'
     +     '<button class="btn btn-ghost-dark" onclick="_kpiDrillPrint()">&#128438; Print</button>'
@@ -2403,7 +2415,7 @@ function showArchivedApplications(){
       + '<td class="std-cell-muted">' + esc(a.id || '') + '</td>'
       + '<td class="std-cell-muted">' + esc((a.appType || 'new_housing').replace(/_/g, ' ')) + '</td>'
       + '<td class="std-cell-muted">' + esc(a.archivedAt || '\u2014') + (a.archivedBy ? ' \u00b7 ' + esc(a.archivedBy) : '') + '</td>'
-      + '<td>' + (canDel ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" onclick="_restoreArchivedApp(\'' + sid + '\')">&#8635; Restore</button>' : '') + '</td></tr>';
+      + '<td>' + (canDel ? '<button class="btn btn-ghost btn-xs" onclick="_restoreArchivedApp(\'' + sid + '\')">&#8635; Restore</button>' : '') + '</td></tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No archived applications.</td></tr>';
   var ex = document.getElementById('modalArchivedApps'); if (ex) ex.remove();
   var mo = document.createElement('div');
@@ -2411,7 +2423,7 @@ function showArchivedApplications(){
   mo.innerHTML =
     '<div class="modal" style="max-width:860px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
     + '<div class="modal-hdr"><div><h2>Archived Applications</h2>'
-    + '<div style="font-size:11px;opacity:.7;margin-top:2px;">Deleted applications are archived, never destroyed \u2014 restore returns one to the active lists.</div></div>'
+    + '<div class="modal-hdr-sub">Deleted applications are archived, never destroyed \u2014 restore returns one to the active lists.</div></div>'
     + '<button class="modal-close" onclick="var m=document.getElementById(\'modalArchivedApps\');if(m)m.remove();">&#x2715;</button></div>'
     + '<div class="modal-body" style="padding:0 16px 16px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;">'
     + '<table class="tbl"><thead><tr><th>Applicant</th><th>App ID</th><th>Type</th><th>Archived</th><th></th></tr></thead><tbody>'
@@ -2762,7 +2774,7 @@ function _reconMergePrompt(idsCsv){
   mo.innerHTML =
     '<div class="modal" style="max-width:560px;width:96%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">'
     + '<div class="modal-hdr" style="flex-shrink:0;"><div><h2>Merge Applications</h2>'
-    +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">Pick the application to KEEP. The others are archived and any missing details fold into the kept one (reversible).</div></div>'
+    +   '<div class="modal-hdr-sub">Pick the application to KEEP. The others are archived and any missing details fold into the kept one (reversible).</div></div>'
     +   '<button class="modal-close" onclick="var m=document.getElementById(\'modalReconMerge\');if(m)m.remove();">&#x2715;</button></div>'
     + '<div class="modal-body" style="padding:16px;flex:1;min-height:0;overflow:auto;">'+rowsHtml+'</div>'
     + '<div class="modal-footer" style="flex-shrink:0;"><button class="btn btn-ghost" onclick="var m=document.getElementById(\'modalReconMerge\');if(m)m.remove();">Cancel</button>'

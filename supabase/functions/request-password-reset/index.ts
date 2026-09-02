@@ -28,7 +28,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sendEmail, renderBrandedEmail, emailConfigured, isValidEmail, escapeHtml } from '../_shared/email.ts'
+import { sendEmail, renderBrandedEmail, emailConfigured, isValidEmail, escapeHtml, isSafeRedirect } from '../_shared/email.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -62,17 +62,37 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const email = String(body.email || '').toLowerCase().trim()
     if (!isValidEmail(email)) return json({ error: 'A valid email is required.' }, 400)
+    // Host-allowlisted like the sibling functions (shared isSafeRedirect) --
+    // the old bare https?:// format check accepted arbitrary hosts.
     const redirectRaw = String(body.redirect_to || '').trim().slice(0, 400)
-    const redirectTo = /^https?:\/\/[^\s]+$/.test(redirectRaw) ? redirectRaw : ''
+    const redirectTo = isSafeRedirect(redirectRaw) ? redirectRaw : ''
     const nationName = String(body.nation_name || '').slice(0, 120)
     const brandColorRaw = String(body.brand_color || '').trim()
     const btnColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(brandColorRaw) ? brandColorRaw : '#eab308'
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+    // Small per-IP budget on top of the per-email throttle below, so rotating
+    // target emails can't be used to probe or mail-bomb from one source.
+    // Rides the magic_link_requests table; degrades open if it's absent.
+    try {
+      const ip = (req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+      if (ip) {
+        const ipSince = new Date(Date.now() - THROTTLE_WINDOW_MIN * 60000).toISOString()
+        const { count: ipCount } = await admin.from('magic_link_requests')
+          .select('id', { count: 'exact', head: true }).eq('ip', ip).gte('created_at', ipSince)
+        if ((ipCount || 0) >= 10) return okSilent()
+        await admin.from('magic_link_requests').insert({ email, ip })
+      }
+    } catch (_e) { /* table not created yet -- skip limiting rather than break */ }
+
     // Only active staff get reset emails. Anything else: silent ok.
+    // Case-insensitive with the email treated as a LITERAL (escaped LIKE
+    // wildcards) -- a mixed-case staff.email row silently never received
+    // resets under the old case-sensitive eq.
+    const emailLit = email.replace(/[\\%_]/g, (c: string) => '\\' + c)
     const { data: rows } = await admin.from('staff')
-      .select('name, is_active').eq('email', email).limit(1)
+      .select('name, is_active').ilike('email', emailLit).limit(1)
     if (!rows || !rows.length || !rows[0].is_active) return okSilent()
     const staffName = String(rows[0].name || '')
 

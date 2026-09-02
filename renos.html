@@ -12,6 +12,8 @@
 <link rel="stylesheet" href="renos.css"/>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
+<script src="rent-age.js"></script>
+<script src="policy-rules.js"></script>
 <script src="shared-auth.js"></script>
 <script src="shared-ui.js"></script>
 <script src="approval-authority.js"></script>
@@ -1677,9 +1679,6 @@ function renderRenoApprovalsView() {
 function _raOnHold(r){
   return !!((r.prog && r.prog.status === 'On Hold')
          || (r.sow && r.sow.progress && r.sow.progress.status === 'On Hold'));
-}
-function _raOnHoldBadge(){
-  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber-text);white-space:nowrap;">\u23F8 On Hold \u2014 seeking funding</span>';
 }
 function _raCardTileFor(r, role, hmLimit) {
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };

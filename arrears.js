@@ -24,7 +24,20 @@
       .then(function (r) { return r.ok ? r.json() : []; })
       .catch(function () { return []; });
   }
-  function _todayISO() { return new Date().toISOString().split('T')[0]; }
+  // LOCAL date, not UTC — toISOString() after ~8 pm Eastern returns tomorrow,
+  // which stamped A/R entry_date and the window/review comparisons a day ahead.
+  function _todayISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  // Policy Rules: a parameter's VALUE comes from policyParam; whether the rule
+  // is ENFORCED at all comes from its Settings "enabled" checkbox — which
+  // policyParam deliberately ignores. Fails open (no rule engine = enforce
+  // defaults) so arrears policy never silently switches off by accident.
+  function _ruleOn(key) {
+    try { return typeof policyRule !== 'function' || policyRule(key).enabled !== false; }
+    catch (e) { return true; }
+  }
   function _addMonths(iso, m) {
     var d = new Date(String(iso).slice(0, 10) + 'T12:00:00');
     if (isNaN(d.getTime())) return '';
@@ -43,7 +56,7 @@
     CACHE.loading = Promise.all([
       _get('finance_rent_ledger?select=tenant_id,entry_type,amount,entry_date&limit=20000'),
       _get('finance_arrangements?select=*&order=created_at.desc&limit=2000'),
-      _get('finance_arr_payments?select=arrangement_id,payment_date,amount,voids_id&limit=20000'),
+      _get('finance_arr_payments?select=id,arrangement_id,payment_date,amount,voids_id&limit=20000'),
       _get('tenants?select=id,full_name,application_id,current_unit_id&merged_into=is.null&limit=5000')
     ]).then(function (res) {
       var ledger = res[0] || [], arrs = res[1] || [], pays = res[2] || [], tenants = res[3] || [];
@@ -63,9 +76,14 @@
           if (d && (!lastPay[r.tenant_id] || d > lastPay[r.tenant_id])) lastPay[r.tenant_id] = d;
         }
       });
+      // Void handling: skip both the reversal rows (voids_id set) AND the
+      // originals they reverse — a payment entered in error and voided in
+      // Finance must not mark that month paid for arrangement compliance.
+      var payVoided = {};
+      pays.forEach(function (p) { if (p && p.voids_id) payVoided[p.voids_id] = true; });
       var paysByArr = {};
       pays.forEach(function (p) {
-        if (!p || p.voids_id) return;
+        if (!p || p.voids_id || payVoided[p.id]) return;
         (paysByArr[p.arrangement_id] = paysByArr[p.arrangement_id] || []).push(p);
       });
       CACHE.byTenant = {};
@@ -104,7 +122,8 @@
   };
 
   function _resolveTenantByName(name) {
-    var norm = function (s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+    var norm = (typeof normNameKey === 'function') ? normNameKey
+             : function (s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
     var n = norm(name);
     if (!n) return null;
     return CACHE.tenants.find(function (t) { return norm(t.full_name) === n; }) || null;
@@ -142,27 +161,39 @@
     var winM = (typeof policyParam === 'function') ? policyParam('arrangement_window_months', 'months', 12) : 12;
     var revM = (typeof policyParam === 'function') ? policyParam('arrangement_review_months', 'months', 3) : 3;
     var missM = (typeof policyParam === 'function') ? policyParam('missed_months_eviction', 'months', 3) : 3;
-    var arr = e.arrangements.find(function (a) { return a.status === 'approved'; })
+    // 'active' is the finance module's own live-arrangement status (its
+    // default; finance-batch checks active||approved) — treat it as approved
+    // here or finance-created arrangements read as "none" and the
+    // good-standing gate wrongly blocks the tenant.
+    var _live = function (a) { return a.status === 'approved' || a.status === 'active'; };
+    var arr = e.arrangements.find(_live)
            || e.arrangements.find(function (a) { return a.status === 'pending-ed'; })
            || null;
     var st = {
       tenantId: tenantId, tenant: e.tenant, balance: e.balance,
-      arrangement: arr, hasApproved: !!(arr && arr.status === 'approved'),
+      arrangement: arr, hasApproved: !!(arr && _live(arr)),
       pendingEd: !!(arr && arr.status === 'pending-ed'),
       windowEndsAt: null, windowExpired: false,
       nextReviewDue: null, reviewOverdue: false,
       consecutiveMissed: 0, compliant: null,
       stamps: CACHE.stamps[tenantId] || {}
     };
-    if (arr && arr.status === 'approved') {
-      var start = arr.start_date || (arr.approved_at || '').slice(0, 10) || _todayISO();
-      st.windowEndsAt = _addMonths(start, winM);
-      st.windowExpired = st.windowEndsAt && st.windowEndsAt < _todayISO();
+    if (arr && _live(arr)) {
+      // The protected window runs from APPROVAL (that's what the approval
+      // dialog promises: "the window starts now") — falling back to
+      // start_date for finance-created rows without an approved_at stamp.
+      var start = (arr.approved_at || '').slice(0, 10) || arr.start_date || _todayISO();
+      if (_ruleOn('arrangement_window_months')) {
+        st.windowEndsAt = _addMonths(start, winM);
+        st.windowExpired = st.windowEndsAt && st.windowEndsAt < _todayISO();
+      }
       // Review cadence: from the last recorded review (audit stamp) or the
       // arrangement start.
-      var lastRev = st.stamps.arrears_review ? String(st.stamps.arrears_review.created_at).slice(0, 10) : start;
-      st.nextReviewDue = _addMonths(lastRev, revM);
-      st.reviewOverdue = st.nextReviewDue && st.nextReviewDue < _todayISO();
+      if (_ruleOn('arrangement_review_months')) {
+        var lastRev = st.stamps.arrears_review ? String(st.stamps.arrears_review.created_at).slice(0, 10) : start;
+        st.nextReviewDue = _addMonths(lastRev, revM);
+        st.reviewOverdue = st.nextReviewDue && st.nextReviewDue < _todayISO();
+      }
       // Consecutive missed months: walk back from last month; a month with no
       // non-void arrangement payment counts as missed. The current month is
       // never counted (it isn't over).
@@ -203,11 +234,15 @@
       machine: !st.arrangement, attest: !st.arrangement,
       note: st.arrangement ? 'An arrangement exists — condition (a) does not apply.' : 'System confirms: no arrangement on file. ED attests notice + opportunity were given.'
     });
-    // (b) arrangement in place but >= N consecutive months unpaid.
+    // (b) arrangement in place but >= N consecutive months unpaid. When the
+    // rule is unchecked in Settings it stops machine-verifying (never makes
+    // eviction easier — it removes an automatic path, not a protection).
+    var missOn = _ruleOn('missed_months_eviction');
     conds.push({
       key: 'b', label: st.hasApproved ? (st.consecutiveMissed + ' consecutive month(s) without an arrangement payment (threshold ' + missM + ')') : 'Approved arrangement with ' + missM + '+ consecutive missed months',
-      machine: st.hasApproved && st.consecutiveMissed >= missM, attest: false,
-      note: st.hasApproved ? 'Measured from finance arrangement payments.' : 'No approved arrangement to measure.'
+      machine: missOn && st.hasApproved && st.consecutiveMissed >= missM, attest: false,
+      note: !missOn ? 'Rule disabled in Settings — not machine-verified.'
+          : st.hasApproved ? 'Measured from finance arrangement payments.' : 'No approved arrangement to measure.'
     });
     // (c) window expired without meaningful reduction and no extension.
     var reduced = null;
@@ -216,9 +251,14 @@
     }
     var extended = !!st.stamps.arrears_extension
       && st.windowEndsAt && String(st.stamps.arrears_extension.created_at).slice(0, 10) >= _addMonths(st.windowEndsAt, -1);
+    // When the reduction-% rule is off, (c) can't be machine-verified (the
+    // "meaningfully reduced" test has no threshold) — it falls back to an ED
+    // attestation instead of getting easier.
+    var redOn = _ruleOn('meaningful_reduction_pct');
     conds.push({
       key: 'c', label: 'Protected window expired; arrears not meaningfully reduced (' + redPct + '%); no ED extension',
-      machine: !!(st.windowExpired && reduced != null && reduced < redPct && !extended), attest: false,
+      machine: !!(redOn && st.windowExpired && reduced != null && reduced < redPct && !extended),
+      attest: !redOn && !!st.windowExpired,
       note: st.windowExpired
         ? ('Window ended ' + st.windowEndsAt + '; arrears reduced ' + (reduced == null ? 'n/a' : reduced + '%') + (extended ? '; ED extension on file.' : '; no extension on file.'))
         : ('Window ' + (st.windowEndsAt ? 'runs to ' + st.windowEndsAt : 'not started') + '.')
@@ -235,7 +275,9 @@
       state: st, conditions: conds,
       anyMachineMet: conds.some(function (c) { return c.machine; }),
       finalNotice: notice, finalNoticeAgeDays: noticeAge,
-      noticeSatisfied: notice != null && noticeAge >= noticeDays,
+      // The final notice itself is always required (it's the documentation
+      // trail); disabling the rule only lifts the minimum AGE requirement.
+      noticeSatisfied: notice != null && (noticeAge >= noticeDays || !_ruleOn('final_notice_days')),
       noticeDaysRequired: noticeDays,
       alreadyAuthorized: !!st.stamps.arrears_eviction_authorized
     };
@@ -266,7 +308,7 @@
     var rent = Number(opts.monthlyRent) || 0;
     var pct = (typeof policyParam === 'function') ? policyParam('repayment_extra_pct', 'pct', 50) : 50;
     var minPay = Math.round((rent + rent * pct / 100) * 100) / 100;
-    if (rent > 0 && payment < minPay) {
+    if (rent > 0 && payment < minPay && _ruleOn('repayment_extra_pct')) {
       var isEd = (typeof ROLE !== 'undefined' && window.currentRole === 'ed') || window.currentRole === 'super_user';
       if (!isEd || !(opts.reason || '').trim()) {
         showToast('Below the policy minimum ($' + minPay.toFixed(2) + ' = rent + ' + pct + '%). An ED-approved documented reason is required to go lower.', { type: 'error' });
@@ -395,7 +437,10 @@
   // Balance + arrangement state + the Policy s.12 actions. Renders "no data"
   // quietly for people with no tenant/finance footprint.
   function _esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(s) : String(s == null ? '' : s); }
-  function _money(v) { return '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function _money(v) {
+    return (typeof formatCurrency === 'function') ? formatCurrency(v)
+      : '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   window.arrearsRenderTicPanel = function (mount, tenantName, monthlyRent) {
     if (!mount) return;
@@ -455,17 +500,19 @@
       + ' (name-token match only — verify).</div>');
     if (st.stamps.arrears_final_notice) rows.push('<div style="font-size:11px;color:var(--warn-amber-text);margin-top:3px;">Final notice recorded ' + _esc(String(st.stamps.arrears_final_notice.created_at).slice(0, 10)) + '</div>');
     if (st.stamps.arrears_eviction_authorized) rows.push('<div style="font-size:11px;color:var(--danger);font-weight:700;margin-top:3px;">Arrears eviction AUTHORIZED ' + _esc(String(st.stamps.arrears_eviction_authorized.created_at).slice(0, 10)) + '</div>');
+    // data-arr-act + one delegated wiring pass below (no onclick string
+    // concatenation — the audit flagged the composed-handler pattern as the
+    // panel's one injection-shaped spot even though tid is a uuid today).
     var btns = [];
-    var b = function (label, fn, primary) {
-      return '<button type="button" class="btn ' + (primary ? 'btn-primary' : 'btn-ghost') + '" style="padding:4px 10px;font-size:11px;" onclick="' + fn + '">' + label + '</button>';
+    var b = function (label, act, primary) {
+      return '<button type="button" class="btn btn-xs ' + (primary ? 'btn-primary' : 'btn-ghost') + '" data-arr-act="' + act + '">' + label + '</button>';
     };
-    var args = "'" + tid + "'," + (Number(monthlyRent) || 0);
-    if (canManage && st.balance > 0 && !st.arrangement) btns.push(b('+ Repayment arrangement', '_arrUiNewArrangement(' + args + ')', true));
-    if (canApprove && st.pendingEd) btns.push(b('✓ Approve arrangement', '_arrUiApprove(' + args + ')', true));
-    if (canManage && st.hasApproved) btns.push(b('📝 Record review', '_arrUiReview(' + args + ')'));
-    if (canApprove && st.hasApproved && st.windowExpired && !st.stamps.arrears_extension) btns.push(b('⏩ Extend window', '_arrUiExtend(' + args + ')'));
-    if (canManage && st.balance > 0) btns.push(b('📮 Record final notice', '_arrUiFinalNotice(' + args + ')'));
-    if (canEvict && st.balance > 0) btns.push(b('⚖ Eviction readiness', '_arrUiEvictionCheck(' + args + ')'));
+    if (canManage && st.balance > 0 && !st.arrangement) btns.push(b('+ Repayment arrangement', 'new', true));
+    if (canApprove && st.pendingEd) btns.push(b('✓ Approve arrangement', 'approve', true));
+    if (canManage && st.hasApproved) btns.push(b('📝 Record review', 'review'));
+    if (canApprove && st.hasApproved && st.windowExpired && !st.stamps.arrears_extension) btns.push(b('⏩ Extend window', 'extend'));
+    if (canManage && st.balance > 0) btns.push(b('📮 Record final notice', 'notice'));
+    if (canEvict && st.balance > 0) btns.push(b('⚖ Eviction readiness', 'evict'));
     mount.innerHTML = '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Arrears &amp; Repayment</div>'
       + '<div style="padding:6px 0 2px;">' + rows.join('') + '</div>'
       + (btns.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + btns.join('') + '</div>' : '')
@@ -473,10 +520,22 @@
       + '</div>';
     mount.dataset.tid = tid;
     mount.dataset.rent = String(monthlyRent || 0);
+    if (tenantName) mount.dataset.name = tenantName;
+    var ARR_ACTS = { 'new': window._arrUiNewArrangement, approve: window._arrUiApprove,
+                     review: window._arrUiReview, extend: window._arrUiExtend,
+                     notice: window._arrUiFinalNotice, evict: window._arrUiEvictionCheck };
+    mount.querySelectorAll('[data-arr-act]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var fn = ARR_ACTS[btn.getAttribute('data-arr-act')];
+        if (fn) fn(tid, Number(monthlyRent) || 0);
+      });
+    });
   }
   function _repaint(tid, rent) {
     var mount = document.getElementById('tic_arrears_mount');
-    if (mount) _paint(mount, tid, Number(rent) || 0);
+    // Pass the stored name back so the joint-account warning survives a
+    // repaint (it used to vanish after any panel action).
+    if (mount) _paint(mount, tid, Number(rent) || 0, mount.dataset.name || '');
   }
 
   // Inline UI actions (prompt-driven; every write is audited).
@@ -546,9 +605,11 @@
             + (chk.noticeSatisfied ? ' <strong style="color:var(--success);">OK</strong>' : ' <strong style="color:var(--danger);">too recent</strong>')
           : '<strong style="color:var(--danger);">not recorded</strong>') + '</div>'
       + (chk.alreadyAuthorized ? '<div style="font-size:12px;color:var(--danger);font-weight:700;margin-top:4px;">Already authorized.</div>'
-         : '<div style="margin-top:8px;"><button type="button" class="btn btn-primary" style="padding:4px 12px;font-size:11px;" onclick="_arrUiAuthorize(\'' + tid + '\',' + (Number(rent) || 0) + ')">Authorize arrears eviction (ED)</button></div>')
+         : '<div style="margin-top:8px;"><button type="button" class="btn btn-primary btn-xs" data-arr-authorize>Authorize arrears eviction (ED)</button></div>')
       + '</div>';
     out.innerHTML = html;
+    var authBtn = out.querySelector('[data-arr-authorize]');
+    if (authBtn) authBtn.addEventListener('click', function () { window._arrUiAuthorize(tid, Number(rent) || 0); });
   };
   window._arrUiAuthorize = function (tid, rent) {
     var out = document.getElementById('tic_arrears_detail');
@@ -599,22 +660,13 @@
     return { rows: rows, sum: sum, asOf: _todayISO() };
   };
 
-  var _jspdfPromise = null;
+  // jsPDF comes from the shared loader (shared.js window.loadJsPdf) — the
+  // local copy this replaced skipped loading autotable when jsPDF was already
+  // present, so an A/R report after any plain-PDF action threw
+  // `doc.autoTable is not a function`.
   function _loadJsPdf() {
-    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
-    if (_jspdfPromise) return _jspdfPromise;
-    function inject(src) {
-      return new Promise(function (res, rej) {
-        var sc = document.createElement('script');
-        sc.src = src; sc.onload = res;
-        sc.onerror = function () { rej(new Error('PDF library failed to load')); };
-        document.head.appendChild(sc);
-      });
-    }
-    _jspdfPromise = inject('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-      .then(function () { return inject('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js'); })
-      .catch(function (e) { _jspdfPromise = null; throw e; });
-    return _jspdfPromise;
+    if (typeof window.loadJsPdf === 'function') return window.loadJsPdf({ autotable: true });
+    return Promise.reject(new Error('PDF loader unavailable'));
   }
 
   window.arrearsCouncilReport = function (format) {
@@ -624,23 +676,18 @@
     }).then(function () {
       var d = window.arrearsReportData();
       var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
-      var money = function (v) { return '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 }); };
+      var money = _money;
       if (format === 'csv') {
         var head = ['Tenant', 'Unit', 'Balance', 'Arrangement', 'Monthly Payment', 'Last Payment', 'Window Ends'];
-        var csv = [head.join(',')].concat(d.rows.map(function (r) {
-          return [r.name, r.unit, r.balance.toFixed(2), r.arrangement, r.monthly != null ? r.monthly.toFixed(2) : '', r.lastPayment, r.windowEnds]
-            .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
-        })).join('\n');
-        var a = document.createElement('a');
-        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-        a.download = ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Report_' + d.asOf + '.csv';
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        var data = d.rows.map(function (r) {
+          return [r.name, r.unit, r.balance.toFixed(2), r.arrangement, r.monthly != null ? r.monthly.toFixed(2) : '', r.lastPayment, r.windowEnds];
+        });
+        _doExport('csv', head, data, ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Report_' + d.asOf);
         if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', 'A/R report exported (CSV) — ' + d.rows.length + ' accounts, ' + money(d.sum.outstanding) + ' outstanding', window.currentRole || 'staff');
         return;
       }
       _loadJsPdf().then(function () {
         var doc = new window.jspdf.jsPDF();
-        var pw = doc.internal.pageSize.getWidth();
         doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
         doc.text(nation, 14, 16);
         doc.setFontSize(12); doc.text('Rental Arrears (A/R) Report — Chief & Council', 14, 24);
@@ -693,6 +740,20 @@
   // uploads match them to that tenant automatically, before the name cascade.
   var IMP = { rows: [], imported: {}, remembered: {} };
 
+  // Non-tenant account exclusions. These defaults reflect one nation's Sage
+  // conventions (interest-accumulation lines, HYDRO-prefixed utility
+  // accounts); a nation can override both patterns via the ar_import_excludes
+  // setting {namePattern, custnoPattern} without a code change.
+  var _AR_EXCLUDE_NAME = /interest/i;
+  var _AR_EXCLUDE_CUSTNO = /^HYDRO/i;
+  (function () {
+    try {
+      var ex = window._appSettings && _appSettings.ar_import_excludes;
+      if (ex && ex.namePattern) _AR_EXCLUDE_NAME = new RegExp(ex.namePattern, 'i');
+      if (ex && ex.custnoPattern) _AR_EXCLUDE_CUSTNO = new RegExp(ex.custnoPattern, 'i');
+    } catch (e) { /* bad pattern in settings — keep defaults */ }
+  })();
+
   function _normName(s) {
     return String(s || '').toLowerCase()
       .replace(/\(.*?\)/g, ' ')                        // (SIW) etc.
@@ -725,7 +786,7 @@
       if (!mHead) return;
       var custno = mHead[1], name = mHead[2].replace(/[-–]\s*$/, '').trim();
       if (/^(report|grand)\s+totals?:?$/i.test(custno + ' ' + name)) { meta.reportGrandTotal = last6[5]; return; }
-      if (/interest/i.test(name) || /^HYDRO/i.test(custno)) {          // non-tenant accounts
+      if (_AR_EXCLUDE_NAME.test(name) || _AR_EXCLUDE_CUSTNO.test(custno)) {   // non-tenant accounts
         meta.interestTotal = Math.round((meta.interestTotal + last6[5]) * 100) / 100;
         meta.interestCount++;
         return;
@@ -793,7 +854,11 @@
   // via sbResolveTenantId so no duplicates are created.
   async function _arImpEnsureTenant(row) {
     if (row.kind === 'tenant' && row.tenantId) return row.tenantId;
-    var display = _cleanDisplayName(row.rawName);
+    // AUDIT FIX: mint with the matched target's CANONICAL name (unit
+    // assignedName / application fn+ln). Sage names are often LAST-FIRST, so
+    // minting the ledger spelling made the record invisible to every
+    // exact-name lookup (TIC arrears panel, good-standing gate, warnings).
+    var display = row.targetName || _cleanDisplayName(row.rawName);
     // Find-FIRST only (sbResolveTenantId would create a bare row on miss —
     // we mint our own richer row below, with status + unit/application link).
     try {
@@ -840,7 +905,7 @@
     // cleanup classification), so it gets the whole viewport.
     mo.innerHTML = '<div class="modal" style="max-width:none;width:100vw;height:100vh;max-height:100vh;margin:0;border-radius:0;display:flex;flex-direction:column;overflow:hidden;">'
       + '<div class="modal-hdr"><div><h2>Import Arrears Ledger (A/R)</h2>'
-      + '<div style="font-size:11px;opacity:.7;margin-top:2px;">Paste the A/R Aged Trial Balance text. Totals become opening balances in the rent ledger; the Current column sets unit rent where none is recorded. Already-imported rows are skipped automatically.</div></div>'
+      + '<div class="modal-hdr-sub">Paste the A/R Aged Trial Balance text. Totals become opening balances in the rent ledger; the Current column sets unit rent where none is recorded. Already-imported rows are skipped automatically.</div></div>'
       + '<button class="modal-close" onclick="var m=document.getElementById(\'modalArImport\');if(m)m.remove();">&#x2715;</button></div>'
       // max-width/margin overrides: housing.css redefines .modal-body as a
       // 680px centered card (its own modal system) — full-screen needs the
@@ -862,6 +927,14 @@
     mo.addEventListener('click', function (e) { if (e.target === mo) mo.remove(); });
     mo.style.padding = '0';   // .modal-ov's 20px inset would frame the full-screen card
     document.body.appendChild(mo); mo.style.display = ''; mo.classList.add('on');
+    // Changing the as-of date after Parse & Match used to be silently ignored
+    // (each row froze its period at parse time) — re-parse so the period, the
+    // already-imported skip map, and the import tags all follow the new date.
+    var asofEl = mo.querySelector('#ar_import_asof');
+    if (asofEl) asofEl.addEventListener('change', function () {
+      var ta = document.getElementById('ar_import_text');
+      if (ta && ta.value.trim() && IMP.rows && IMP.rows.length) window._arImpParse();
+    });
     window.arrearsLoad();
   };
 
@@ -960,7 +1033,7 @@
     review.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Matching against tenants and prior imports…</div>';
     Promise.all([
       window.arrearsLoad(),
-      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=id,description,tenant_id,voids_id&limit=8000'),
+      _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=id,description,tenant_id,voids_id,amount&limit=8000'),
       _get('housing_settings?key=eq.ar_cleanup&select=value&limit=1')
     ]).then(function (res) {
       IMP.imported = {};
@@ -969,6 +1042,9 @@
       // classification debounce has flushed must not wipe just-typed edits.
       var clsSaved = (res[2] && res[2][0] && res[2][0].value) || {};
       IMP.cleanup = Object.assign({}, clsSaved.accounts || {}, IMP.cleanup || {});
+      // A locally-cleared classification must not be resurrected by the saved
+      // blob before the debounced persist has flushed the deletion.
+      Object.keys(IMP.clsDeleted || {}).forEach(function (k) { delete IMP.cleanup[k]; });
       if (clsSaved.flags && clsSaved.flags.length) IMP.flags = clsSaved.flags;
       // Undo support: an undone import is VOIDED (a reversing entry whose
       // voids_id points at the original). Voided originals count for neither
@@ -976,12 +1052,23 @@
       // importable again — against a corrected match.
       var voided = {};
       (res[1] || []).forEach(function (r) { if (r.voids_id) voided[r.voids_id] = true; });
+      // Per-custno net contribution to the app balance (un-voided imports).
+      // AUDIT FIX (multi-account tenants): a member often has several Sage
+      // accounts (RENT + MORT) resolving to ONE tenant; syncing each row
+      // against the tenant's WHOLE balance made every row "correct" the
+      // others' money (oscillating adjustments). Deltas are now computed per
+      // custno, with the tenant's non-import balance residue absorbed once.
+      IMP.custContrib = {};
+      IMP.tenantContrib = {};
+      IMP.residueUsed = {};
       (res[1] || []).forEach(function (r) {
         if (r.voids_id || voided[r.id]) return;   // void entries + voided originals
         var m = String(r.description || '').match(/\[AR-IMPORT:([^\]:]+)(?::([^\]]+))?\]/);
         if (m) {
           (IMP.imported[m[1]] = IMP.imported[m[1]] || {})[m[2] || 'initial'] = true;
           if (r.tenant_id) IMP.remembered[m[1]] = r.tenant_id;
+          IMP.custContrib[m[1]] = Math.round(((IMP.custContrib[m[1]] || 0) + Number(r.amount || 0)) * 100) / 100;
+          if (r.tenant_id) IMP.tenantContrib[r.tenant_id] = Math.round(((IMP.tenantContrib[r.tenant_id] || 0) + Number(r.amount || 0)) * 100) / 100;
         }
       });
       IMP.rows = _parseArText(txt).map(function (row) {
@@ -1011,13 +1098,52 @@
         row.already = !!(IMP.imported[row.custno] && IMP.imported[row.custno][period]);
         row.appBalance = row.tenantId && CACHE.byTenant[row.tenantId]
           ? CACHE.byTenant[row.tenantId].balance : 0;
-        row.delta = Math.round((row.total - row.appBalance) * 100) / 100;
-        row.inSync = Math.abs(row.delta) < 0.005;
         return row;
       });
+      // Preview deltas with the same per-custno math the import uses,
+      // simulating batch order so multi-account tenants preview correctly.
+      (function previewDeltas(){
+        var simResidue = {};
+        IMP.rows.forEach(function (row) {
+          if (row.already) { row.delta = 0; row.inSync = true; return; }
+          var contrib = (IMP.custContrib && IMP.custContrib[row.custno]) || 0;
+          var residue = 0;
+          var tid = row.tenantId || '';
+          if (tid && !(IMP.residueUsed && IMP.residueUsed[tid]) && !simResidue[tid]) {
+            residue = Math.round((row.appBalance - ((IMP.tenantContrib && IMP.tenantContrib[tid]) || 0)) * 100) / 100;
+            simResidue[tid] = true;
+          }
+          row.delta = Math.round((row.total - contrib - residue) * 100) / 100;
+          row.inSync = Math.abs(row.delta) < 0.005;
+        });
+      })();
       _arImpRender();
     });
   };
+  // AUDIT FIX (multi-account): the delta a row would write. contrib =
+  // this custno's prior net imports; residue = the tenant's non-import
+  // balance components, absorbed by the FIRST row of that tenant only.
+  // Single-account tenants with no history reduce to the original
+  // total-minus-balance sync exactly.
+  function _arImpRowDelta(r, tid) {
+    var contrib = (IMP.custContrib && IMP.custContrib[r.custno]) || 0;
+    var residue = 0;
+    if (tid && !(IMP.residueUsed && IMP.residueUsed[tid])) {
+      var bal = (CACHE.byTenant[tid] && CACHE.byTenant[tid].balance) || 0;
+      residue = Math.round((bal - ((IMP.tenantContrib && IMP.tenantContrib[tid]) || 0)) * 100) / 100;
+    }
+    return { delta: Math.round((r.total - contrib - residue) * 100) / 100, contrib: contrib, residue: residue };
+  }
+  // Bookkeeping after a write (or its inverse after an undo).
+  function _arImpApplyContrib(custno, tid, delta, residueConsumed) {
+    IMP.custContrib = IMP.custContrib || {}; IMP.tenantContrib = IMP.tenantContrib || {}; IMP.residueUsed = IMP.residueUsed || {};
+    IMP.custContrib[custno] = Math.round(((IMP.custContrib[custno] || 0) + delta) * 100) / 100;
+    if (tid) {
+      IMP.tenantContrib[tid] = Math.round(((IMP.tenantContrib[tid] || 0) + delta) * 100) / 100;
+      if (residueConsumed) IMP.residueUsed[tid] = true;
+    }
+  }
+
   // Manual picker options: tenants + housed units + applications, disambiguated
   // by a suffix the change-handler parses back.
   function _arImpPickerOptions() {
@@ -1053,6 +1179,18 @@
   function _clsFlagList() {
     return (IMP.flags && IMP.flags.length) ? IMP.flags : _CLS_FLAGS_DEFAULT;
   }
+  // Income-program options: values 'OW'/'ODSP' are the stable internal keys
+  // the rent model computes shelter rent from; the DISPLAY labels come from
+  // the nation-editable rent model (Settings > App Settings > Rent Model), so
+  // program names aren't hardcoded into multi-nation UI copy.
+  function _clsIncomeOpts() {
+    var rm = (typeof getRentModel === 'function') ? getRentModel() : null;
+    return [
+      { v: '', l: '—' },
+      { v: 'OW', l: (rm && rm.ow && rm.ow.label) || 'OW' },
+      { v: 'ODSP', l: (rm && rm.odsp && rm.odsp.label) || 'ODSP' }
+    ];
+  }
   function _clsFlagMap() {
     var m = {};
     _clsFlagList().forEach(function (f) { if (f && f.k) m[f.k] = f.label || f.k; });
@@ -1062,11 +1200,26 @@
   function _arClsPersist() {
     clearTimeout(_clsSaveTimer);
     _clsSaveTimer = setTimeout(function () {
-      if (typeof sbSaveSetting === 'function') {
-        var payload = { accounts: IMP.cleanup || {}, updatedAt: new Date().toISOString() };
-        if (IMP.flags && IMP.flags.length) payload.flags = IMP.flags;
+      if (typeof sbSaveSetting !== 'function') return;
+      // Merge-before-write: several staff classify accounts at once during the
+      // cleanup exercise, and writing our parse-time snapshot whole would
+      // clobber classifications saved since. Start from the CURRENT server
+      // blob, overlay local edits per custno, and apply local deletions
+      // explicitly (IMP.clsDeleted) — absence must neither resurrect a
+      // just-cleared row nor delete someone else's work.
+      _get('housing_settings?key=eq.ar_cleanup&select=value&limit=1').then(function (sv) {
+        var server = (sv && sv[0] && sv[0].value) || {};
+        var merged = Object.assign({}, server.accounts || {}, IMP.cleanup || {});
+        Object.keys(IMP.clsDeleted || {}).forEach(function (k) {
+          if (!(IMP.cleanup || {})[k]) delete merged[k];
+        });
+        IMP.cleanup = merged;
+        var payload = { accounts: merged, updatedAt: new Date().toISOString() };
+        var flags = (IMP.flags && IMP.flags.length) ? IMP.flags
+                  : (server.flags && server.flags.length ? server.flags : null);
+        if (flags) payload.flags = flags;
         sbSaveSetting('ar_cleanup', payload);
-      }
+      });
     }, 800);
   }
 
@@ -1083,7 +1236,7 @@
       mo.innerHTML =
           '<div class="modal" style="max-width:420px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">'
         + '<div class="modal-hdr"><div><h2 style="font-size:16px;">Cleanup Flags</h2>'
-        +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">The choices in the Flag dropdown. Accounts already flagged with a removed option keep it.</div></div>'
+        +   '<div class="modal-hdr-sub">The choices in the Flag dropdown. Accounts already flagged with a removed option keep it.</div></div>'
         +   '<button class="modal-close" onclick="var m=document.getElementById(\'arClsFlagsModal\');if(m)m.remove();">&#x2715;</button></div>'
         + '<div style="padding:14px 16px;overflow-y:auto;flex:1;">'
         + list.map(function (f, i) {
@@ -1139,7 +1292,12 @@
     e.total = r.total; e.current = r.current;
     e.by = (window.HOUSING_SESSION || {}).email || 'staff';
     e.at = new Date().toISOString();
-    if (!e.income && !e.flag && !e.note) delete IMP.cleanup[r.custno];
+    if (!e.income && !e.flag && !e.note) {
+      delete IMP.cleanup[r.custno];
+      (IMP.clsDeleted = IMP.clsDeleted || {})[r.custno] = true;   // real deletion, not merge-loss
+    } else if (IMP.clsDeleted) {
+      delete IMP.clsDeleted[r.custno];
+    }
     _arClsPersist();
     if (flagChanged && value && typeof auditEntry === 'function') {
       auditEntry(r.tenantId ? ('TENANT:' + r.tenantId) : 'SETTINGS', 'ar_account_flagged',
@@ -1207,7 +1365,7 @@
     });
     var asOf = _todayISO();
     var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
-    var money = function (v) { return '$' + Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 }); };
+    var money = _money;
     if (format === 'csv') {
       var head = ['Account Flag', 'Tenant', 'Cust #', 'Income (OW/ODSP)', 'Note', 'Amount', 'Classified By', 'Date'];
       var csvRows = [];
@@ -1220,13 +1378,7 @@
         });
         csvRows.push([fk + ' — SUBTOTAL', '', '', '', '', byFlag[fk].total.toFixed(2), '', '']);
       });
-      var csv = [head.join(',')].concat(csvRows.map(function (r) {
-        return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
-      })).join('\n');
-      var a = document.createElement('a');
-      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-      a.download = ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Cleanup_' + asOf + '.csv';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      _doExport('csv', head, csvRows, ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Cleanup_' + asOf);
       if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_cleanup_report_generated', 'A/R cleanup report exported (CSV) — ' + rows.length + ' classified accounts', window.currentRole || 'staff');
       return;
     }
@@ -1364,7 +1516,7 @@
       if (cls.income || cls.flag || cls.note) counts.classified = (counts.classified || 0) + 1;
       var clsHtml =
           '<td><select data-ar-cls="' + i + '" data-cls-k="income" style="font-size:11px;padding:3px 4px;">'
-        +   ['', 'OW', 'ODSP'].map(function (o) { return '<option value="' + o + '"' + ((cls.income || '') === o ? ' selected' : '') + '>' + (o || '—') + '</option>'; }).join('')
+        +   _clsIncomeOpts().map(function (o) { return '<option value="' + o.v + '"' + ((cls.income || '') === o.v ? ' selected' : '') + '>' + _esc(o.l) + '</option>'; }).join('')
         + '</select></td>'
         + '<td><select data-ar-cls="' + i + '" data-cls-k="flag" style="font-size:11px;padding:3px 4px;">'
         +   '<option value=""' + (!cls.flag ? ' selected' : '') + '>—</option>'
@@ -1384,11 +1536,11 @@
         + '<td style="font-size:10px;color:var(--muted);white-space:nowrap;">' + (willSetRent ? 'rent → ' + _money(r.current) : (unit && Number(unit.monthlyRent) > 0 ? 'rent set' : '')) + '</td>'
         + clsHtml
         + '<td>' + (canRow
-            ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-import-one="' + i + '">Import</button>'
+            ? '<button class="btn btn-ghost btn-xs" data-ar-import-one="' + i + '">Import</button>'
             : r.already
-              ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-undo="' + i + '" title="Void this period\'s import (reversing entry) and re-open the row so the match can be corrected and re-imported">↺ Undo</button>'
+              ? '<button class="btn btn-ghost btn-xs" data-ar-undo="' + i + '" title="Void this period\'s import (reversing entry) and re-open the row so the match can be corrected and re-imported">↺ Undo</button>'
               : (!isAmb && !_rowResolved(r)
-                ? '<button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" data-ar-new-person="' + i + '" title="Create a person record with no unit or application (arrears from a former tenancy) and import this balance">+ New person</button>'
+                ? '<button class="btn btn-ghost btn-xs" data-ar-new-person="' + i + '" title="Create a person record with no unit or application (arrears from a former tenancy) and import this balance">+ New person</button>'
                 : '')) + '</td>'
         + '</tr>';
     }).join('');
@@ -1469,7 +1621,12 @@
       // positive = adjustment_debit, negative = adjustment_credit — either
       // way the stored amount is the balance contribution.
       var bal = (CACHE.byTenant[tid] && CACHE.byTenant[tid].balance) || 0;
-      var delta = Math.round((r.total - bal) * 100) / 100;
+      // Per-custno delta (multi-account tenants): this row only corrects its
+      // OWN account's prior imports, plus the tenant's non-import residue
+      // absorbed once — never another account's money. Reduces to
+      // total-minus-balance for a single-account tenant with no history.
+      var dd = _arImpRowDelta(r, tid);
+      var delta = dd.delta;
       if (Math.abs(delta) < 0.005) { r.already = true; _arImpRender(); return true; }
       var etype = bal === 0 ? 'opening_balance' : (delta > 0 ? 'adjustment_debit' : 'adjustment_credit');
       var asOf = r.period || _todayISO();
@@ -1505,6 +1662,7 @@
         'A/R balance synced to ' + _money(r.total) + ' (' + etype + ' ' + _money(delta) + ', ' + r.custno + ', ' + r.kind + ' match, as of ' + asOf + ')', window.currentRole || 'staff');
       var e = CACHE.byTenant[tid];
       if (e) e.balance = Math.round((e.balance + delta) * 100) / 100;
+      _arImpApplyContrib(r.custno, tid, delta, dd.residue !== 0);
       r.already = true;
       (IMP.imported[r.custno] = IMP.imported[r.custno] || {})[asOf] = true;
       _arImpRender();
@@ -1533,12 +1691,20 @@
       : window.confirm('Undo the ' + period + ' import for ' + r.rawName + '?');
     if (!go) return;
     try {
-      var tag = '[AR-IMPORT:' + r.custno + ':' + period + ']';
       var origs = await _get('finance_rent_ledger?description=like.*'
         + encodeURIComponent('AR-IMPORT:' + r.custno + ':' + period) + '*&select=id,amount,entry_type,tenant_id,unit_id,voids_id');
+      // AUDIT FIX (double-void): void rows are tagged [AR-IMPORT-UNDO:…] so
+      // the query above never returns them — building voidedIds from origs'
+      // own voids_id found nothing, and a second Undo re-voided the same
+      // original (balance drifting negative). Look up voids by FK instead.
       var voidedIds = {};
-      (origs || []).forEach(function (o) { if (o.voids_id) voidedIds[o.voids_id] = true; });
-      var live = (origs || []).filter(function (o) { return !o.voids_id && !voidedIds[o.id] && o.entry_type !== 'void'; });
+      var candidates = (origs || []).filter(function (o) { return !o.voids_id && o.entry_type !== 'void'; });
+      if (candidates.length) {
+        var vr = await _get('finance_rent_ledger?voids_id=in.('
+          + candidates.map(function (o) { return '"' + o.id + '"'; }).join(',') + ')&select=voids_id');
+        (vr || []).forEach(function (v) { if (v.voids_id) voidedIds[v.voids_id] = true; });
+      }
+      var live = candidates.filter(function (o) { return !voidedIds[o.id]; });
       if (!live.length) { showToast('No un-voided ledger entry found for ' + r.custno + ' (' + period + ').', { type: 'error' }); return; }
       for (var k = 0; k < live.length; k++) {
         var o = live[k];
@@ -1562,6 +1728,10 @@
         if (!resp.ok) throw new Error('void insert HTTP ' + resp.status);
         var e2 = CACHE.byTenant[o.tenant_id];
         if (e2) e2.balance = Math.round((e2.balance - Number(o.amount || 0)) * 100) / 100;
+        // Give the voided amount back to the per-custno/tenant contribution
+        // maps so the next import's delta math starts from the true state.
+        _arImpApplyContrib(r.custno, o.tenant_id, -Number(o.amount || 0), false);
+        if (o.tenant_id && IMP.residueUsed) delete IMP.residueUsed[o.tenant_id];
         if (typeof auditEntry === 'function') auditEntry('TENANT:' + o.tenant_id, 'arrears_import_undone',
           'A/R import undone: ' + _money(Number(o.amount || 0)) + ' voided for ' + _cleanDisplayName(r.rawName) + ' (' + r.custno + ', ' + period + ')', window.currentRole || 'staff');
       }
@@ -1571,7 +1741,8 @@
       delete IMP.remembered[r.custno];
       r.already = false; r.forceCreate = false;
       r.appBalance = r.tenantId && CACHE.byTenant[r.tenantId] ? CACHE.byTenant[r.tenantId].balance : 0;
-      r.delta = Math.round((r.total - r.appBalance) * 100) / 100;
+      var rd = _arImpRowDelta(r, r.tenantId || '');
+      r.delta = rd.delta;
       r.inSync = Math.abs(r.delta) < 0.005;
       _arImpRender();
       showToast('Import undone for ' + _cleanDisplayName(r.rawName) + ' — fix the match and import again.', { type: 'info' });

@@ -1453,11 +1453,20 @@ window._sowPromptWorkOrderEmail = _sowPromptWorkOrderEmail;
 // with a timeline entry saying so. Writes the same housing_reno_progress row
 // saveRenoProgress uses (merge-duplicates upsert), and mirrors status onto
 // the SOW's work-progress so the Renovations tables read In Progress.
-function _sowMarkWorkStarted(unitId, sow, whoLabel){
+async function _sowMarkWorkStarted(unitId, sow, whoLabel){
   try {
     if(!unitId) return;
     window._renoProgress = window._renoProgress || {};
-    var prog = window._renoProgress[unitId] || { updates: [], photos: [] };
+    // AUDIT FIX: _renoProgress is only hydrated on renos/contractors pages.
+    // Writing from housing/inventory/tenants used to upsert a near-empty
+    // record over the server row, erasing progress %, photos and history.
+    // Always fetch the server row and merge onto it.
+    var prog = null;
+    try {
+      var pr = await fetch(SUPABASE_URL + '/rest/v1/housing_reno_progress?unit_id=eq.' + encodeURIComponent(unitId) + '&select=data', { headers: HOUSING_HEADERS });
+      if(pr.ok){ var prows = await pr.json(); prog = (prows && prows[0] && prows[0].data) || null; }
+    } catch(_pe){ /* fall back to local cache below */ }
+    if(!prog) prog = window._renoProgress[unitId] || { updates: [], photos: [] };
     var today = new Date().toISOString().slice(0,10);
     if(!prog.startDate) prog.startDate = today;
     if(prog.status !== 'Completed') prog.status = 'In Progress';
@@ -1495,7 +1504,10 @@ function _sowOpenProgress(){
   var uid = _sowUnitId;
   if(!uid){ if(typeof showToast === 'function') showToast('Save the request first — progress reports attach to the unit.', {type:'info'}); return; }
   if(typeof openRenoProgress === 'function' && document.getElementById('renoProgressModal')){
-    if(typeof closeSowModal === 'function') closeSowModal();
+    // handoff: a plain closeSowModal() runs the contractors-/nav-referrer
+    // return navigation, which would navigate away before the progress modal
+    // opens (same fix as sowStartNewRequest).
+    if(typeof closeSowModal === 'function') closeSowModal({handoff:true});
     openRenoProgress(uid);
   } else {
     window.location.href = 'renos.html?progress=' + encodeURIComponent(uid);
@@ -2051,7 +2063,7 @@ function markSowComplete(){
   mo.innerHTML =
       '<div class="modal" style="max-width:470px;">'
     + '<div class="modal-hdr"><div><h2 style="font-size:16px;">Mark ' + esc(pn) + ' Completed?</h2>'
-    +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">This locks the request, work order and progress reports. Only the Executive Director can reopen it.</div></div>'
+    +   '<div class="modal-hdr-sub">This locks the request, work order and progress reports. Only the Executive Director can reopen it.</div></div>'
     +   '<button class="modal-close" onclick="var m=document.getElementById(\'sowCompleteModal\');if(m)m.remove();">&#x2715;</button></div>'
     + '<div style="padding:16px;">'
     +   (tenantName

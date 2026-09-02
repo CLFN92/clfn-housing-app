@@ -163,7 +163,8 @@ window.policyPriorAllocation = function (app) {
   if (!rule.enabled || !app) return null;
   var years = rule.params.years;
   var apps = (typeof applications !== 'undefined' && applications) ? applications : (window.applications || []);
-  var norm = function (s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+  var norm = (typeof window.normNameKey === 'function') ? window.normNameKey
+           : function (s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
   var name = norm((app.fn || '') + ' ' + (app.ln || ''));
   if (!name) return null;
   var cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - years);

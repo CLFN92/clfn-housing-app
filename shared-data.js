@@ -1672,7 +1672,7 @@ window.openBcrManager = function(prefillName){
     '<div class="modal" style="max-width:640px;width:96%;">'
     + '<div class="modal-hdr">'
     +   '<div><h2>BCR / Ineligibility List</h2>'
-    +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">People banished by Band Council Resolution &mdash; not eligible for housing.</div></div>'
+    +   '<div class="modal-hdr-sub">People banished by Band Council Resolution &mdash; not eligible for housing.</div></div>'
     +   '<button class="modal-close" onclick="var m=document.getElementById(\'modalBcrManager\');if(m)m.remove();">&#x2715;</button>'
     + '</div>'
     + '<div class="modal-body" style="padding:18px 20px;">'
@@ -1803,7 +1803,7 @@ window.openTenantMergeManager = function(){
   mo.innerHTML =
     '<div class="modal" style="max-width:680px;width:96%;">'
     + '<div class="modal-hdr"><div><h2>Merge Duplicate Tenants</h2>'
-    +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">Same person, multiple records. Pick the record to keep; the others point to it (reversible).</div></div>'
+    +   '<div class="modal-hdr-sub">Same person, multiple records. Pick the record to keep; the others point to it (reversible).</div></div>'
     +   '<button class="modal-close" onclick="var m=document.getElementById(\'modalTenantMerge\');if(m)m.remove();">&#x2715;</button></div>'
     + '<div class="modal-body" style="padding:16px 20px;"><div id="merge_body">Loading&hellip;</div></div>'
     + '</div>';
@@ -3454,8 +3454,8 @@ window._appIsTenancyHolder = _appIsTenancyHolder;
 // record-data address for innerHTML surfaces.
 function tenancyHolderMsg(app, forHtml){
   var addr = (app && app.assignedAddress) || 'a unit';
-  if (forHtml && typeof escapeHtml === 'function') addr = escapeHtml(addr);
   var name = app ? (((app.fn||'')+' '+(app.ln||'')).trim() || 'This applicant') : 'This applicant';
+  if (forHtml && typeof escapeHtml === 'function') { addr = escapeHtml(addr); name = escapeHtml(name); }
   return name + ' is assigned to ' + addr
     + ' — a current tenant cannot file a New Application. Use Transfer Request (seeking a different unit) or File Update, or clear the unit link first.';
 }
@@ -3491,7 +3491,7 @@ function clearAppUnitLink(a){
 }
 window.clearAppUnitLink = clearAppUnitLink;
 
-function appAssignabilityStatus(app, unit){
+function appAssignabilityStatus(app, unit, opts){
   if(!app) return { ok:false, reason:'Application not found' };
   if(app.archived) return { ok:false, reason:'Application is archived' };
   if(app.deceased) return { ok:false, reason:'Applicant is deceased — this application cannot be assigned' };
@@ -3514,10 +3514,15 @@ function appAssignabilityStatus(app, unit){
   var ok = (s === 'ed_approved' || s === 'mgr_approved' || s === 'hm_approved');
   if(ok){
     // Policy 8.5 / 12.5 good-standing gate — arrears with no approved
-    // repayment arrangement block assignment. Reads the arrears machine's
-    // cache of FINANCE data; fails open while that hasn't loaded and when
-    // the policy rule is disabled (arrears.js / policy-rules.js).
-    if(typeof arrearsAllocationBlock === 'function'){
+    // repayment arrangement block assignment. Applied ONLY at the actual
+    // assignment actions (opts.forAssignment: confirmAssignment /
+    // saveUnitEdit / saveAddTenant) — an arrears-flagged applicant stays
+    // VISIBLE on Match and Ready-to-Match with a warning badge (mirrors the
+    // BCR pattern) instead of silently vanishing from the queue, and a mere
+    // name collision with a debtor can't hide an innocent applicant.
+    // Fails open while the finance cache hasn't loaded and when the policy
+    // rule is disabled (arrears.js / policy-rules.js).
+    if(opts && opts.forAssignment && typeof arrearsAllocationBlock === 'function'){
       var _gs = arrearsAllocationBlock(((app.fn||'') + ' ' + (app.ln||'')).trim());
       if(_gs) return { ok:false, reason:_gs };
     }
@@ -3529,6 +3534,16 @@ function appAssignabilityStatus(app, unit){
 function appIsAssignable(app){ return appAssignabilityStatus(app).ok; }
 window.appAssignabilityStatus = appAssignabilityStatus;
 window.appIsAssignable = appIsAssignable;
+
+// The good-standing warning for LIST surfaces (Match rows, worklist): the
+// same message the assignment gate blocks with, as a badge-able string —
+// null when clear / cache unloaded / rule off.
+function appArrearsWarning(app){
+  if(!app || typeof arrearsAllocationBlock !== 'function') return null;
+  try { return arrearsAllocationBlock(((app.fn||'') + ' ' + (app.ln||'')).trim()); }
+  catch(e){ return null; }
+}
+window.appArrearsWarning = appArrearsWarning;
 
 // After a commercial (business/department) application is assigned to a
 // building, type the trigger-created tenant row: business/department kind,
@@ -3830,6 +3845,31 @@ function _resolveBrandColorHex(candidate) {
   return bc;
 }
 window._resolveBrandColorHex = _resolveBrandColorHex;
+
+// Canonical name-equality key: lowercase, collapse whitespace, trim. The
+// Correct Name feature, A/R import matching, joint-account warning and the
+// policy prior-allocation check all key on name equality — they must agree,
+// so they all resolve through this one normalizer (variants that also strip
+// punctuation stay local and documented at their site).
+function normNameKey(s){ return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+window.normNameKey = normNameKey;
+
+// The brand payload the magic-link / password-reset emails carry — one
+// builder so the reset and magic-link paths can't drift (they were copies).
+function _magicLinkBrand(){
+  var _nc = window.NATION_CONFIG || {};
+  var _contact = [];
+  if(_nc.phone) _contact.push(_nc.phone);
+  var _em = _nc.email || _nc.housing_email; if(_em) _contact.push(_em);
+  return {
+    nation_name:  _nc.display_name || _nc.short || '',
+    // Normalised registry colour -> live theme accent fallback (shared
+    // resolver) — the raw registry value alone left these emails slate.
+    brand_color:  (typeof _resolveBrandColorHex === 'function' ? _resolveBrandColorHex() : (_nc.primary_color || '')),
+    contact_line: _contact.join('  |  ')
+  };
+}
+window._magicLinkBrand = _magicLinkBrand;
 
 window.sendNotification = async function(opts) {
   if(!opts || !opts.to || !opts.subject || (!opts.message && !opts.html && !opts.bodyHtml)) {
@@ -4309,10 +4349,6 @@ async function sendStaffPasswordReset(email, btn){
     // pipeline (housing mailbox) — the old /auth/v1/recover endpoint depends
     // on the Supabase auth mailer, which this project doesn't configure, so
     // sends were failing with an unexplained "could not be sent".
-    var _nc = window.NATION_CONFIG || {};
-    var _contact = [];
-    if(_nc.phone) _contact.push(_nc.phone);
-    var _em2 = _nc.email || _nc.housing_email; if(_em2) _contact.push(_em2);
     var token = (window.HOUSING_SESSION && HOUSING_SESSION.accessToken) || '';
     var fnDown = false;
     try {
@@ -4323,11 +4359,7 @@ async function sendStaffPasswordReset(email, btn){
           type: 'recovery',
           email: email,
           redirect_to: redirectTo,
-          brand: {
-            nation_name:  _nc.display_name || _nc.short || '',
-            brand_color:  (typeof _resolveBrandColorHex === 'function' ? _resolveBrandColorHex() : (_nc.primary_color || '')),
-            contact_line: _contact.join('  |  ')
-          }
+          brand: _magicLinkBrand()
         })
       });
       if (fr.status === 404) { fnDown = true; }   // function not deployed yet — legacy fallback
@@ -4413,6 +4445,11 @@ function _staffMagicClose(){
 // email path) and hand it to the admin — clipboard first, with the visible
 // selectable input as the always-works fallback.
 async function _staffMagicCopy(email){
+  // Defense-in-depth: window-exposed and callable directly, so re-check the
+  // authority here too (send-magic-link enforces server-side regardless).
+  if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageStaffRecord', window.currentRole)){
+    showToast('You are not authorized to generate sign-in links.', {type:'error'}); return;
+  }
   var btn = document.getElementById('_staffMagicCopyBtn');
   if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
   try {
@@ -4483,6 +4520,11 @@ async function _staffMagicCopy(email){
 }
 // EMAIL path — the original behaviour (branded pipeline, expiry line included).
 async function _staffMagicEmail(email){
+  // Defense-in-depth: window-exposed and callable directly, so re-check the
+  // authority here too (send-magic-link enforces server-side regardless).
+  if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageStaffRecord', window.currentRole)){
+    showToast('You are not authorized to send sign-in links.', {type:'error'}); return;
+  }
   var btn = document.getElementById('_staffMagicEmailBtn');
   if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
   try {
@@ -4490,10 +4532,6 @@ async function _staffMagicEmail(email){
     // and emails it via the nation's branded pipeline (from housing mailbox),
     // including the recipient's access-expiry date — instead of Supabase's own
     // generic auth email.
-    var _nc = window.NATION_CONFIG || {};
-    var _contact = [];
-    if(_nc.phone) _contact.push(_nc.phone);
-    var _em = _nc.email || _nc.housing_email; if(_em) _contact.push(_em);
     var token = (window.HOUSING_SESSION && HOUSING_SESSION.accessToken) || '';
     var r = await fetch(SUPABASE_URL + '/functions/v1/send-magic-link', {
       method:  'POST',
@@ -4501,13 +4539,7 @@ async function _staffMagicEmail(email){
       body:    JSON.stringify({
         email: email,
         redirect_to: window.location.origin + '/index.html',
-        brand: {
-          nation_name:  _nc.display_name || _nc.short || '',
-          // Normalised registry colour -> live theme accent fallback (shared
-          // resolver) - the raw registry value alone left this email slate.
-          brand_color:  (typeof _resolveBrandColorHex === 'function' ? _resolveBrandColorHex() : (_nc.primary_color || '')),
-          contact_line: _contact.join('  |  ')
-        }
+        brand: _magicLinkBrand()
       })
     });
     var data = await r.json().catch(function(){ return {}; });
@@ -8110,7 +8142,7 @@ async function runDocPoolMigration() {
     }
   }
   console.log('[migration] Done. ' + ok + ' migrated, ' + fail + ' failed.');
-  if (typeof showToast === 'function') showToast('Migration: ' + ok + ' moved, ' + fail + ' failed', {type:'error'});
+  if (typeof showToast === 'function') showToast('Migration: ' + ok + ' moved, ' + fail + ' failed', {type: fail ? 'error' : 'info'});
 }
 window.runDocPoolMigration = runDocPoolMigration;
 function setExportView(viewName) {
@@ -8985,7 +9017,16 @@ function sbSaveSowRow(entity){
         fetch(SUPABASE_URL+'/rest/v1/housing_sow?unit_id=eq.'+encodeURIComponent(entity.unit_id)+'&select=data',
           { headers: HOUSING_HEADERS })
           .then(function(r){ return r.ok ? r.json() : null; })
-          .then(function(fr){ if(fr && fr[0] && window._sowCache) window._sowCache[entity.unit_id] = fr[0].data; })
+          .then(function(fr){
+            if(fr && fr[0] && window._sowCache) window._sowCache[entity.unit_id] = fr[0].data;
+            // Refresh the surfaces still showing the stale list the toast
+            // just warned about.
+            try {
+              if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(entity.unit_id);
+              if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+              if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
+            } catch(e){}
+          })
           .catch(function(){});
         return true;   // clear the queue entry — this payload must never retry
       }

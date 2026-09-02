@@ -14,8 +14,9 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   emailConfigured, isValidEmail, escapeHtml, renderBrandedEmail, emailBrand,
-  sendEmail, sendEmailSerially,
+  sendEmail, sendEmailSerially, isSafeRedirect,
 } from '../_shared/email.ts'
+import { uploadMrPhotos, mrSubject, resolveStaffRecipients } from '../_shared/mr.ts'
 
 const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')
 const ANON_KEY          = Deno.env.get('SUPABASE_ANON_KEY')
@@ -44,22 +45,9 @@ function json(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 }
 
-// Resolve the housing recipients for the "new application submitted" email.
-async function resolveHousingRecipients(admin: any): Promise<Array<{ to: string; to_name?: string }>> {
-  const seen = new Set<string>()
-  const out: Array<{ to: string; to_name?: string }> = []
-  for (const e of NOTIFY_TO) { const k = e.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push({ to: e }) } }
-  try {
-    const { data } = await admin.from('staff').select('email, name, role, is_active').eq('is_active', true)
-    for (const s of (data || [])) {
-      if (NOTIFY_ROLES.indexOf(String(s.role || '').toLowerCase()) === -1) continue
-      if (!isValidEmail(s.email)) continue
-      const k = String(s.email).toLowerCase()
-      if (seen.has(k)) continue
-      seen.add(k); out.push({ to: s.email, to_name: s.name || undefined })
-    }
-  } catch (_e) { /* explicit list only */ }
-  return out
+// Resolve the housing recipients for staff notifications (shared resolver).
+function resolveHousingRecipients(admin: any): Promise<Array<{ to: string; to_name?: string }>> {
+  return resolveStaffRecipients(admin, NOTIFY_ROLES, NOTIFY_TO, isValidEmail)
 }
 
 const TYPE_LABEL: Record<string, string> = { new: 'application', update: 'application update', transfer: 'transfer request' }
@@ -99,45 +87,9 @@ async function notifySubmission(admin: any, row: any, applicantEmail: string, ap
   }
 }
 
-// --- Portal maintenance-request photos (mirrors tenant-mr) ----------------
-const MRQ_MAX_PHOTOS = 3
-const MRQ_MAX_PHOTO_BYTES = 6 * 1024 * 1024
-const MRQ_PHOTO_MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+// Portal maintenance-request photos: shared with tenant-mr via _shared/mr.ts
+// (same caps, mime map and storage path convention).
 const MRQ_BUCKET = Deno.env.get('STORAGE_BUCKET') || 'housing-files'
-function mrqDecodePhoto(dataUrl: string): { bytes: Uint8Array; ext: string; contentType: string } | null {
-  if (typeof dataUrl !== 'string') return null
-  const m = dataUrl.match(/^data:([^;,]+);base64,([\s\S]+)$/)
-  if (!m) return null
-  const contentType = m[1].toLowerCase()
-  const ext = MRQ_PHOTO_MIME[contentType]
-  if (!ext) return null
-  let bin: string
-  try { bin = atob(m[2]) } catch { return null }
-  if (bin.length > MRQ_MAX_PHOTO_BYTES) return null
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return { bytes, ext, contentType }
-}
-// Same storage path convention as the QR flow, so staff review shows portal
-// photos identically. A failed photo is skipped, never sinks the request.
-async function mrqUploadPhotos(admin: any, unitId: string, submissionId: string, raw: unknown): Promise<string[]> {
-  let list: unknown[] = []
-  if (Array.isArray(raw)) list = raw
-  else if (typeof raw === 'string' && raw) list = [raw]
-  if (!list.length) return []
-  const paths: string[] = []
-  for (let i = 0; i < list.length && paths.length < MRQ_MAX_PHOTOS; i++) {
-    const dec = mrqDecodePhoto(String(list[i] || ''))
-    if (!dec) continue
-    const path = 'tenants/' + unitId + '/tenant-mr/' + submissionId + '/photo-' + (paths.length + 1) + '.' + dec.ext
-    try {
-      const { error } = await admin.storage.from(MRQ_BUCKET)
-        .upload(path, dec.bytes, { contentType: dec.contentType, upsert: true })
-      if (!error) paths.push(path)
-    } catch (_e) { /* skip this photo, keep the request */ }
-  }
-  return paths
-}
 
 // --- Member portal: resolve the signed-in member's UNIT -------------------
 // Email-matched tenants row first (the tenant file), then a linked
@@ -146,8 +98,13 @@ async function mrqUploadPhotos(admin: any, unitId: string, submissionId: string,
 async function resolveMemberUnit(admin: any, email: string, linkedAppIds: string[]): Promise<{ id: string; address: string } | null> {
   try {
     let unitId: string | null = null
+    // ilike gives case-insensitivity, but the email must be treated as a
+    // LITERAL: unescaped % / _ are LIKE wildcards, and underscores are legal
+    // in emails -- an account like mary_s@x.com would match mary.s@x.com and
+    // resolve SOMEONE ELSE'S unit (and their maintenance history).
+    const emailLit = email.replace(/[\\%_]/g, (c: string) => '\\' + c)
     const { data: ts } = await admin.from('tenants')
-      .select('current_unit_id').ilike('email', email).is('merged_into', null)
+      .select('current_unit_id').ilike('email', emailLit).is('merged_into', null)
       .not('current_unit_id', 'is', null).limit(1)
     if (ts && ts[0] && ts[0].current_unit_id) unitId = ts[0].current_unit_id
     if (!unitId && linkedAppIds && linkedAppIds.length) {
@@ -168,9 +125,7 @@ async function notifyPortalMr(admin: any, info: { address: string; category: str
   if (!emailConfigured()) return
   const recipients = await resolveHousingRecipients(admin)
   if (!recipients.length) return
-  const urg = (info.urgency || 'routine').toLowerCase()
-  const subject = (urg === 'emergency' ? 'EMERGENCY ' : urg === 'urgent' ? 'Urgent ' : '')
-    + 'maintenance request - ' + (info.address || 'a unit')
+  const subject = mrSubject(info.urgency, info.address)
   const inner = '<p style="font-size:14px;color:#333;margin:0 0 6px;">A maintenance request was submitted through the member portal for <b>' + escapeHtml(info.address) + '</b>.</p>'
     + (info.category ? '<p style="font-size:13px;color:#333;margin:0 0 4px;"><b>Category:</b> ' + escapeHtml(info.category) + '</p>' : '')
     + '<p style="font-size:13px;color:#333;margin:0 0 4px;"><b>Urgency:</b> ' + escapeHtml(info.urgency) + '</p>'
@@ -210,22 +165,34 @@ const PORTAL_CLOSED_MSG = 'Online applications are currently closed. Please cont
 // Generic on purpose -- never disclose the expected length or prefix.
 const BAND_FAIL_MSG = 'That band / membership number could not be verified. Please check the number on your status card, or contact the Housing office.'
 
-// Only allow magic-link redirects back to our own hosts (defense in depth;
-// Supabase also validates against its Redirect URL allow-list).
-function isSafeRedirect(u: string): boolean {
+// Brute-force lock on the band-prefix check: without one, a confirmed account
+// could loop submit with prefixes 000-999 and learn the nation prefix from
+// the ok/fail difference. Failures are counted per ACCOUNT (uid) in the
+// append-only audit log; past the cap every band check for that account fails
+// with the same generic message (no oracle left). Fails open on read errors.
+const BAND_FAIL_MAX = 5
+const BAND_FAIL_WINDOW_HOURS = 24
+async function bandCheckLocked(admin: any, uid: string): Promise<boolean> {
   try {
-    const url = new URL(u)
-    const h = url.hostname
-    const localOk = (h === 'localhost' || h === '127.0.0.1')
-    if (url.protocol !== 'https:' && !localOk) return false
-    // Our own hosts ONLY. The old wildcard *.pages.dev / *.workers.dev
-    // acceptance meant ANY attacker-registered Cloudflare Pages/Workers
-    // subdomain was an accepted post-auth redirect target (open-redirect
-    // token leak; Supabase's own uri_allow_list was the only real gate).
-    // Mirrors support-login's safeRedirect.
-    return h === 'fnhub.app' || h.endsWith('.fnhub.app') || localOk
-  } catch { return false }
+    const since = new Date(Date.now() - BAND_FAIL_WINDOW_HOURS * 3600000).toISOString()
+    const { count } = await admin.from('housing_audit_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('entity_id', 'PORTAL:' + uid).eq('action', 'portal_band_check_failed').gte('created_at', since)
+    return (count || 0) >= BAND_FAIL_MAX
+  } catch (_e) { return false }
 }
+async function recordBandCheckFail(admin: any, uid: string, email: string): Promise<void> {
+  try {
+    await admin.from('housing_audit_log').insert({
+      entity_type: 'portal', entity_id: 'PORTAL:' + uid, action: 'portal_band_check_failed',
+      detail: 'Band / registry number failed the server-side check', actor: email,
+    })
+  } catch (_e) { /* best-effort */ }
+}
+
+// Redirect allow-listing: shared isSafeRedirect (_shared/email.ts) -- our
+// own hosts only. (The old wildcard *.pages.dev / *.workers.dev acceptance
+// was an open-redirect token leak; see that helper's comment.)
 
 // Throttle magic-link requests per email + per IP. Generic (never reveals
 // whether an address exists). Degrades to "no limit" if the table is absent.
@@ -308,7 +275,10 @@ serve(async (req) => {
       if (!isValidEmail(linkEmail)) return json({ error: 'Please enter a valid email address.' }, 400)
       const rawRedirect = String(body.redirect_to || '').trim()
       const redirectTo  = isSafeRedirect(rawRedirect) ? rawRedirect : undefined
-      const ip = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim()
+      // cf-connecting-ip first: the leftmost x-forwarded-for hop is
+      // client-suppliable, which let the per-IP budget be walked with a
+      // spoofed header; Cloudflare's own header is not.
+      const ip = (req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
       const admin0 = createClient(SUPABASE_URL, SERVICE_KEY)
       if (!(await portalEnabled(admin0))) return json({ error: PORTAL_CLOSED_MSG, portal_disabled: true }, 503)
       // Rate-limit BEFORE the band-number gate so prefix guessing burns the
@@ -347,10 +317,15 @@ serve(async (req) => {
     const email = (user.email || '').toLowerCase()
     const admin = createClient(SUPABASE_URL, SERVICE_KEY)
 
-    // External-applications master switch: when OFF, every portal action is
-    // refused -- including staff invites, so a disabled portal cannot be
-    // half-used. Staff get a message pointing at the setting.
-    if (!(await portalEnabled(admin))) {
+    // External-applications master switch. When OFF, the APPLICATION-intake
+    // actions are refused (save_draft/submit/withdraw/invite) -- but the
+    // MEMBER portal (My Home card, maintenance reporting, status view) is a
+    // separate feature housed members rely on: 'ping' still answers (flagged
+    // portal_disabled so the client shows the applications-closed notice) and
+    // 'report_mr' still files. Closing application intake is a routine event
+    // and must not silently kill tenant maintenance reporting.
+    const applicationsOpen = await portalEnabled(admin)
+    if (!applicationsOpen && action !== 'ping' && action !== 'report_mr') {
       if (action === 'invite') return json({ error: 'External applications are turned OFF in Settings -> Config. Turn them on to invite applicants.' }, 503)
       return json({ error: PORTAL_CLOSED_MSG, portal_disabled: true }, 503)
     }
@@ -390,7 +365,8 @@ serve(async (req) => {
       // driven off the profile's persistent linked_app_ids (NOT the one-time
       // invite row), so it is idempotent: it still populates the portal even if
       // the invite was already consumed on an earlier sign-in.
-      try {
+      // Skipped while application intake is closed (no new drafts then).
+      if (applicationsOpen) try {
         // 1) Merge any fresh invite app_ids into the profile's linked list.
         const { data: pr } = await admin.from('applicant_profiles').select('linked_app_ids').eq('uid', uid).limit(1)
         const linked: string[] = (pr && pr[0] && pr[0].linked_app_ids) || []
@@ -433,6 +409,22 @@ serve(async (req) => {
       const { data: subs } = await admin.from('application_submissions')
         .select('id, submission_type, status, linked_app_id, created_app_id, review_notes, submitted_at, updated_at')
         .eq('applicant_uid', uid).order('updated_at', { ascending: false })
+      // Live application status per submission: an accepted submission's
+      // APPLICATION keeps moving (approved -> assigned to a unit) and the
+      // portal should reflect that, not the frozen submission status.
+      try {
+        const appIds = (subs || []).map((s: any) => s.created_app_id || s.linked_app_id).filter(Boolean)
+        if (appIds.length) {
+          const { data: liveApps } = await admin.from('housing_applications')
+            .select('id, status, assigned_unit_id').in('id', appIds)
+          const byId: Record<string, any> = {}
+          for (const a of (liveApps || [])) byId[a.id] = a
+          for (const s of (subs || []) as any[]) {
+            const a = byId[s.created_app_id || s.linked_app_id]
+            if (a) s.app_status = { status: a.status || '', assigned: !!a.assigned_unit_id }
+          }
+        }
+      } catch (_e) { /* enrichment is best-effort */ }
       // band_required tells the portal to demand a 10-digit registry number.
       // The 3-digit prefix itself is NEVER sent to the client -- disclosing it
       // would hand a spoofer the exact format to fabricate; the prefix match
@@ -447,12 +439,14 @@ serve(async (req) => {
       if (memberUnit) {
         try {
           const { data: mrs } = await admin.from('tenant_mr_submissions')
-            .select('id, created_at, category, urgency, status, review_notes, sow_project_number')
+            .select('id, created_at, category, urgency, status, review_notes, sow_project_number, description, reviewed_at')
             .eq('unit_id', memberUnit.id).order('created_at', { ascending: false }).limit(5)
           memberMrs = mrs || []
         } catch (_e) { /* list is optional */ }
       }
-      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [], band_required: !!bandPrefix, unit: memberUnit, maintenance: memberMrs })
+      return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [], band_required: !!bandPrefix, unit: memberUnit, maintenance: memberMrs,
+        portal_disabled: applicationsOpen ? undefined : true,
+        closed_message: applicationsOpen ? undefined : PORTAL_CLOSED_MSG })
     }
 
     // --- save_draft: create or update the applicant's OWN draft ---
@@ -511,11 +505,16 @@ serve(async (req) => {
       // Anti-spoofing: neither error message reveals the expected prefix.
       const reqPrefix = await nationBandPrefix(admin)
       if (reqPrefix) {
+        // Brute-force lock: past the failure cap, every check for this
+        // account fails generically -- the ok/fail oracle is gone.
+        if (await bandCheckLocked(admin, uid)) return json({ error: BAND_FAIL_MSG }, 429)
         const band = String(p.band || '').replace(/[\s-]/g, '')
         if (!/^\d{10}$/.test(band)) {
+          await recordBandCheckFail(admin, uid, email)
           return json({ error: BAND_FAIL_MSG }, 400)
         }
         if (band.slice(0, 3) !== reqPrefix) {
+          await recordBandCheckFail(admin, uid, email)
           return json({ error: BAND_FAIL_MSG }, 400)
         }
         p.band = band   // persist the normalized (digits-only) form
@@ -549,7 +548,10 @@ serve(async (req) => {
         .select('id, applicant_uid, status').eq('id', subId).limit(1)
       const row = rows && rows[0]
       if (!row || row.applicant_uid !== uid) return json({ error: 'Not found.' }, 404)
-      if (['submitted', 'in_review', 'changes_requested'].indexOf(row.status) === -1) {
+      // 'draft' included: stray drafts (invite seeding + "start a different
+      // application") were unreachable AND undeletable -- members can now
+      // clear their own unsent drafts.
+      if (['draft', 'submitted', 'in_review', 'changes_requested'].indexOf(row.status) === -1) {
         return json({ error: 'This application cannot be withdrawn.' }, 409)
       }
       await admin.from('application_submissions')
@@ -562,7 +564,7 @@ serve(async (req) => {
     // Writes the same staging queue as the QR flow (tenant_mr_submissions),
     // same rate limit + staff notification, tagged with the member's email. ---
     if (action === 'report_mr') {
-      const { data: pr2 } = await admin.from('applicant_profiles').select('linked_app_ids').eq('uid', uid).limit(1)
+      const { data: pr2 } = await admin.from('applicant_profiles').select('linked_app_ids, full_name').eq('uid', uid).limit(1)
       const linked2: string[] = (pr2 && pr2[0] && pr2[0].linked_app_ids) || []
       const unit = await resolveMemberUnit(admin, email, linked2)
       if (!unit) return json({ error: 'No unit is linked to your account yet. Contact the Housing office to have your home added to your file.' }, 400)
@@ -571,9 +573,11 @@ serve(async (req) => {
       const category = String(body.category || '').trim().slice(0, 80)
       const URG2 = ['routine', 'urgent', 'emergency']
       const urgency = URG2.indexOf(String(body.urgency || '')) !== -1 ? String(body.urgency) : 'routine'
-      const contactName = String(body.contact_name || '').trim().slice(0, 120)
+      // The portal never sends contact_name -- use the member's profile name
+      // so the staff email and row aren't stuck with a bare email address.
+      const contactName = String((pr2 && pr2[0] && pr2[0].full_name) || '').trim().slice(0, 120)
       const contactPhone = String(body.contact_phone || '').trim().slice(0, 40)
-      const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+      const ip = (req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
       const sinceIso = new Date(Date.now() - 10 * 60000).toISOString()
       const { count: mrCount } = await admin.from('tenant_mr_submissions')
         .select('id', { count: 'exact', head: true }).eq('unit_id', unit.id).gte('created_at', sinceIso)
@@ -592,7 +596,7 @@ serve(async (req) => {
       // the QR flow's so the staff review modal renders them unchanged.
       try {
         if (mrIns && mrIns[0] && body.photos) {
-          const pPaths = await mrqUploadPhotos(admin, unit.id, mrIns[0].id, body.photos)
+          const pPaths = await uploadMrPhotos(admin, MRQ_BUCKET, unit.id, mrIns[0].id, body.photos)
           if (pPaths.length) await admin.from('tenant_mr_submissions').update({ photo_path: JSON.stringify(pPaths) }).eq('id', mrIns[0].id)
         }
       } catch (_e) { /* photos are best-effort */ }

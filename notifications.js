@@ -3195,8 +3195,7 @@ function _ntfSanitizeNode(node) {
 // Uses the existing PostgREST upsert pattern from saveScoringModelED.
 // ED-only: same gate as the rest of the editable settings surfaces.
 function saveNotificationTemplate() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit notification templates', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can edit notification templates')) return;
   var ed = _ntfReadEditorState();
   if (!ed) return;
   var all  = (window._appSettings && window._appSettings.email_templates) || {};
@@ -4145,8 +4144,7 @@ function _termsWireEditor() {
 }
 
 function saveTermsDoc() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit terms & conditions', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can edit terms & conditions')) return;
   if (!_termsSelectedDoc) { showToast('Select a document first', {type:'error'}); return; }
 
   var bodyEl = document.getElementById('terms_body');
@@ -5001,8 +4999,7 @@ function _contractsReadClauses() {
 }
 
 function saveContractsDoc() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can edit contracts')) return;
   if (!_contractsSelectedDoc) { showToast('Select a document first', {type:'error'}); return; }
 
   var bodyEl = document.getElementById('contracts_body');
@@ -5090,8 +5087,7 @@ function _rfqDocEditorHtml() {
     + '</div>';
 }
 function saveRfqDocumentStrings() {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts', {type:'error'}); return; }
+  if (!_cfgEdGuard('Only the Executive Director can edit contracts')) return;
   var g = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ''; };
   var obj = {};
   _RFQDOC_EDIT_KEYS.forEach(function(grp){
@@ -5125,8 +5121,7 @@ window.saveRfqDocumentStrings  = saveRfqDocumentStrings;
 window.resetRfqDocumentStrings = resetRfqDocumentStrings;
 
 function toggleHideSignatures(el) {
-  var role = window.currentRole || window._realRole;
-  if (role !== 'ed') { showToast('Only the Executive Director can change this', {type:'error'}); if (el) el.checked = _docSigsHidden(); return; }
+  if (!_cfgEdGuard('Only the Executive Director can change this')) { if (el) el.checked = _docSigsHidden(); return; }
   var on = !!(el && el.checked);
   persistSetting('hide_signatures', on, {
     auditAction: 'contracts_hide_signatures',

@@ -156,20 +156,23 @@
       return d.toISOString().replace('T',' ').slice(0,16) + ' UTC';
     } catch(e){ return String(s); }
   }
-  function _ticAge(dob){
-    if(!dob) return '';
-    var d = new Date(dob);
-    if(isNaN(d.getTime())) return '';
-    var diff = Date.now() - d.getTime();
-    var age = new Date(diff).getUTCFullYear() - 1970;
-    return age >= 0 ? String(age) + ' yrs' : '';
-  }
+  // Age-from-DOB: delegate to the canonical policyAgeYears (policy-rules.js,
+  // loaded on every page housing-tic.js loads on) so the min-age policy gate
+  // and the TIC never disagree; local formula kept only as a fallback.
   function _ticAgeNum(dob){
     if(!dob) return null;
+    if(typeof policyAgeYears === 'function'){
+      var a = policyAgeYears(dob);
+      return (a != null && a >= 0) ? a : null;
+    }
     var d = new Date(dob);
     if(isNaN(d.getTime())) return null;
     var age = new Date(Date.now() - d.getTime()).getUTCFullYear() - 1970;
     return age >= 0 ? age : null;
+  }
+  function _ticAge(dob){
+    var a = _ticAgeNum(dob);
+    return a == null ? '' : String(a) + ' yrs';
   }
   function _ticPet(species){
     var s = (species||'').toLowerCase();
@@ -476,7 +479,12 @@
   var TIC_TENANCY_OPTIONS = ['active','vacated','transferred','evicted','suspended','deceased','bankrupt','banished','harbouring'];
   var TIC_LEASE_TYPE_OPTIONS = ['Rental','Rent-to-Own','Lease-to-Own','Market','Subsidized','Elders','Family Compound','Other'];
   var TIC_INCOME_PERSONS = ['Applicant','Co-Applicant'];
-  var TIC_INCOME_TYPES   = ['Employed','Self-Employment','OW','ODSP','CPP','EI','Pension','Other'];
+  // Derived from the canonical shared-config list ('No Income' excluded —
+  // staff record actual income rows only); inline fallback keeps the TIC
+  // working if shared-config predates INCOME_TYPES.
+  var TIC_INCOME_TYPES = (window.INCOME_TYPES || []).map(function(t){ return t.v; })
+    .filter(function(v){ return v !== 'No Income'; });
+  if(!TIC_INCOME_TYPES.length) TIC_INCOME_TYPES = ['Employed','Self-Employment','OW','ODSP','CPP','EI','Pension','Other'];
   var TIC_OVERVIEW_FIELDS = [
     { key: TIC_C.wait_list_date,  label: 'Wait List Date',      type: 'date',   readOnly: true },
     { key: TIC_C.lease_type,      label: 'Lease Type',          type: 'select', options: TIC_LEASE_TYPE_OPTIONS },
@@ -1228,7 +1236,7 @@
   // Records that came in through the applicant portal used its old friendly
   // type labels; normalize the unambiguous ones to the canonical staff values
   // so the OW/ODSP household-rent machinery recognizes them.
-  var TIC_INCOME_TYPE_ALIASES = {
+  var TIC_INCOME_TYPE_ALIASES = window.INCOME_TYPE_CANON || {
     'Employment': 'Employed', 'Self-employed': 'Self-Employment',
     'Employment Insurance': 'EI', 'Disability (ODSP)': 'ODSP',
     'Social Assistance': 'OW', 'Ontario Works': 'OW', 'Child Benefit': 'Other'
@@ -1518,6 +1526,13 @@
   }
   // First income row's type for a person ('Applicant'/'Co-Applicant') — an
   // OW/ODSP row wins so the select surfaces the benefit status.
+  // Canonicalize a stored income type through the portal-label alias map so
+  // legacy portal records ('Ontario Works', 'Disability (ODSP)', …) read as
+  // OW/ODSP here the same way they do in the edit form.
+  function _ticCanonIncomeType(t){
+    t = t || '';
+    return TIC_INCOME_TYPE_ALIASES[t] || t;
+  }
   function _ticPersonIncomeType(person){
     var app = _ticState.application;
     var rows = _ticIsArray(app && app.incomes) ? app.incomes : [];
@@ -1525,8 +1540,9 @@
     for(var i = 0; i < rows.length; i++){
       var r = rows[i];
       if(!r || r.person !== person) continue;
-      if(r.incomeType === 'OW' || r.incomeType === 'ODSP') return r.incomeType;
-      if(!first && r.incomeType) first = r.incomeType;
+      var t = _ticCanonIncomeType(r.incomeType);
+      if(t === 'OW' || t === 'ODSP') return t;
+      if(!first && t) first = t;
     }
     return first;
   }
@@ -1548,7 +1564,7 @@
     hab.forEach(function(h){
       if(!h || (!h.fn && !h.ln)) return;
       var ageN = _ticAgeNum(h.dob);
-      var t = h.incomeSource || '';
+      var t = _ticCanonIncomeType(h.incomeSource);
       // Adult when DOB confirms 18+, or DOB unknown but an income source was
       // recorded (staff marked them as an income-earning adult).
       var adult = (ageN != null) ? ageN >= 18 : !!t;
@@ -2674,7 +2690,7 @@
     mo.innerHTML =
         '<div class="modal" style="max-width:440px;">'
       + '<div class="modal-hdr"><div><h2 style="font-size:16px;">Correct Name</h2>'
-      +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">Fixes the spelling on the tenant record, the unit, and the application together, and keeps all history on the same file.</div></div>'
+      +   '<div class="modal-hdr-sub">Fixes the spelling on the tenant record, the unit, and the application together, and keeps all history on the same file.</div></div>'
       +   '<button class="modal-close" onclick="var m=document.getElementById(\'ticRenameModal\');if(m)m.remove();">&#x2715;</button></div>'
       + '<div style="padding:16px;">'
       +   '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Currently on file: <strong>' + _ticEsc(oldName) + '</strong></div>'

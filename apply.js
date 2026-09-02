@@ -221,8 +221,23 @@
   var _ACCEPTED_BY_TYPE = { update: 'Processed — file updated', transfer: 'Accepted — in the housing queue', new: 'Accepted — in the housing queue' };
   function _statusLabel(s) {
     var st = s.status || 'draft';
-    if (st === 'approved' && _ACCEPTED_BY_TYPE[s.submission_type]) return _ACCEPTED_BY_TYPE[s.submission_type];
+    if (st === 'approved') {
+      // The APPLICATION keeps moving after acceptance — show where it is now.
+      var a = s.app_status || null;
+      if (a && a.assigned) return 'Housed — unit assigned';
+      if (a && a.status === 'declined') return 'Reviewed — not approved';
+      if (_ACCEPTED_BY_TYPE[s.submission_type]) return _ACCEPTED_BY_TYPE[s.submission_type];
+    }
     return STATUS_LABEL[st] || st;
+  }
+  // Pill colour follows the live state too (housed = green, declined = red).
+  function _statusCls(s) {
+    var st = s.status || 'draft';
+    if (st === 'approved' && s.app_status) {
+      if (s.app_status.assigned) return 'approved';
+      if (s.app_status.status === 'declined') return 'rejected';
+    }
+    return st;
   }
   var TYPE_LABEL = { new: 'New application', update: 'Application update', transfer: 'Transfer request' };
 
@@ -262,28 +277,53 @@
     var linked = (prof && prof.linked_app_ids) || [];
     var name = (prof && prof.full_name) || '';
 
+    // Applications-closed flag: the member portal (My Home + maintenance)
+    // keeps working; only the application-intake actions are unavailable.
+    var portalClosed = !!(res.data && res.data.portal_disabled);
     var listHtml = subs.length
       ? '<ul class="sublist">' + subs.map(function (s) {
           var st = s.status || 'draft';
           var noteLine = (st === 'changes_requested' && s.review_notes)
             ? '<div style="width:100%;font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:7px;padding:7px 9px;margin-top:6px;"><b>Changes requested:</b> ' + esc(s.review_notes) + '</div>'
             : '';
+          // Every editable row gets its OWN Continue (a newer draft used to
+          // shadow a changes_requested submission — only editable[0] was ever
+          // reachable), and drafts can be removed (server-side withdraw).
+          var canEdit = !portalClosed && (st === 'draft' || st === 'changes_requested');
+          var rowBtns = canEdit
+            ? '<div style="width:100%;display:flex;gap:8px;margin-top:8px;">'
+              + '<button class="btn" type="button" style="width:auto;margin:0;padding:8px 16px;font-size:13px;" onclick="applyContinue(\'' + esc(s.id) + '\')">Continue &rarr;</button>'
+              + (st === 'draft' ? '<button class="btn ghost" type="button" style="width:auto;margin:0;padding:8px 14px;font-size:13px;" onclick="applyRemoveDraft(\'' + esc(s.id) + '\')">Remove</button>' : '')
+              + '</div>'
+            : '';
           return '<li style="flex-wrap:wrap;"><span>' + esc(TYPE_LABEL[s.submission_type] || 'Application')
             + (s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleDateString() : '')
-            + '</span><span class="pill ' + esc(st) + '">' + esc(_statusLabel(s)) + '</span>'
-            + noteLine + '</li>';
+            + '</span><span class="pill ' + esc(_statusCls(s)) + '">' + esc(_statusLabel(s)) + '</span>'
+            + noteLine + rowBtns + '</li>';
         }).join('') + '</ul>'
       : '<div class="empty">You have no applications yet.</div>';
 
     // "Has application vs not" per account, plus any in-progress draft to resume.
     var hasApp = (linked && linked.length) || subs.some(function (s) { return s.status === 'approved'; });
     var editable = subs.filter(function (s) { return s.status === 'draft' || s.status === 'changes_requested'; });
+    // HOUSED members (unit on file, or an application assigned to a unit) only
+    // update their existing file / request a transfer — no new applications.
+    var housed = !!(res.data && res.data.unit) || subs.some(function (s) { return s.app_status && s.app_status.assigned; });
+    window._portalHoused = housed;
     var actionHtml, cardTitle, cardHint = '';
-    if (editable.length) {
+    if (portalClosed) {
+      cardTitle = 'Applications are closed';
+      cardHint = '<p class="sub" style="margin:6px 0 12px;">' + esc((res.data && res.data.closed_message) || 'Online applications are currently closed. Please contact the Housing office.') + '</p>';
+      actionHtml = '';
+    } else if (editable.length) {
       cardTitle = 'Continue your application';
       if (editable[0].status === 'changes_requested') cardHint = '<p class="sub" style="margin:6px 0 12px;color:#9a3412;">The Housing office asked for some changes. Continue to update and resubmit.</p>';
       actionHtml = '<button class="btn" type="button" onclick="applyContinue(\'' + esc(editable[0].id) + '\')">Continue &rarr;</button>'
-        + '<button class="btn ghost" type="button" onclick="showTypeChooser()">Start a different application</button>';
+        + '<button class="btn ghost" type="button" onclick="showTypeChooser()">' + (housed ? 'Update my housing file' : 'Start a different application') + '</button>';
+    } else if (housed) {
+      cardTitle = 'Manage your housing';
+      cardHint = '<p class="sub" style="margin:6px 0 12px;">You have a home with us — update your housing file or request a transfer. A new application isn\u2019t needed while you\u2019re housed.</p>';
+      actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Update my application</button>';
     } else if (hasApp) {
       cardTitle = 'Manage your housing';
       cardHint = '<p class="sub" style="margin:6px 0 12px;">Update your file, request a transfer, or start a new application.</p>';
@@ -303,16 +343,14 @@
       'approved': { label: 'Accepted \u2014 work order issued',  cls: 'approved' },
       'rejected': { label: 'Reviewed \u2014 not proceeding',     cls: 'rejected' }
     };
+    window._portalMrs = mrs;
     var mrListHtml = mrs.length
       ? '<div style="margin-top:14px;"><b style="font-size:13px;">Your maintenance requests</b><ul class="sublist" style="margin-top:8px;">'
-        + mrs.map(function (m) {
+        + mrs.map(function (m, mi) {
             var st = MR_STATUS[m.status] || { label: m.status || 'Received', cls: 'submitted' };
-            var noteLine = (m.status === 'rejected' && m.review_notes)
-              ? '<div class="msg err" style="display:block;width:100%;margin-top:6px;font-size:12px;padding:7px 9px;">' + esc(m.review_notes) + '</div>'
-              : '';
-            return '<li style="flex-wrap:wrap;"><span>' + esc(m.category || 'Maintenance')
+            return '<li onclick="mrView(' + mi + ')" style="flex-wrap:wrap;cursor:pointer;"><span>' + esc(m.category || 'Maintenance')
               + (m.created_at ? ' \u00b7 ' + new Date(m.created_at).toLocaleDateString() : '')
-              + '</span><span class="pill ' + esc(st.cls) + '">' + esc(st.label) + '</span>' + noteLine + '</li>';
+              + '</span><span class="pill ' + esc(st.cls) + '">' + esc(st.label) + '</span></li>';
           }).join('') + '</ul></div>'
       : '';
     var homeHtml = window._portalUnit
@@ -383,6 +421,9 @@
       _mrCompress(file, function (dataUrl) {
         if (dataUrl && _mrq.photos.length < MR_MAX_PHOTOS) _mrq.photos.push(dataUrl);
         _mrRenderPhotos();
+        // A failed decode (unsupported format, corrupt file) used to be
+        // silent — the member believed the photo attached.
+        if (!dataUrl) setMsg('mr_msg', 'That photo could not be read. Try a different photo (JPEG or PNG works best).', 'err');
       });
     });
     wrap.querySelectorAll('[data-rm]').forEach(function (b) {
@@ -404,6 +445,40 @@
     }).join('');
   }
 
+  // Read-only view of a submitted request: what was reported plus the
+  // workflow dates (submitted -> reviewed). Locked — members can't edit a
+  // request once it's with the Housing office.
+  window.mrView = function (i) {
+    var m = (window._portalMrs || [])[i];
+    if (!m) { showDashboard(); return; }
+    var MR_STATUS = {
+      'new':      { label: 'Received \u2014 waiting for review', cls: 'submitted' },
+      'approved': { label: 'Accepted \u2014 work order issued',  cls: 'approved' },
+      'rejected': { label: 'Reviewed \u2014 not proceeding',     cls: 'rejected' }
+    };
+    var st = MR_STATUS[m.status] || { label: m.status || 'Received', cls: 'submitted' };
+    var line = function (l, v) { return v ? '<div style="font-size:13px;margin:4px 0;"><b>' + esc(l) + ':</b> ' + esc(v) + '</div>' : ''; };
+    var fmtD = function (d) { return d ? new Date(d).toLocaleDateString() : ''; };
+    app.innerHTML =
+      '<button type="button" class="backlink" onclick="showDashboardPublic()">&larr; Back</button>'
+      + '<h1>' + esc(m.category || 'Maintenance request') + '</h1>'
+      + '<p class="sub" style="margin:0 0 12px;">' + esc((window._portalUnit || {}).address || '') + '</p>'
+      + '<span class="pill ' + esc(st.cls) + '">' + esc(st.label) + '</span>'
+      + '<div class="card">'
+      +   line('Submitted', fmtD(m.created_at))
+      +   line('Reviewed by the Housing office', fmtD(m.reviewed_at))
+      +   (m.status === 'approved' && m.sow_project_number ? line('Work order', m.sow_project_number) : '')
+      +   line('Urgency', m.urgency)
+      + '</div>'
+      + '<div class="card"><h3>What you reported</h3>'
+      +   '<div style="font-size:14px;white-space:pre-wrap;margin-top:6px;">' + esc(m.description || '') + '</div>'
+      + '</div>'
+      + (m.review_notes
+          ? '<div class="card"><h3>Housing office note</h3><div style="font-size:14px;white-space:pre-wrap;margin-top:6px;">' + esc(m.review_notes) + '</div></div>'
+          : '')
+      + '<p class="sub" style="margin-top:14px;">This request is locked \u2014 if something changed, report a new problem or contact the Housing office.</p>';
+  };
+
   window.mrStart = function () {
     var u = window._portalUnit;
     if (!u) { showDashboard(); return; }
@@ -416,6 +491,7 @@
   }
   function _mrStepCat() {
     _mrq.cur = {};
+    delete _mrq.editIdx;
     app.innerHTML = _mrHeader('What is the problem with?', 'For <b>' + esc((window._portalUnit || {}).address || 'your unit') + '</b>. Pick the closest match.', _mrq.items.length ? 'window._mrReview()' : 'showDashboardPublic()')
       + MRQ.TRADES.map(function (t, i) {
           return '<button type="button" class="choice" onclick="_mrPickCat(' + i + ')">' + esc((t.icon ? t.icon + ' ' : '') + t.cat) + '</button>';
@@ -443,6 +519,7 @@
   window._mrPickCompOther = function () {
     _mrq.cur.component = 'Other';
     _mrq.cur.issueOpts = [];
+    _mrq.cur.issues = []; _mrq.cur.other = '';   // never carry picks across components
     _mrIssuesStep();
   };
   window._mrPickComp = function (ci) {
@@ -450,6 +527,7 @@
     var c = t.components[ci]; if (!c) return;
     _mrq.cur.component = c.label;
     _mrq.cur.issueOpts = c.issues || [];
+    _mrq.cur.issues = []; _mrq.cur.other = '';   // never carry picks across components
     _mrIssuesStep();
   };
   function _mrIssuesStep() {
@@ -482,7 +560,10 @@
     }
     var issues = _mrq.cur.issues.slice();
     if (_mrq.cur.other) issues.push(_mrq.cur.other);
-    _mrq.items.push({ cat: _mrq.cur.cat, room: _mrq.cur.room, component: _mrq.cur.component, issues: issues });
+    var built = { cat: _mrq.cur.cat, room: _mrq.cur.room, component: _mrq.cur.component, issues: issues };
+    if (_mrq.editIdx != null && _mrq.items[_mrq.editIdx]) _mrq.items[_mrq.editIdx] = built;
+    else _mrq.items.push(built);
+    delete _mrq.editIdx;
     _mrq.cur = {};
     window._mrReview();
   };
@@ -490,8 +571,11 @@
   // Review-screen Back: reopen the LAST problem in the issues editor (its
   // picks restored) instead of stranding the member between Send and Cancel.
   window._mrReviewBack = function () {
-    var last = _mrq.items.pop();
+    // Edit IN PLACE: the item stays in the list; Done replaces it. Backing
+    // further out of the editor no longer silently deletes the problem.
+    var last = _mrq.items[_mrq.items.length - 1];
     if (!last) { _mrStepCat(); return; }
+    _mrq.editIdx = _mrq.items.length - 1;
     var ti = 0;
     MRQ.TRADES.forEach(function (t, i) { if (t.cat === last.cat) ti = i; });
     var t = MRQ.TRADES[ti] || { components: [] };
@@ -578,10 +662,15 @@
       desc: 'You currently rent a unit and are applying to move to a different one. This will be scored and ranked.' }
   ];
   window.showTypeChooser = function () {
+    // Housed members can only update / transfer — a fresh new-housing
+    // application would duplicate the file they already have.
+    var _types = window._portalHoused
+      ? APPLY_TYPES.filter(function (t) { return t.key !== 'new'; })
+      : APPLY_TYPES;
     app.innerHTML =
       '<h1>What kind of application?</h1>'
       + '<p class="sub" style="margin:0 0 16px;">Choose the option that matches your situation.</p>'
-      + APPLY_TYPES.map(function (t) {
+      + _types.map(function (t) {
           return '<button type="button" class="typecard" data-apptype="' + esc(t.key) + '"'
             + ' style="display:block;width:100%;text-align:left;background:var(--surface,#fff);border:2px solid var(--hair);border-radius:11px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:inherit;">'
             + '<div style="font-weight:700;font-size:15px;">' + esc(t.title) + '</div>'
@@ -625,18 +714,12 @@
   // staff wizard / TIC), with friendly labels for the member. Records saved
   // by the old label-valued list are normalized on render via _INC_CANON, so
   // drafts and re-opened submissions migrate themselves.
-  var INCOME_OPTS = [
-    { v: 'Employed',        l: 'Employment' },
-    { v: 'Self-Employment', l: 'Self-employed' },
-    { v: 'OW',              l: 'Ontario Works (OW)' },
-    { v: 'ODSP',            l: 'ODSP (Disability)' },
-    { v: 'EI',              l: 'Employment Insurance (EI)' },
-    { v: 'CPP',             l: 'CPP' },
-    { v: 'Pension',         l: 'Pension' },
-    { v: 'Other',           l: 'Other (child benefit, support, ...)' },
-    { v: 'No Income',       l: 'No income' }
-  ];
-  var _INC_CANON = { 'Employment': 'Employed', 'Self-employed': 'Self-Employment',
+  // Canonical income types come from shared-config.js (loaded by portal.html)
+  // so the portal, the staff wizard and the TIC can't drift; minimal inline
+  // fallback in case the config script failed to load.
+  var INCOME_OPTS = (window.INCOME_TYPES || []).map(function (t) { return { v: t.v, l: t.memberLabel || t.label || t.v }; });
+  if (!INCOME_OPTS.length) INCOME_OPTS = [{ v: 'Employed', l: 'Employment' }, { v: 'OW', l: 'Ontario Works (OW)' }, { v: 'ODSP', l: 'ODSP (Disability)' }, { v: 'Other', l: 'Other' }, { v: 'No Income', l: 'No income' }];
+  var _INC_CANON = window.INCOME_TYPE_CANON || { 'Employment': 'Employed', 'Self-employed': 'Self-Employment',
     'Employment Insurance': 'EI', 'Disability (ODSP)': 'ODSP',
     'Social Assistance': 'OW', 'Child Benefit': 'Other' };
   var PET_SIZES   = ['Small', 'Medium', 'Large'];
@@ -978,6 +1061,14 @@
     _wiz = { type: row.submission_type || 'new', id: row.id, step: 0, payload: row.payload || {} };
     wizRender();
   };
+  // Remove an unsent draft (server-side withdraw — drafts used to be
+  // undeletable, so seeded/extra drafts piled up with no way to clear them).
+  window.applyRemoveDraft = async function (id) {
+    if (!window.confirm('Remove this draft? Anything typed into it will be gone.')) return;
+    var res = await api('withdraw', { submission_id: id });
+    if (res.ok) { showDashboard(); }
+    else { window.alert((res.data && res.data.error) || 'Could not remove the draft. Please try again.'); }
+  };
 
   // ---- Boot ------------------------------------------------------------------
   function parseHash() {
@@ -995,7 +1086,10 @@
   var hash = parseHash();
   if (hash && hash.access_token) {
     setSession(hash.access_token, hash.refresh_token);
-    try { history.replaceState(null, '', REDIRECT); } catch (e) { location.hash = ''; }
+    // Strip the auth hash but keep the CURRENT page path (portal.html) — the
+    // hardcoded forwarder path (REDIRECT) put apply.html in the address bar,
+    // adding the forwarder hop to every reload.
+    try { history.replaceState(null, '', location.pathname); } catch (e) { location.hash = ''; }
     showDashboard();
   } else if (hash && hash.error) {
     showLogin();

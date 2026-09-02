@@ -2073,8 +2073,11 @@ function renderRentModelPanel(){
       + '<input type="number" min="0" step="0.01" id="rm_mkt_r' + b + '" value="' + money(m.market.rates[b]) + '"' + dis + '/>'
       + '<div id="rm_mkt_est' + b + '" style="font-size:11px;color:var(--muted);margin-top:3px;"></div></div>';
   }
+  // Heading from the model's own (editable) label — the region-specific
+  // "(CMHC — Ontario North)" parenthetical was hardcoded into multi-nation
+  // UI copy while the actual data source note IS config.
   var mktCard = '<div class="card" style="margin-top:14px;">'
-    + '<div class="ctitle">Baseline market rent by unit size (CMHC — Ontario North)</div>'
+    + '<div class="ctitle">' + escapeHtml((m.market && m.market.label) || 'Baseline Market Rent') + ' by unit size</div>'
     + '<div class="fg c3">' + mktRows + '</div>'
     + '<div class="fg c2" style="margin-top:6px;">'
     +   '<div class="f"><label>Effective Date</label><input type="date" id="rm_mkt_date" value="' + (m.market.effectiveDate||'') + '"' + dis + '/></div>'
@@ -2217,10 +2220,22 @@ function saveRentModel(){
   catch(e){ showToast(e.message, {type:'error'}); return; }
   window._appSettings = window._appSettings || {};
   window._appSettings.rent_model = model;
-  if(typeof saveSettingWithDraftFallback === 'function') saveSettingWithDraftFallback('rent_model', model);
-  if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'rent_model_updated',
-    'Rent model saved — discount ' + model.discountPct + '%, baseline market rent + OW/ODSP shelter tables updated', role);
-  showToast('Rent model saved', {type:'info'});
+  if(typeof saveSettingWithDraftFallback === 'function'){
+    // Branch on the save result like the sibling savers — a failed rent-model
+    // save silently reverting on next sign-in while the ED saw "saved" is
+    // exactly the wrong failure mode for money-bearing settings.
+    saveSettingWithDraftFallback('rent_model', model).then(function(ok){
+      if(ok){
+        if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'rent_model_updated',
+          'Rent model saved — discount ' + model.discountPct + '%, baseline market rent + OW/ODSP shelter tables updated', role);
+        showToast('Rent model saved', {type:'info'});
+      } else {
+        showToast('Rent model save FAILED — the change is not stored. Check your connection and save again.', {type:'error'});
+      }
+    });
+  } else {
+    showToast('Rent model save unavailable on this page.', {type:'error'});
+  }
   renderRentModelPanel();
 }
 window.saveRentModel = saveRentModel;
@@ -2269,10 +2284,19 @@ function saveRentAgeSchedule(){
                   savedBy: role, savedAt: new Date().toISOString() });
   var payload = { versions: versions };
   window._appSettings.rent_age_factors = payload;
-  if(typeof saveSettingWithDraftFallback === 'function') saveSettingWithDraftFallback('rent_age_factors', payload);
-  if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'rent_age_schedule_updated',
-    'Rent age-adjustment schedule v' + nextV + ' saved (effective ' + effDate + ') — bands ' + JSON.stringify(bands) + ', floor ' + floor, role);
-  showToast('Age-adjustment schedule saved as v' + nextV, {type:'info'});
+  if(typeof saveSettingWithDraftFallback === 'function'){
+    saveSettingWithDraftFallback('rent_age_factors', payload).then(function(ok){
+      if(ok){
+        if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'rent_age_schedule_updated',
+          'Rent age-adjustment schedule v' + nextV + ' saved (effective ' + effDate + ') — bands ' + JSON.stringify(bands) + ', floor ' + floor, role);
+        showToast('Age-adjustment schedule saved as v' + nextV, {type:'info'});
+      } else {
+        showToast('Age-adjustment schedule save FAILED — the change is not stored. Check your connection and save again.', {type:'error'});
+      }
+    });
+  } else {
+    showToast('Age-adjustment schedule save unavailable on this page.', {type:'error'});
+  }
   renderRentModelPanel();
 }
 window.saveRentAgeSchedule = saveRentAgeSchedule;
@@ -2344,10 +2368,19 @@ function savePolicyRules(){
   if(bad){ showToast('Invalid value: ' + bad + ' (must be zero or greater)', {type:'error'}); return; }
   window._appSettings = window._appSettings || {};
   window._appSettings.policy_rules = { rules: out };
-  if(typeof saveSettingWithDraftFallback === 'function') saveSettingWithDraftFallback('policy_rules', { rules: out });
-  if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'policy_rules_updated',
-    'Policy Rules saved — ' + Object.keys(out).map(function(k){ return k + (out[k].enabled ? '' : '(off)') + '=' + JSON.stringify(out[k].params); }).join('; '), role);
-  showToast('Policy rules saved', {type:'info'});
+  if(typeof saveSettingWithDraftFallback === 'function'){
+    saveSettingWithDraftFallback('policy_rules', { rules: out }).then(function(ok){
+      if(ok){
+        if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'policy_rules_updated',
+          'Policy Rules saved — ' + Object.keys(out).map(function(k){ return k + (out[k].enabled ? '' : '(off)') + '=' + JSON.stringify(out[k].params); }).join('; '), role);
+        showToast('Policy rules saved', {type:'info'});
+      } else {
+        showToast('Policy rules save FAILED — the change is not stored. Check your connection and save again.', {type:'error'});
+      }
+    });
+  } else {
+    showToast('Policy rules save unavailable on this page.', {type:'error'});
+  }
   renderPolicyRulesPanel();
 }
 window.savePolicyRules = savePolicyRules;

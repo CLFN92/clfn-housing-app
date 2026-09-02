@@ -1167,7 +1167,7 @@ function confirmAssignment() {
   // strict gate blocked file_update apps (hm_approved) even when the ED
   // already had the assign authority.
   var _as = (typeof appAssignabilityStatus === 'function')
-    ? appAssignabilityStatus(app)
+    ? appAssignabilityStatus(app, null, { forAssignment: true })
     : { ok: (app.status === APP_STATUS.ED_APPROVED || app.status === APP_STATUS.MGR_APPROVED || app.status === APP_STATUS.HM_APPROVED), reason:'Approval required before assigning' };
   if(!_as.ok){ showToast(_as.reason, {type:'info'}); return; }
 
@@ -2030,7 +2030,7 @@ window.HEADER_NAV = [
       // gate. run functions are serialized into inline onclick strings, so
       // they must be self-contained: call the opener when this page has it
       // (housing.html), else deep-link via ?view= (handled at boot).
-      { divider:true, label:'Data Health' },
+      { divider:true, label:'Data Health', roles:'ed,housing_manager,super_user' },
       { key:'dh_likely',    label:'Likely Already-Housed',   module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5L12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>', run:function(){ if(typeof showLikelyHousedReport==='function') showLikelyHousedReport(); else window.location.href='housing.html?view=likely-housed'; } },
       { key:'dh_reconcile', label:'Reconcile Units & Apps',  module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>', run:function(){ if(typeof showReconcileReport==='function') showReconcileReport(); else window.location.href='housing.html?view=reconcile'; } },
       { key:'dh_arimport',  label:'Import Arrears Ledger',    module:null, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', run:function(){ if(typeof openArrearsImport==='function') openArrearsImport(); else window.location.href='housing.html?view=ar-import'; } },
@@ -2077,10 +2077,12 @@ function renderHeaderNav(){
       if(!visibleChildren.some(function(c){ return !c.divider; })) return;
       var dropItems = visibleChildren.map(function(c){
         // Section divider inside a dropdown (e.g. Operations > Data Health).
-        // Carries the same data-roles as its section's items so a role that
-        // can't see the tools doesn't see a lone heading either.
+        // Carries its own roles (declared on the divider entry, like items)
+        // so a role that can't see the section's tools doesn't see a lone
+        // heading either — and a future differently-gated section works.
         if(c.divider){
-          return '<div class="nav-dropdown-sect" data-roles="ed,housing_manager,super_user" style="border-top:1px solid var(--border);margin:6px 0 2px;padding:6px 14px 2px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);">'+(c.label||'')+'</div>';
+          var dvRoles = c.roles ? ' data-roles="'+c.roles+'"' : '';
+          return '<div class="nav-dropdown-sect"'+dvRoles+' style="border-top:1px solid var(--border);margin:6px 0 2px;padding:6px 14px 2px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);">'+(c.label||'')+'</div>';
         }
         var rolesAttr = c.roles ? ' data-roles="'+c.roles+'"' : '';
         return '<button class="nav-dropdown-item" data-nav="'+c.key+'"'+_featAttr(c.key)+rolesAttr+' onclick="('+c.run.toString()+')();closeNavDropdowns()">'+c.svg+' '+c.label+'</button>';

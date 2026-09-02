@@ -700,23 +700,25 @@ function saveUnitEdit(){
   var prevAssignedName = u.assignedName || null;
   var prevAssignedDate = u.assignedDate || null;
   var prevStatusVal    = u.status || 'vacant';
+  // Validate BEFORE the first u.* assignment: an early return after in-place
+  // mutation leaves unsaved form values displayed (and persistable) as real —
+  // the same poisoning the assignment-cluster rollback below guards against.
+  var mryRaw = get('ue_major_reno_year');
+  var mryN = null;
+  if(mryRaw !== '' && mryRaw != null){
+    mryN = parseInt(mryRaw, 10);
+    if(isNaN(mryN) || mryN < 1800 || mryN > 2200){
+      showToast('Major Renovation Year must be a valid year (e.g. 2015)', {type:'error'});
+      return;
+    }
+  }
   u.street=get('ue_street')||u.street; u.num=get('ue_num')||u.num;
   u.bedrooms=parseInt(get('ue_bedrooms'))||u.bedrooms;
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
   u.buildingName = get('ue_building_name') || null;
   u.funder=get('ue_funder'); u.phase=get('ue_phase'); u.year=get('ue_year');
   // Major renovation year — resets the effective age for the rent age factor.
-  var mryRaw = get('ue_major_reno_year');
-  if(mryRaw !== '' && mryRaw != null){
-    var mryN = parseInt(mryRaw, 10);
-    if(isNaN(mryN) || mryN < 1800 || mryN > 2200){
-      showToast('Major Renovation Year must be a valid year (e.g. 2015)', {type:'error'});
-      return;
-    }
-    u.majorRenoYear = mryN;
-  } else {
-    u.majorRenoYear = null;
-  }
+  u.majorRenoYear = mryN;
   u.deptNumber=get('ue_dept_number');
   u.acctNumber=get('ue_acct_number');
   u.hydro_meter_number = get('ue_hydro_meter') || null;
@@ -792,7 +794,7 @@ function saveUnitEdit(){
       // never drift. Any approved-flavour status is fine regardless of role;
       // ED can assign hm_approved file updates, HM can assign past ed_approved.
       var _as = (typeof appAssignabilityStatus === 'function')
-        ? appAssignabilityStatus(linkedApp2, u)
+        ? appAssignabilityStatus(linkedApp2, u, { forAssignment: true })
         : { ok:false, reason:'Approval required before assigning' };
       if(!_as.ok) {
         // Roll back the in-place assignment mutation so a repeat Save can't
@@ -2631,7 +2633,7 @@ function saveAddTenant(){
   // app was never written back, leaking the tenant onto Match. Enforce the same
   // rule as every other assignment path.
   if(linkedApp && typeof appAssignabilityStatus === 'function'){
-    var _as = appAssignabilityStatus(linkedApp, units[idx]);
+    var _as = appAssignabilityStatus(linkedApp, units[idx], { forAssignment: true });
     if(!_as.ok){ showErr('⚠ ' + _as.reason); return; }
   }
 

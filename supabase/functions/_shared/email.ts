@@ -59,6 +59,20 @@ export function isValidEmail(s: unknown): boolean {
   return typeof s === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 }
 
+// Only allow auth-link redirects back to our own hosts (defense in depth;
+// GoTrue additionally enforces the dashboard Redirect URLs allowlist when
+// minting the link). One definition shared by every link-sending function --
+// a bare ^https?:// check accepts arbitrary attacker hosts.
+export function isSafeRedirect(u: string): boolean {
+  try {
+    const url = new URL(u);
+    const h = url.hostname;
+    const localOk = (h === "localhost" || h === "127.0.0.1");
+    if (url.protocol !== "https:" && !localOk) return false;
+    return h === "fnhub.app" || h.endsWith(".fnhub.app") || localOk;
+  } catch { return false; }
+}
+
 // Black or white text, whichever reads on the given background (mirrors
 // send-notification's readableTextColor).
 function readableTextColor(hex: string): string {

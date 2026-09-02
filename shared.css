@@ -717,7 +717,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .btn-sec     { background: rgba(var(--accent-rgb),0.1); color: var(--accent-ink); border-color: rgba(var(--accent-rgb),0.35); }
 .btn-sec:hover { background: rgba(var(--accent-rgb),0.18); }
 .btn-sm      { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
-.btn-xs      { padding: 3px 8px;  font-size: 11px; border-radius: 5px; }
+.btn-xs      { padding: 3px 8px;  font-size: 11px; border-radius: 5px; white-space: nowrap; }
 .btn-rm      { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; font-family: var(--sans); padding: 4px 8px; }
 .btn-add     { background: var(--yellow-light); border: 1.5px dashed var(--yellow-mid); color: var(--accent-ink); border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--sans); width: 100%; }
 .btn:disabled, button:disabled { opacity: 0.45; cursor: not-allowed; }
