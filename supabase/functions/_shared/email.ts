@@ -29,6 +29,9 @@ const GRAPH_FROM_USER     = Deno.env.get("GRAPH_FROM_USER");
 const RESEND_API_KEY      = Deno.env.get("RESEND_API_KEY");
 const SENDGRID_API_KEY    = Deno.env.get("SENDGRID_API_KEY");
 
+const EMAIL_BRAND_COLOR   = Deno.env.get("EMAIL_BRAND_COLOR");    // optional per-nation header color (hex)
+const EMAIL_CONTACT_LINE  = Deno.env.get("EMAIL_CONTACT_LINE");   // optional footer contact line
+
 const DEFAULT_REPLY_TO = "housing@clfn.on.ca";
 const DEFAULT_BRAND    = "Housing";
 
@@ -56,16 +59,50 @@ export function isValidEmail(s: unknown): boolean {
   return typeof s === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 }
 
-// Wrap inner content in the same branded shell send-notification uses.
+// Black or white text, whichever reads on the given background (mirrors
+// send-notification's readableTextColor).
+function readableTextColor(hex: string): string {
+  const m = String(hex || "").trim().match(/^#?([0-9a-fA-F]{6})$/);
+  if (!m) return "#ffffff";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum > 150 ? "#111827" : "#ffffff";
+}
+
+// Wrap inner content in the SAME nation-branded shell send-notification uses
+// (header bar in the nation color, card body, footer with the contact line) --
+// so emails sent by the public functions (applicant confirmation, tenant
+// maintenance intake, password reset) look identical to every other app
+// email. Branding comes from per-nation secrets: EMAIL_BRAND (name),
+// EMAIL_BRAND_COLOR (header hex, optional) and EMAIL_CONTACT_LINE (optional);
+// safe neutral fallbacks keep it working where those are not set.
 export function renderBrandedEmail(subject: string, innerHtml: string): string {
-  const brand = emailBrand();
-  return '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#111;max-width:560px;margin:0 auto;padding:24px;">'
-    + '<h2 style="font-size:18px;margin:0 0 16px;color:#111;">' + escapeHtml(subject) + '</h2>'
-    + innerHtml
-    + '<hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;"/>'
-    + '<p style="font-size:12px;color:#888;margin:0;">' + escapeHtml(brand)
-      + ' - automated notification. Reply to this email to reach the housing team.</p>'
-    + '</div>';
+  const name = escapeHtml(emailBrand());
+  const bgRaw = String(EMAIL_BRAND_COLOR || "").trim();
+  const bg = /^#[0-9a-fA-F]{6}$/.test(bgRaw) ? bgRaw : "#1f2937";
+  const onBrand = readableTextColor(bg);
+  const contact = EMAIL_CONTACT_LINE ? (escapeHtml(EMAIL_CONTACT_LINE) + "<br/>") : "";
+  return '' +
+'<!doctype html><html><head><meta charset="utf-8"/>' +
+'<meta name="viewport" content="width=device-width,initial-scale=1"/></head>' +
+'<body style="margin:0;padding:0;background:#f4f5f7;">' +
+'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;">' +
+'<tr><td align="center" style="padding:24px 12px;">' +
+'<table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">' +
+'<tr><td style="background:' + bg + ';padding:18px 28px;">' +
+'<span style="font-size:16px;font-weight:700;letter-spacing:.2px;color:' + onBrand + ';">' + name + '</span>' +
+'</td></tr>' +
+'<tr><td style="padding:26px 28px 8px;">' +
+'<h1 style="font-size:19px;line-height:1.3;margin:0 0 16px;color:#111827;font-weight:700;">' + escapeHtml(subject) + '</h1>' +
+'<div style="font-size:14px;line-height:1.65;color:#374151;">' + innerHtml + '</div>' +
+'</td></tr>' +
+'<tr><td style="padding:18px 28px 22px;background:#f9fafb;border-top:1px solid #e5e7eb;">' +
+'<div style="font-size:12px;line-height:1.6;color:#6b7280;">' +
+'<strong style="color:#374151;">' + name + '</strong><br/>' + contact +
+'This is an automated notification. Reply to this email to reach the housing team.' +
+'</div></td></tr>' +
+'</table></td></tr></table></body></html>';
 }
 
 let _cachedToken: { access_token: string; expires_at: number } | null = null;
