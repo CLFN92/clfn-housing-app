@@ -1440,8 +1440,9 @@ function renderRenoApprovalsView() {
       var hay = [
         r.u.num, r.u.street, r.u.bedrooms, r.u.type, r.u.status,
         r.projectNumber,
-        (r.sow && r.sow.contractor) || '',
+        (typeof sowContractorLabel === 'function' ? sowContractorLabel(r.sow) : (r.sow && r.sow.contractor)) || '',
         (r.appr && r.appr.label) || '',
+        _raOnHold(r) ? 'on hold seeking funding' : '',
         r.cost, r.rs && r.rs.score
       ].filter(function(v){ return v != null && v !== ''; }).join(' ').toLowerCase();
       return hay.indexOf(_raSearch) !== -1;
@@ -1475,7 +1476,7 @@ function renderRenoApprovalsView() {
     projectNumber: { label: 'Project #',       accessor: function(r){ return r.projectNumber || '(none)'; } },
     priority:      { label: 'Priority',        accessor: function(r){ return r.rs && r.rs.score || 0; } },
     cost:          { label: 'Request Value',   accessor: function(r){ return r.cost || 0; } },
-    approval:      { label: 'Approval Status', accessor: function(r){ return (r.appr && r.appr.label) || '(none)'; } },
+    approval:      { label: 'Approval Status', accessor: function(r){ return ((r.appr && r.appr.label) || '(none)') + (_raOnHold(r) ? ' \u00b7 On Hold \u2014 seeking funding' : ''); } },
     contractor:    { label: 'Contractor',      accessor: function(r){ return (typeof sowContractorLabel === 'function' ? sowContractorLabel(r.sow) : (r.sow && r.sow.contractor)) || '(none)'; } },
     progress:      { label: 'Progress',        accessor: function(r){ return (r.prog && r.prog.overallPct) || 0; } },
     payments:      { label: 'Payments',        accessor: function(r){ var pi = (typeof sowPaymentInfo==='function') ? sowPaymentInfo(r.sow) : {hasPo:false,percent:0}; return pi.hasPo ? pi.percent : -1; } }
@@ -1524,9 +1525,12 @@ function renderRenoApprovalsView() {
       var v = _raCatValues[cat] || 0;
       return (v > 0 ? '$' + Math.round(v).toLocaleString() : '—');
     }
+    var _raHold = rows.filter(_raOnHold);
+    var _raHoldVal = _raHold.reduce(function(s, r){ return s + (r.cost || 0); }, 0);
     _raKpiEl.innerHTML =
       _raKpiCard('Total Requests', rows.length, rows.length === 1 ? '1 maintenance request' : rows.length + ' total') +
       _raKpiCard('Total Value', _raTotalVal > 0 ? '$' + Math.round(_raTotalVal).toLocaleString() : '—', 'across all requests', 'info') +
+      _raKpiCard('⏸ On Hold', _raHold.length, _raHold.length ? ('seeking funding · $' + Math.round(_raHoldVal).toLocaleString()) : 'seeking funding', _raHold.length ? 'warn' : '') +
       (_raTopCats[0] ? _raKpiCard(_raTopCats[0], _raCatCounts[_raTopCats[0]], _raCatMeta(_raTopCats[0]), 'success') : _raKpiCard('#1 Category', '—', 'no items yet')) +
       (_raTopCats[1] ? _raKpiCard(_raTopCats[1], _raCatCounts[_raTopCats[1]], _raCatMeta(_raTopCats[1])) : '') +
       (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], _raCatMeta(_raTopCats[2])) : '');
@@ -1609,9 +1613,9 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 10px;word-break:break-word;">'+pnCell+'</td>'
       +'<td style="padding:10px 10px;white-space:nowrap;"><span style="font-size:14px;font-weight:800;color:var(--text);">'+rs.score+'</span> <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:'+tier.bg+';color:'+tier.c+';">'+tier.l+'</span></td>'
       +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div class="txt-info-bold" style="font-size:9px;">ED auth</div>':'')+'</td>'
-      +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
+      +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span>'+(_raOnHold(r)?'<div style="margin-top:4px;">'+_raOnHoldBadge()+'</div>':'')+'</td>'
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);word-break:break-word;max-width:160px;">'+((typeof sowContractorLabel==='function'&&sowContractorLabel(sow))?escapeHtml(sowContractorLabel(sow)):'—')+'</td>'
-      +'<td style="padding:10px 10px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+pct+'%</span></div></td>'
+      +'<td style="padding:10px 10px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(_raOnHold(r)?'var(--warn-amber-text)':(pct>=100?'var(--success)':'var(--yellow)'))+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+pct+'%'+(_raOnHold(r)?' \u23F8':'')+'</span></div></td>'
       +'<td style="padding:10px 10px;">'+payCell+'</td>'
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
@@ -1664,6 +1668,15 @@ function renderRenoApprovalsView() {
 // Cards view for the Renovation Approvals tab — same rows/filters as the
 // table, laid out as _cardTile tiles. Mirrors the table's open + actions.
 // Build ONE reno-approvals card (shared by the Cards grid and the Kanban board).
+// On Hold = the progress report says work is paused — these are the projects
+// waiting on FUNDING, so they get a visible flag everywhere in Approvals.
+function _raOnHold(r){
+  return !!((r.prog && r.prog.status === 'On Hold')
+         || (r.sow && r.sow.progress && r.sow.progress.status === 'On Hold'));
+}
+function _raOnHoldBadge(){
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber-text);white-space:nowrap;">\u23F8 On Hold \u2014 seeking funding</span>';
+}
 function _raCardTileFor(r, role, hmLimit) {
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
   var u=r.u, sow=r.sow, prog=r.prog, rs=r.rs, appr=r.appr;
@@ -1677,6 +1690,7 @@ function _raCardTileFor(r, role, hmLimit) {
   var locked = sow && sow.approval_status === 'completed';
   var badges = ['<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+rs.score+' · '+tier.l+'</span>'];
   if (u.status==='condemned') badges.push('<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>');
+  if (_raOnHold(r)) badges.push(_raOnHoldBadge());
   var actions = [];
   if (sow && !locked) {
     if (APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')

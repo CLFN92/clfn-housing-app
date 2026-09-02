@@ -2081,6 +2081,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .kpi-card.kpi-accent-danger::before  { background: var(--danger); }
 .kpi-card.kpi-accent-success::before { background: var(--success); }
 .kpi-card.kpi-accent-info::before    { background: var(--info-blue); }
+.kpi-card.kpi-accent-warn::before    { background: var(--warn-amber-text); }
 .kpi-label {
   font-size: 10px; font-weight: 700; letter-spacing: .8px;
   color: var(--muted); text-transform: uppercase; margin-bottom: 4px;
