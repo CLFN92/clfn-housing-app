@@ -219,25 +219,33 @@
     changes_requested: 'Changes requested', approved: 'Accepted — in the housing queue', rejected: 'Not approved', withdrawn: 'Withdrawn'
   };
   var _ACCEPTED_BY_TYPE = { update: 'Processed — file updated', transfer: 'Accepted — in the housing queue', new: 'Accepted — in the housing queue' };
+  // The linked APPLICATION's live state outranks the frozen submission status
+  // — for accepted rows AND for drafts: a draft seeded from / linked to an
+  // application housing has already approved or housed must not read as a
+  // bare pending "Draft".
+  function _liveOverride(s) {
+    var st = s.status || 'draft';
+    if (st !== 'approved' && st !== 'draft') return null;
+    var a = s.app_status || null;
+    if (!a) return null;
+    if (a.assigned) return { label: 'Housed — unit assigned', cls: 'approved' };
+    if (a.status === 'declined') return { label: 'Reviewed — not approved', cls: 'rejected' };
+    if (st === 'draft' && /approved$/.test(String(a.status || ''))) {
+      return { label: 'Accepted — in the housing queue', cls: 'approved' };
+    }
+    return null;
+  }
   function _statusLabel(s) {
     var st = s.status || 'draft';
-    if (st === 'approved') {
-      // The APPLICATION keeps moving after acceptance — show where it is now.
-      var a = s.app_status || null;
-      if (a && a.assigned) return 'Housed — unit assigned';
-      if (a && a.status === 'declined') return 'Reviewed — not approved';
-      if (_ACCEPTED_BY_TYPE[s.submission_type]) return _ACCEPTED_BY_TYPE[s.submission_type];
-    }
+    var ov = _liveOverride(s);
+    if (ov) return ov.label;
+    if (st === 'approved' && _ACCEPTED_BY_TYPE[s.submission_type]) return _ACCEPTED_BY_TYPE[s.submission_type];
     return STATUS_LABEL[st] || st;
   }
   // Pill colour follows the live state too (housed = green, declined = red).
   function _statusCls(s) {
-    var st = s.status || 'draft';
-    if (st === 'approved' && s.app_status) {
-      if (s.app_status.assigned) return 'approved';
-      if (s.app_status.status === 'declined') return 'rejected';
-    }
-    return st;
+    var ov = _liveOverride(s);
+    return ov ? ov.cls : (s.status || 'draft');
   }
   var TYPE_LABEL = { new: 'New application', update: 'Application update', transfer: 'Transfer request' };
 
@@ -316,10 +324,14 @@
       cardHint = '<p class="sub" style="margin:6px 0 12px;">' + esc((res.data && res.data.closed_message) || 'Online applications are currently closed. Please contact the Housing office.') + '</p>';
       actionHtml = '';
     } else if (editable.length) {
-      cardTitle = 'Continue your application';
-      if (editable[0].status === 'changes_requested') cardHint = '<p class="sub" style="margin:6px 0 12px;color:#9a3412;">The Housing office asked for some changes. Continue to update and resubmit.</p>';
-      actionHtml = '<button class="btn" type="button" onclick="applyContinue(\'' + esc(editable[0].id) + '\')">Continue &rarr;</button>'
-        + '<button class="btn ghost" type="button" onclick="showTypeChooser()">' + (housed ? 'Update my housing file' : 'Start a different application') + '</button>';
+      // The application rows above carry their own Continue/Remove buttons —
+      // this card no longer duplicates a big Continue; it only offers the
+      // other path (chooser access).
+      cardTitle = 'Manage your housing';
+      cardHint = '<p class="sub" style="margin:6px 0 12px;">' + (housed
+        ? 'You have a home with us — update your housing file or request a transfer.'
+        : 'Need something else? You can start a different application.') + '</p>';
+      actionHtml = '<button class="btn ghost" type="button" onclick="showTypeChooser()">' + (housed ? 'Update my housing file' : 'Start a different application') + '</button>';
     } else if (housed) {
       cardTitle = 'Manage your housing';
       cardHint = '<p class="sub" style="margin:6px 0 12px;">You have a home with us — update your housing file or request a transfer. A new application isn\u2019t needed while you\u2019re housed.</p>';
