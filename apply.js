@@ -288,8 +288,20 @@
     // Applications-closed flag: the member portal (My Home + maintenance)
     // keeps working; only the application-intake actions are unavailable.
     var portalClosed = !!(res.data && res.data.portal_disabled);
-    var listHtml = subs.length
-      ? '<ul class="sublist">' + subs.map(function (s) {
+    // Hide duplicate seeded drafts: staff-invite seeding creates a prefilled
+    // draft per linked application, but when that same application already
+    // shows through another submission row (the member's own accepted one),
+    // two rows describe ONE application — keep the real row, drop the draft.
+    // Updates to a housed file go through the "Update my housing file" path.
+    var seenApp = {};
+    subs.forEach(function (s) {
+      if (s.status !== 'draft') { var aid = s.created_app_id || s.linked_app_id; if (aid) seenApp[aid] = true; }
+    });
+    var visibleSubs = subs.filter(function (s) {
+      return !(s.status === 'draft' && s.linked_app_id && seenApp[s.linked_app_id]);
+    });
+    var listHtml = visibleSubs.length
+      ? '<ul class="sublist">' + visibleSubs.map(function (s) {
           var st = s.status || 'draft';
           var noteLine = (st === 'changes_requested' && s.review_notes)
             ? '<div style="width:100%;font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:7px;padding:7px 9px;margin-top:6px;"><b>Changes requested:</b> ' + esc(s.review_notes) + '</div>'
@@ -313,36 +325,29 @@
 
     // "Has application vs not" per account, plus any in-progress draft to resume.
     var hasApp = (linked && linked.length) || subs.some(function (s) { return s.status === 'approved'; });
-    var editable = subs.filter(function (s) { return s.status === 'draft' || s.status === 'changes_requested'; });
+    var editable = visibleSubs.filter(function (s) { return s.status === 'draft' || s.status === 'changes_requested'; });
     // HOUSED members (unit on file, or an application assigned to a unit) only
     // update their existing file / request a transfer — no new applications.
     var housed = !!(res.data && res.data.unit) || subs.some(function (s) { return s.app_status && s.app_status.assigned; });
     window._portalHoused = housed;
-    var actionHtml, cardTitle, cardHint = '';
+    // ONE applications card: the list, then the next-step action at the
+    // bottom (the separate "Manage your housing" card duplicated this).
+    var actionHtml, cardHint = '';
     if (portalClosed) {
-      cardTitle = 'Applications are closed';
-      cardHint = '<p class="sub" style="margin:6px 0 12px;">' + esc((res.data && res.data.closed_message) || 'Online applications are currently closed. Please contact the Housing office.') + '</p>';
+      cardHint = '<p class="sub" style="margin:10px 0 0;">' + esc((res.data && res.data.closed_message) || 'Online applications are currently closed. Please contact the Housing office.') + '</p>';
       actionHtml = '';
     } else if (editable.length) {
-      // The application rows above carry their own Continue/Remove buttons —
-      // this card no longer duplicates a big Continue; it only offers the
-      // other path (chooser access).
-      cardTitle = 'Manage your housing';
-      cardHint = '<p class="sub" style="margin:6px 0 12px;">' + (housed
-        ? 'You have a home with us — update your housing file or request a transfer.'
-        : 'Need something else? You can start a different application.') + '</p>';
+      // The rows above carry their own Continue/Remove buttons -- offer
+      // only the other path here.
       actionHtml = '<button class="btn ghost" type="button" onclick="showTypeChooser()">' + (housed ? 'Update my housing file' : 'Start a different application') + '</button>';
     } else if (housed) {
-      cardTitle = 'Manage your housing';
-      cardHint = '<p class="sub" style="margin:6px 0 12px;">You have a home with us — update your housing file or request a transfer. A new application isn\u2019t needed while you\u2019re housed.</p>';
-      actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Update my application</button>';
+      cardHint = '<p class="sub" style="margin:10px 0 0;">You have a home with us \u2014 update your housing file or request a transfer. A new application isn\u2019t needed while you\u2019re housed.</p>';
+      actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Update my housing file</button>';
     } else if (hasApp) {
-      cardTitle = 'Manage your housing';
-      cardHint = '<p class="sub" style="margin:6px 0 12px;">Update your file, request a transfer, or start a new application.</p>';
+      cardHint = '<p class="sub" style="margin:10px 0 0;">Update your file, request a transfer, or start a new application.</p>';
       actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Start an application</button>';
     } else {
-      cardTitle = 'Apply for housing';
-      cardHint = '<p class="sub" style="margin:6px 0 12px;">Start your housing application. You can save and come back any time.</p>';
+      cardHint = '<p class="sub" style="margin:10px 0 0;">Start your housing application. You can save and come back any time.</p>';
       actionHtml = '<button class="btn" type="button" onclick="showTypeChooser()">Start an application</button>';
     }
 
@@ -373,12 +378,31 @@
         + '</div>'
       : '';
 
+    // Hero + glance strip, mirroring the staff Tenant Information Card
+    // shell (hero with name/sub, then a tile strip of at-a-glance values).
+    var openMr = mrs.filter(function (m) { return m.status === 'new'; }).length;
+    var stripApp = portalClosed && !visibleSubs.length ? 'Closed'
+      : housed ? 'Housed'
+      : visibleSubs.some(function (s) { return s.status === 'approved'; }) ? 'In the queue'
+      : visibleSubs.some(function (s) { return s.status === 'submitted' || s.status === 'in_review'; }) ? 'In review'
+      : editable.length ? 'In draft' : 'None yet';
+    var tile = function (lbl, val) {
+      return '<div class="pstrip-tile"><div class="pstrip-lbl">' + lbl + '</div><div class="pstrip-val">' + val + '</div></div>';
+    };
+    var heroShell =
+      '<div class="pshell">'
+      + '<div class="phero"><div class="phero-name">Welcome' + (name ? ', ' + esc(name.split(' ')[0]) : '') + '</div>'
+      + '<div class="phero-sub">Signed in as ' + esc(email) + '</div></div>'
+      + '<div class="pstrip">'
+      + tile('My home', window._portalUnit ? esc(window._portalUnit.address || 'Your unit') : 'Not on file')
+      + tile('Maintenance', mrs.length ? (openMr ? openMr + ' awaiting review' : 'All reviewed') : (window._portalUnit ? 'No requests' : '—'))
+      + tile('Application', stripApp)
+      + '</div></div>';
+
     app.innerHTML =
-      '<h1>Welcome' + (name ? ', ' + esc(name.split(' ')[0]) : '') + '</h1>'
-      + '<p class="sub">Signed in as ' + esc(email) + '</p>'
+      heroShell
       + homeHtml
-      + '<div class="card"><h3>Your applications</h3>' + listHtml + '</div>'
-      + '<div class="card"><h3>' + cardTitle + '</h3>' + cardHint + actionHtml + '</div>';
+      + '<div class="card"><h3>Your applications</h3>' + listHtml + cardHint + actionHtml + '</div>';
   }
 
   // -- Maintenance request (member portal) ------------------------------------
