@@ -166,7 +166,10 @@ serve(async (req) => {
       const contactPhone = String(body.contact_phone || '').trim().slice(0, 40)
       const contactEmailRaw = String(body.contact_email || '').trim().slice(0, 160)
       const contactEmail = isValidEmail(contactEmailRaw) ? contactEmailRaw : ''
-      const ip = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim()
+      // cf-connecting-ip first -- the leftmost x-forwarded-for hop is
+      // client-suppliable, which let the per-IP budget be walked with a
+      // spoofed header (same fix as applicant-intake / request-password-reset).
+      const ip = (req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
       const sinceIso = new Date(Date.now() - RL_WINDOW_MIN * 60000).toISOString()
 
       // Rate limit: per unit and per source IP.

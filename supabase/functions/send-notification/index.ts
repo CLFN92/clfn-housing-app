@@ -317,6 +317,28 @@ serve(async (req: Request) => {
     return jsonResponse({ error: "Unauthorized", detail: authErr?.message }, 401);
   }
 
+  // SECURITY: a valid JWT is no longer enough. This function predates the
+  // member portal, when every authenticated user was staff -- the portal now
+  // mints real auth accounts for ANY self-registered applicant, and this
+  // function sends caller-authored HTML (with attachments) from the nation's
+  // own mailbox to arbitrary recipients. Without a staff check it is a
+  // turnkey phishing relay under the nation's identity. Mirror the
+  // send-magic-link gate: the caller's JWT email must match an ACTIVE staff
+  // row (exact, escaped, case-insensitive -- never a raw LIKE pattern).
+  if (!SUPABASE_SERVICE_KEY) {
+    return jsonResponse({ error: "Server not configured" }, 500);
+  }
+  {
+    const callerEmail = (user.email || "").toLowerCase();
+    const emailLit = callerEmail.replace(/[\\%_]/g, (c: string) => "\\" + c);
+    const adminGate = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { data: staffRows } = await adminGate
+      .from("staff").select("id").ilike("email", emailLit).eq("is_active", true).limit(1);
+    if (!staffRows || !staffRows.length) {
+      return jsonResponse({ error: "Staff access required" }, 403);
+    }
+  }
+
   // Payload
   let payload: Record<string, unknown>;
   try { payload = await req.json(); }

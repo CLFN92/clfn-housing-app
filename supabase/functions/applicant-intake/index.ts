@@ -334,7 +334,11 @@ serve(async (req) => {
     // and (optionally) pre-link their existing application to their email so
     // they land on it. Runs before the applicant email-confirmed gate. ---
     if (action === 'invite') {
-      const { data: staffRows } = await admin.from('staff').select('id').ilike('email', email).eq('is_active', true).limit(1)
+      // Escaped LIKE literal, same as resolveMemberUnit: an unescaped ilike
+      // let an attacker-registrable address with % or _ wildcard-match into
+      // an active staff email and pass this gate.
+      const staffLit = email.replace(/[\\%_]/g, (c: string) => '\\' + c)
+      const { data: staffRows } = await admin.from('staff').select('id').ilike('email', staffLit).eq('is_active', true).limit(1)
       if (!staffRows || !staffRows.length) return json({ error: 'Staff access required.' }, 403)
       const targetEmail = String(body.email || '').trim().toLowerCase()
       if (!isValidEmail(targetEmail)) return json({ error: 'Enter a valid applicant email.' }, 400)
@@ -532,7 +536,10 @@ serve(async (req) => {
         await admin.from('housing_audit_log').insert({
           entity_type: 'application', entity_id: subId, action: 'application_portal_submitted',
           detail: kindLbl + ' submitted via applicant portal - ' + (applicantName || email),
-          actor: (p.email && isValidEmail(p.email)) ? p.email : email, created_at: now,
+          // Always the JWT-verified address: the payload email is applicant-
+          // typed and would let audit rows be attributed to arbitrary
+          // addresses (including a staff member's own activity feed).
+          actor: email, created_at: now,
         })
       } catch (_e) { /* audit is best-effort */ }
       try { await notifySubmission(admin, saved, (p.email && isValidEmail(p.email)) ? p.email : email, applicantName) }

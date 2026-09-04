@@ -2896,7 +2896,7 @@ window._tenantMrRenderPhotos = _tenantMrRenderPhotos;
 function openTenantMrReview(id){
   var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });
   if(!s){ if(typeof showToast === 'function') showToast('Request not found', {type:'error'}); return; }
-  var e = function(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
+  var e = function(t){ return String(t==null?'':t).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
   var photoPaths = _tenantMrPhotoPaths(s);
   var photosHtml = photoPaths.length
     ? '<div class="tic-field-lbl">Photos (' + photoPaths.length + ')</div>'
@@ -2928,7 +2928,7 @@ function openTenantMrReview(id){
     +   photosHtml
     +   (s.contact_name || s.contact_phone || s.contact_email ? '<div class="tic-field-lbl">Contact</div><div style="font-size:13px;margin-bottom:14px;">' + e([s.contact_name, s.contact_phone, s.contact_email].filter(Boolean).join(' · ')) + '</div>' : '')
     +   '<div class="tic-field-lbl">Review note (optional)</div>'
-    +   '<textarea id="tenant_mr_note" rows="2" placeholder="Note shown on the audit trail / to the record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
+    +   '<textarea id="tenant_mr_note" rows="2" placeholder="Shown to the MEMBER on their portal, and on the audit trail — write it for the tenant to read" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
     + '</div>'
     + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;flex-shrink:0;">'
     +   '<button type="button" onclick="_tenantMrReject(\'' + e(s.id) + '\')" class="btn btn-ghost" style="color:var(--danger);border-color:var(--danger);">Reject</button>'
@@ -3111,7 +3111,7 @@ var _APPSUB_TYPE_LABEL = { new:'New application', update:'Application update', t
 function openApplicationSubmissionReview(id){
   var s = (window._appSubmissions || []).find(function(x){ return x.id === id; });
   if(!s){ if(typeof showToast === 'function') showToast('Submission not found', {type:'error'}); return; }
-  var e = function(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
+  var e = function(t){ return String(t==null?'':t).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
   var p = s.payload || {};
   var when = s.submitted_at ? new Date(s.submitted_at).toLocaleString() : (s.created_at ? new Date(s.created_at).toLocaleString() : '');
   var row = function(l, v){ return v ? '<div style="font-size:13px;margin:3px 0;"><span style="color:var(--muted);">' + e(l) + ':</span> ' + e(v) + '</div>' : ''; };

@@ -20,7 +20,7 @@
 
   var LS_AT = 'clfn_apply_at', LS_RT = 'clfn_apply_rt';
   var app = document.getElementById('app');
-  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
 
   // Nation branding — applied at boot and re-applied when the registry
   // refresh lands mid-visit (a stale localStorage cache otherwise leaves the

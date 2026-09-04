@@ -714,7 +714,9 @@
     return Promise.reject(new Error('PDF loader unavailable'));
   }
 
-  window.arrearsCouncilReport = function (format) {
+  window.arrearsCouncilReport = function (format, opts) {
+    opts = opts || {};
+    var noHouse = !!opts.noHouse;
     Promise.all([
       window.arrearsLoad().then(function () {
         var ids = Object.keys(CACHE.byTenant).filter(function (tid) { return CACHE.byTenant[tid].arrangements.length || CACHE.byTenant[tid].balance !== 0; });
@@ -724,36 +726,80 @@
     ]).then(function (res) {
       var d = window.arrearsReportData();
       _arAttachAccounts(d, res[1] || {});
+      // ── No-House variant: arrears with NO current housing ────────────────
+      // Former tenancies and unhoused applicants carrying a balance — the
+      // Policy 8.5/12.5 good-standing gate blocks their unit assignment
+      // until a repayment arrangement is approved. "No house" = no linked
+      // current unit AND their name is not assigned on any unit (belt and
+      // braces against a missing current_unit_id link). The Unit column is
+      // always blank here, so it becomes "Application on file" instead.
+      if (noHouse) {
+        var _nrm = (typeof normNameKey === 'function') ? normNameKey
+                 : function (s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+        var housedNames = {};
+        (window.housingUnits || []).forEach(function (u) {
+          if (u && !u.archived && String(u.assignedName || '').trim()) housedNames[_nrm(u.assignedName)] = true;
+        });
+        d.rows = d.rows.filter(function (r) {
+          return r.balance > 0 && !r.unit && !housedNames[_nrm(r.name)];
+        });
+        var apps = (typeof applications !== 'undefined' && applications) ? applications : (window.applications || []);
+        d.rows.forEach(function (r) {
+          var t = (CACHE.byTenant[r.tid] || {}).tenant || {};
+          var app = (t.application_id && apps.find(function (a) { return a && a.id === t.application_id; }))
+                 || apps.find(function (a) { return a && !a.archived && _nrm((a.fn || '') + ' ' + (a.ln || '')) === _nrm(r.name); })
+                 || null;
+          r.appOnFile = app
+            ? ((typeof formatAppStatusLabel === 'function' ? formatAppStatusLabel(app.status) : String(app.status || '')) || 'On file')
+            : 'None';
+        });
+      }
       var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
       var money = _money;
+      var rptTitle = noHouse ? 'Arrears — No Current Housing' : 'Rental Arrears (A/R) Report — Chief & Council';
+      var fileTag = noHouse ? '_AR_NoHouse_' : '_AR_Report_';
+      var col2Hdr = noHouse ? 'Application' : 'Unit';
+      var col2Of = function (r) { return noHouse ? (r.appOnFile || '—') : r.unit; };
       if (format === 'csv') {
-        var head = ['Tenant', 'Unit', 'Account (Cust #)', 'Balance', 'Arrangement', 'Monthly Payment', 'Last Payment', 'Window Ends'];
+        var head = ['Tenant', col2Hdr, 'Account (Cust #)', 'Balance', 'Arrangement', 'Monthly Payment', 'Last Payment', 'Window Ends'];
         var data = [];
         d.rows.forEach(function (r) {
-          data.push([r.name, r.unit, '', r.balance.toFixed(2), r.arrangement, r.monthly != null ? r.monthly.toFixed(2) : '', r.lastPayment, r.windowEnds]);
+          data.push([r.name, col2Of(r), '', r.balance.toFixed(2), r.arrangement, r.monthly != null ? r.monthly.toFixed(2) : '', r.lastPayment, r.windowEnds]);
           (r.accounts || []).forEach(function (a) {
             data.push(['', '', a.custno, a.amount.toFixed(2), '', '', '', '']);
           });
           if (r.residue != null) data.push(['', '', AR_RESIDUE_LABEL, r.residue.toFixed(2), '', '', '', '']);
         });
-        _doExport('csv', head, data, ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Report_' + d.asOf);
-        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', 'A/R report exported (CSV) — ' + d.rows.length + ' accounts, ' + money(d.sum.outstanding) + ' outstanding', window.currentRole || 'staff');
+        _doExport('csv', head, data, ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + fileTag + d.asOf);
+        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', (noHouse ? 'A/R no-house report' : 'A/R report') + ' exported (CSV) — ' + d.rows.length + ' accounts', window.currentRole || 'staff');
         return;
       }
       _loadJsPdf().then(function () {
         var doc = new window.jspdf.jsPDF();
         doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
         doc.text(nation, 14, 16);
-        doc.setFontSize(12); doc.text('Rental Arrears (A/R) Report — Chief & Council', 14, 24);
+        doc.setFontSize(12); doc.text(rptTitle, 14, 24);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
         doc.text('As of ' + d.asOf + ' · generated from the housing management system rent ledger', 14, 30);
         var s = d.sum;
-        var lines = [
-          'Total arrears outstanding: ' + money(s.outstanding) + ' across ' + s.inArrears + ' account(s)',
-          'Credit balances: ' + money(s.credits) + ' (' + s.creditCount + ' account(s))',
-          'Repayment arrangements: ' + s.arrActive + ' active (' + s.arrNonCompliant + ' non-compliant) · ' + s.arrPending + ' awaiting ED approval',
-          'Arrears evictions authorized: ' + s.evictions
-        ];
+        var lines;
+        if (noHouse) {
+          var nhTotal = d.rows.reduce(function (t2, r) { return Math.round((t2 + r.balance) * 100) / 100; }, 0);
+          var nhArr = d.rows.filter(function (r) { return /^Active/.test(r.arrangement); }).length;
+          var nhApp = d.rows.filter(function (r) { return r.appOnFile && r.appOnFile !== 'None'; }).length;
+          lines = [
+            'People with arrears and NO current housing: ' + d.rows.length + ' — total ' + money(nhTotal),
+            'With an active repayment arrangement: ' + nhArr + ' · with a housing application on file: ' + nhApp,
+            'Good-standing rule: these balances block a new unit assignment until a repayment arrangement is approved.'
+          ];
+        } else {
+          lines = [
+            'Total arrears outstanding: ' + money(s.outstanding) + ' across ' + s.inArrears + ' account(s)',
+            'Credit balances: ' + money(s.credits) + ' (' + s.creditCount + ' account(s))',
+            'Repayment arrangements: ' + s.arrActive + ' active (' + s.arrNonCompliant + ' non-compliant) · ' + s.arrPending + ' awaiting ED approval',
+            'Arrears evictions authorized: ' + s.evictions
+          ];
+        }
         doc.setFontSize(10);
         lines.forEach(function (t, i) { doc.text(t, 14, 40 + i * 6); });
         // Body: one row per tenant, then indented sub-rows per Sage account
@@ -762,7 +808,7 @@
         var SUB = '    -  ';
         var body = [];
         d.rows.forEach(function (r) {
-          body.push([r.name, r.unit, money(r.balance), r.arrangement, r.monthly != null ? money(r.monthly) : '—', r.lastPayment || '—']);
+          body.push([r.name, col2Of(r), money(r.balance), r.arrangement, r.monthly != null ? money(r.monthly) : '—', r.lastPayment || '—']);
           (r.accounts || []).forEach(function (a) {
             body.push([SUB + a.custno, '', money(a.amount), '', '', '']);
           });
@@ -770,7 +816,7 @@
         });
         doc.autoTable({
           startY: 40 + lines.length * 6 + 4,
-          head: [['Tenant', 'Unit', 'Balance', 'Arrangement', '$/mo', 'Last Payment']],
+          head: [['Tenant', col2Hdr, 'Balance', 'Arrangement', '$/mo', 'Last Payment']],
           body: body,
           styles: { fontSize: 8, cellPadding: 1.6 },
           headStyles: { fillColor: [40, 40, 40] },
@@ -788,12 +834,17 @@
             doc.text(nation + ' — A/R Report ' + d.asOf + ' — Page ' + page, 14, doc.internal.pageSize.getHeight() - 8);
           }
         });
-        doc.save(((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Report_' + d.asOf + '.pdf');
-        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', 'A/R report generated (PDF) — ' + d.rows.length + ' accounts, ' + money(d.sum.outstanding) + ' outstanding', window.currentRole || 'staff');
+        doc.save(((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + fileTag + d.asOf + '.pdf');
+        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', (noHouse ? 'A/R no-house report' : 'A/R report') + ' generated (PDF) — ' + d.rows.length + ' accounts', window.currentRole || 'staff');
       }).catch(function (e) {
         showToast('PDF library unavailable (' + e.message + ') — use the CSV export.', { type: 'error' });
       });
     });
+  };
+  // Arrears with NO current housing — former tenancies and unhoused
+  // applicants carrying a balance (the Policy 8.5 gate population).
+  window.arrearsNoHouseReport = function (format) {
+    window.arrearsCouncilReport(format, { noHouse: true });
   };
 
   // ── A/R ledger import (reconciliation exercise) ──────────────────────────

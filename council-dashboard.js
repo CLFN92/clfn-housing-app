@@ -296,6 +296,8 @@
       +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
       +     '<button class="btn btn-ghost" onclick="if(typeof arrearsCouncilReport===\'function\')arrearsCouncilReport(\'pdf\')" title="Rental arrears report for Chief & Council">&#128196; A/R Report (PDF)</button>'
       +     '<button class="btn btn-ghost" onclick="if(typeof arrearsCouncilReport===\'function\')arrearsCouncilReport(\'csv\')">A/R CSV</button>'
+      +     '<button class="btn btn-ghost" onclick="if(typeof arrearsNoHouseReport===\'function\')arrearsNoHouseReport(\'pdf\')" title="People with arrears and NO current housing — former tenancies and unhoused applicants. These balances block a new unit assignment until a repayment arrangement is approved.">&#127962; A/R No-House (PDF)</button>'
+      +     '<button class="btn btn-ghost" onclick="if(typeof arrearsNoHouseReport===\'function\')arrearsNoHouseReport(\'csv\')">No-House CSV</button>'
       +     '<button class="btn btn-ghost" onclick="if(typeof _arClsReport===\'function\')_arClsReport(\'pdf\')" title="A/R cleanup classifications — grouped by flag, tenants with their Sage cust #s and totals">&#129529; A/R Cleanup (PDF)</button>'
       +     '<button class="btn btn-ghost" onclick="if(typeof _arClsReport===\'function\')_arClsReport(\'csv\')">Cleanup CSV</button>'
       +     '<button class="btn btn-ghost" onclick="renderLeadershipDashboard()" title="Refresh">&#8635; Refresh</button>'
