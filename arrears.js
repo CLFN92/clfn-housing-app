@@ -645,6 +645,7 @@
       if (st.pendingEd) sum.arrPending++;
       if (st.stamps.arrears_eviction_authorized) sum.evictions++;
       rows.push({
+        tid: tid,
         name: (st.tenant && st.tenant.full_name) || tid,
         unit: unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : '',
         balance: st.balance,
@@ -660,6 +661,50 @@
     return { rows: rows, sum: sum, asOf: _todayISO() };
   };
 
+  // Per-account (Sage Cust #) breakdown for the C&C report: the balance in
+  // the app is per TENANT, but every imported amount carries its customer
+  // number in the [AR-IMPORT:custno:period] ledger tag — net the un-voided
+  // tagged rows per tenant per custno (same void handling as the import
+  // screen). Whatever the tags don't explain (payments/charges made in the
+  // app since import) becomes the "activity since import" remainder line, so
+  // the sub-rows always sum to the person's balance.
+  function _arAcctBreakdown() {
+    return _get('finance_rent_ledger?description=like.*AR-IMPORT*&select=id,description,tenant_id,voids_id,amount&limit=8000')
+      .then(function (rows) {
+        var voided = {};
+        (rows || []).forEach(function (r) { if (r && r.voids_id) voided[r.voids_id] = true; });
+        var byTenant = {};
+        (rows || []).forEach(function (r) {
+          if (!r || !r.tenant_id || r.voids_id || voided[r.id]) return;
+          var m = String(r.description || '').match(/\[AR-IMPORT:([^\]:]+)(?::([^\]]+))?\]/);
+          if (!m) return;
+          var t = byTenant[r.tenant_id] = byTenant[r.tenant_id] || {};
+          t[m[1]] = Math.round(((t[m[1]] || 0) + Number(r.amount || 0)) * 100) / 100;
+        });
+        return byTenant;
+      })
+      .catch(function () { return {}; });   // breakdown is additive — never sink the report
+  }
+  // Attach accounts[] + residue to each report row that has tagged imports.
+  // A single-account tenant with no other activity gets no sub-rows (the
+  // person's row IS the account) — sub-rows only where they add information.
+  function _arAttachAccounts(d, acctMap) {
+    d.rows.forEach(function (r) {
+      var accts = r.tid && acctMap[r.tid];
+      if (!accts) return;
+      var list = Object.keys(accts).map(function (c) { return { custno: c, amount: accts[c] }; })
+        .sort(function (a, b) { return b.amount - a.amount; });
+      if (!list.length) return;
+      var imported = list.reduce(function (s, a) { return Math.round((s + a.amount) * 100) / 100; }, 0);
+      var residue = Math.round((r.balance - imported) * 100) / 100;
+      if (list.length > 1 || Math.abs(residue) >= 0.005) {
+        r.accounts = list;
+        r.residue = Math.abs(residue) >= 0.005 ? residue : null;
+      }
+    });
+  }
+  var AR_RESIDUE_LABEL = 'Payments & activity since import';
+
   // jsPDF comes from the shared loader (shared.js window.loadJsPdf) — the
   // local copy this replaced skipped loading autotable when jsPDF was already
   // present, so an A/R report after any plain-PDF action threw
@@ -670,17 +715,26 @@
   }
 
   window.arrearsCouncilReport = function (format) {
-    window.arrearsLoad().then(function () {
-      var ids = Object.keys(CACHE.byTenant).filter(function (tid) { return CACHE.byTenant[tid].arrangements.length || CACHE.byTenant[tid].balance !== 0; });
-      return window.arrearsLoadStamps(ids.slice(0, 500));
-    }).then(function () {
+    Promise.all([
+      window.arrearsLoad().then(function () {
+        var ids = Object.keys(CACHE.byTenant).filter(function (tid) { return CACHE.byTenant[tid].arrangements.length || CACHE.byTenant[tid].balance !== 0; });
+        return window.arrearsLoadStamps(ids.slice(0, 500));
+      }),
+      _arAcctBreakdown()
+    ]).then(function (res) {
       var d = window.arrearsReportData();
+      _arAttachAccounts(d, res[1] || {});
       var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing Authority';
       var money = _money;
       if (format === 'csv') {
-        var head = ['Tenant', 'Unit', 'Balance', 'Arrangement', 'Monthly Payment', 'Last Payment', 'Window Ends'];
-        var data = d.rows.map(function (r) {
-          return [r.name, r.unit, r.balance.toFixed(2), r.arrangement, r.monthly != null ? r.monthly.toFixed(2) : '', r.lastPayment, r.windowEnds];
+        var head = ['Tenant', 'Unit', 'Account (Cust #)', 'Balance', 'Arrangement', 'Monthly Payment', 'Last Payment', 'Window Ends'];
+        var data = [];
+        d.rows.forEach(function (r) {
+          data.push([r.name, r.unit, '', r.balance.toFixed(2), r.arrangement, r.monthly != null ? r.monthly.toFixed(2) : '', r.lastPayment, r.windowEnds]);
+          (r.accounts || []).forEach(function (a) {
+            data.push(['', '', a.custno, a.amount.toFixed(2), '', '', '', '']);
+          });
+          if (r.residue != null) data.push(['', '', AR_RESIDUE_LABEL, r.residue.toFixed(2), '', '', '', '']);
         });
         _doExport('csv', head, data, ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Nation') + '_AR_Report_' + d.asOf);
         if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'ar_report_generated', 'A/R report exported (CSV) — ' + d.rows.length + ' accounts, ' + money(d.sum.outstanding) + ' outstanding', window.currentRole || 'staff');
@@ -702,15 +756,32 @@
         ];
         doc.setFontSize(10);
         lines.forEach(function (t, i) { doc.text(t, 14, 40 + i * 6); });
+        // Body: one row per tenant, then indented sub-rows per Sage account
+        // (Cust #) and — when the app ledger has moved since import — one
+        // "activity since import" remainder line; sub-rows sum to the total.
+        var SUB = '    -  ';
+        var body = [];
+        d.rows.forEach(function (r) {
+          body.push([r.name, r.unit, money(r.balance), r.arrangement, r.monthly != null ? money(r.monthly) : '—', r.lastPayment || '—']);
+          (r.accounts || []).forEach(function (a) {
+            body.push([SUB + a.custno, '', money(a.amount), '', '', '']);
+          });
+          if (r.residue != null) body.push([SUB + AR_RESIDUE_LABEL, '', money(r.residue), '', '', '']);
+        });
         doc.autoTable({
           startY: 40 + lines.length * 6 + 4,
           head: [['Tenant', 'Unit', 'Balance', 'Arrangement', '$/mo', 'Last Payment']],
-          body: d.rows.map(function (r) {
-            return [r.name, r.unit, money(r.balance), r.arrangement, r.monthly != null ? money(r.monthly) : '—', r.lastPayment || '—'];
-          }),
+          body: body,
           styles: { fontSize: 8, cellPadding: 1.6 },
           headStyles: { fillColor: [40, 40, 40] },
           columnStyles: { 2: { halign: 'right' }, 4: { halign: 'right' } },
+          didParseCell: function (cell) {
+            // De-emphasize the account sub-rows so tenant rows stay scannable.
+            if (cell.section === 'body' && String(cell.row.raw[0]).indexOf(SUB) === 0) {
+              cell.cell.styles.fontSize = 7;
+              cell.cell.styles.textColor = [110, 110, 110];
+            }
+          },
           didDrawPage: function () {
             var page = doc.internal.getNumberOfPages();
             doc.setFontSize(8);
