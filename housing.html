@@ -175,8 +175,12 @@
       <div class="kpi-meta">Available for assignment</div>
       <div class="kpi-breakdown" style="display:flex;flex-direction:column;margin-top:6px;">
         <div onclick="event.stopPropagation();showHousingKpiDrilldown('under_repair')" role="button" tabindex="0" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer;">
-          <span style="font-size:12px;color:var(--text);" title="Subset of the vacant count above: vacant units currently under repair or renovation (not truly assignable yet) — occupied units being repaired are not counted">&#8627; of which under repair / renovation</span>
+          <span style="font-size:12px;color:var(--text);" title="Subset of the vacant count above: vacant units currently flagged under repair or renovation (the flag is set when a maintenance request is approved and cleared when the last one completes) — occupied units being repaired are not counted">&#8627; of which under repair / renovation</span>
           <span style="font-size:15px;font-weight:800;color:var(--text);" id="kpi_under_repair">—</span>
+        </div>
+        <div onclick="event.stopPropagation();showHousingKpiDrilldown('vacant_open_sow')" role="button" tabindex="0" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+          <span style="font-size:12px;color:var(--text);" title="Subset of the vacant count above, counted LIVE from the maintenance-request data: vacant units with at least one open (not completed or cancelled) maintenance request. Compare with the row above — a gap means a stale under-renovation flag or an open request awaiting approval">&#8627; of which with an open maintenance request</span>
+          <span style="font-size:15px;font-weight:800;color:var(--text);" id="kpi_vacant_open_sow">—</span>
         </div>
         <div onclick="event.stopPropagation();showHousingKpiDrilldown('condemned')" role="button" tabindex="0" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;cursor:pointer;">
           <span style="font-size:12px;color:var(--text);">Condemned</span>

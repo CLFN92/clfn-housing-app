@@ -1527,6 +1527,19 @@ function _renderLandingKpis(){
     if(u.assignedTo || u.assignedName) return false;   // occupied units being repaired aren't vacant stock
     return (u.status||'').toLowerCase() === 'vacant' && !!u.under_renovation;
   }).length;
+  // "Of which with an open Maintenance Request" — derived LIVE from the SOW
+  // data (hasActiveSows in shared-sow.js: not completed / cancelled /
+  // archived), unlike the under-renovation row above, which reads the unit's
+  // persisted under_renovation flag (flipped when a request is approved,
+  // cleared when the last one completes). The two rows cross-check each
+  // other: a gap means either a stale flag or an open request that hasn't
+  // been approved yet.
+  var vacantOpenSowN = units.filter(function(u){
+    if(!u || u.archived) return false;
+    if(u.assignedTo || u.assignedName) return false;
+    if((u.status||'').toLowerCase() !== 'vacant') return false;
+    return typeof hasActiveSows === 'function' && hasActiveSows(u.id);
+  }).length;
 
   // Application-type breakdown (active = non-archived, not declined):
   //   new_housing      → New Applications (seeking a new unit)
@@ -1590,6 +1603,7 @@ function _renderLandingKpis(){
   setKpi('kpi_open_apps',       openApps);
   setKpi('kpi_vacant',          vacant);
   setKpi('kpi_under_repair',    underRepairN);
+  setKpi('kpi_vacant_open_sow', vacantOpenSowN);
   setKpi('kpi_condemned',       condemnedN);
   setKpi('kpi_new_apps',        newApps);
   setKpi('kpi_draft_apps',      draftApps);
@@ -1687,8 +1701,8 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open applications.</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'vacant' || type === 'under_repair' || type === 'condemned') {
-    // One unit-table branch for the Vacant card and its two breakdown rows.
+  } else if (type === 'vacant' || type === 'under_repair' || type === 'vacant_open_sow' || type === 'condemned') {
+    // One unit-table branch for the Vacant card and its breakdown rows.
     // Filters MIRROR the KPI predicates in _renderLandingKpis exactly.
     var _unitCfg = {
       vacant:       { title:'Vacant Units', empty:'No vacant units.',
@@ -1697,6 +1711,12 @@ function showHousingKpiDrilldown(type) {
                       pred:function(u){
                         if(u.assignedTo || u.assignedName) return false;
                         return (u.status||'').toLowerCase()==='vacant' && !!u.under_renovation;
+                      } },
+      vacant_open_sow: { title:'Vacant Units with an Open Maintenance Request', empty:'No vacant units with an open maintenance request.',
+                      pred:function(u){
+                        if(u.assignedTo || u.assignedName) return false;
+                        if((u.status||'').toLowerCase()!=='vacant') return false;
+                        return typeof hasActiveSows === 'function' && hasActiveSows(u.id);
                       } },
       condemned:    { title:'Condemned Units', empty:'No condemned units.',
                       pred:function(u){ return (u.status||'').toLowerCase()==='condemned'; } }
