@@ -14,7 +14,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   emailConfigured, isValidEmail, escapeHtml, renderBrandedEmail, emailBrand,
-  sendEmail, sendEmailSerially, isSafeRedirect,
+  sendEmail, sendEmailSerially, isSafeRedirect, emailButton,
 } from '../_shared/email.ts'
 import { uploadMrPhotos, mrSubject, resolveStaffRecipients } from '../_shared/mr.ts'
 
@@ -63,7 +63,7 @@ async function notifySubmission(admin: any, row: any, applicantEmail: string, ap
     const subject = 'New ' + kind + ' submitted for review'
     const who = applicantName || applicantEmail || 'An applicant'
     const link = APP_URL
-      ? '<p style="font-size:13px;margin:14px 0 0;"><a href="' + APP_URL + '/housing.html" style="color:#0b6bcb;">Open the Housing app</a> and review it under <b>Application Submissions</b>.</p>'
+      ? '<p style="font-size:13px;margin:14px 0 0;"><a href="' + APP_URL + '/housing.html" style="color:#111827;font-weight:700;text-decoration:underline;">Open the Housing app</a> and review it under <b>Application Submissions</b>.</p>'
       : '<p style="font-size:13px;margin:14px 0 0;color:#666;">Review it in the Housing app under <b>Application Submissions</b>.</p>'
     const inner = '<p style="font-size:14px;color:#333;margin:0 0 6px;">' + escapeHtml(who)
       + ' submitted a ' + escapeHtml(kind) + ' through the applicant portal.</p>'
@@ -233,11 +233,11 @@ async function sendMagicLink(admin: any, email: string, redirectTo?: string, opt
   const safeLink = escapeHtml(link)
   const inner =
       '<p style="font-size:14px;color:#333;margin:0 0 16px;">' + escapeHtml(intro) + '</p>'
-    + '<p style="margin:0 0 20px;"><a href="' + safeLink + '" '
-    +   'style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:700;'
-    +   'padding:12px 24px;border-radius:8px;font-size:15px;">Sign in</a></p>'
+    // Brand-colour button with luminance-picked text (the one surface a
+    // brand fill belongs on) instead of the old hardcoded black box.
+    + '<div style="margin:0 0 20px;">' + emailButton(link, 'Sign in') + '</div>'
     + '<p style="font-size:12px;color:#666;margin:0 0 4px;">Or paste this link into your browser:</p>'
-    + '<p style="font-size:12px;color:#0b6bcb;word-break:break-all;margin:0 0 16px;">' + safeLink + '</p>'
+    + '<p style="font-size:12px;color:#374151;word-break:break-all;margin:0 0 16px;">' + safeLink + '</p>'
     + '<p style="font-size:12px;color:#888;margin:0;">If you did not request this, you can safely ignore this email.</p>'
   const html = renderBrandedEmail(subject, inner)
   try {

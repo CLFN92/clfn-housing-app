@@ -74,8 +74,9 @@ export function isSafeRedirect(u: string): boolean {
 }
 
 // Black or white text, whichever reads on the given background (mirrors
-// send-notification's readableTextColor).
-function readableTextColor(hex: string): string {
+// send-notification's readableTextColor). Exported so link-sending functions
+// can build brand-colour buttons with legible text.
+export function readableTextColor(hex: string): string {
   const m = String(hex || "").trim().match(/^#?([0-9a-fA-F]{6})$/);
   if (!m) return "#ffffff";
   const n = parseInt(m[1], 16);
@@ -84,19 +85,47 @@ function readableTextColor(hex: string): string {
   return lum > 150 ? "#111827" : "#ffffff";
 }
 
+// The nation's brand colour from the EMAIL_BRAND_COLOR secret (validated
+// hex), neutral dark-slate fallback.
+export function emailBrandColor(): string {
+  const raw = String(EMAIL_BRAND_COLOR || "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : "#1f2937";
+}
+// Brand-colour CTA button with luminance-picked text (a yellow brand needs
+// black text, a dark one white). The ONE surface a brand fill belongs on.
+export function emailButton(href: string, label: string): string {
+  const bg = emailBrandColor();
+  const fg = readableTextColor(bg);
+  return '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:' + bg + ';">' +
+    '<a href="' + escapeHtml(href) + '" style="display:inline-block;padding:12px 24px;font-size:15px;font-weight:700;color:' + fg + ';text-decoration:none;border-radius:8px;">' + escapeHtml(label) + '</a>' +
+    '</td></tr></table>';
+}
+// Give unstyled <a> tags a brand-safe look (near-black, bold, underlined) so
+// nothing falls to a mail client's own link colour.
+function styleBareLinks(html: string): string {
+  return String(html || "").replace(/<a (?![^>]*style=)/gi,
+    '<a style="color:#111827;font-weight:700;text-decoration:underline;" ');
+}
+// Escape the contact line and pre-link email addresses so client auto-linkers
+// (which paint their own colours) leave the footer on-palette.
+function contactLineHtml(text: string): string {
+  return escapeHtml(text).replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    (m) => '<a href="mailto:' + m + '" style="color:#6b7280;text-decoration:underline;">' + m + '</a>');
+}
+
 // Wrap inner content in the SAME nation-branded shell send-notification uses
-// (header bar in the nation color, card body, footer with the contact line) --
 // so emails sent by the public functions (applicant confirmation, tenant
 // maintenance intake, password reset) look identical to every other app
 // email. Branding comes from per-nation secrets: EMAIL_BRAND (name),
-// EMAIL_BRAND_COLOR (header hex, optional) and EMAIL_CONTACT_LINE (optional);
+// EMAIL_BRAND_COLOR (rule hex, optional) and EMAIL_CONTACT_LINE (optional);
 // safe neutral fallbacks keep it working where those are not set.
+// BRAND RULE: the accent is a RULE, never an area -- white header, name in
+// black, thick brand-colour rule beneath (no filled colour band); fills are
+// reserved for buttons (emailButton).
 export function renderBrandedEmail(subject: string, innerHtml: string): string {
   const name = escapeHtml(emailBrand());
-  const bgRaw = String(EMAIL_BRAND_COLOR || "").trim();
-  const bg = /^#[0-9a-fA-F]{6}$/.test(bgRaw) ? bgRaw : "#1f2937";
-  const onBrand = readableTextColor(bg);
-  const contact = EMAIL_CONTACT_LINE ? (escapeHtml(EMAIL_CONTACT_LINE) + "<br/>") : "";
+  const rule = emailBrandColor();
+  const contact = EMAIL_CONTACT_LINE ? (contactLineHtml(EMAIL_CONTACT_LINE) + "<br/>") : "";
   return '' +
 '<!doctype html><html><head><meta charset="utf-8"/>' +
 '<meta name="viewport" content="width=device-width,initial-scale=1"/></head>' +
@@ -104,14 +133,14 @@ export function renderBrandedEmail(subject: string, innerHtml: string): string {
 '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;">' +
 '<tr><td align="center" style="padding:24px 12px;">' +
 '<table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">' +
-'<tr><td style="background:' + bg + ';padding:18px 28px;">' +
-'<span style="font-size:16px;font-weight:700;letter-spacing:.2px;color:' + onBrand + ';">' + name + '</span>' +
+'<tr><td style="background:#ffffff;padding:18px 28px;border-bottom:4px solid ' + rule + ';">' +
+'<span style="font-size:16px;font-weight:700;letter-spacing:.4px;color:#111827;">' + name + '</span>' +
 '</td></tr>' +
 '<tr><td style="padding:26px 28px 8px;">' +
 '<h1 style="font-size:19px;line-height:1.3;margin:0 0 16px;color:#111827;font-weight:700;">' + escapeHtml(subject) + '</h1>' +
-'<div style="font-size:14px;line-height:1.65;color:#374151;">' + innerHtml + '</div>' +
+'<div style="font-size:14px;line-height:1.65;color:#374151;">' + styleBareLinks(innerHtml) + '</div>' +
 '</td></tr>' +
-'<tr><td style="padding:18px 28px 22px;background:#f9fafb;border-top:1px solid #e5e7eb;">' +
+'<tr><td style="padding:18px 28px 22px;background:#ffffff;border-top:1px solid #e5e7eb;">' +
 '<div style="font-size:12px;line-height:1.6;color:#6b7280;">' +
 '<strong style="color:#374151;">' + name + '</strong><br/>' + contact +
 'This is an automated notification. Reply to this email to reach the housing team.' +

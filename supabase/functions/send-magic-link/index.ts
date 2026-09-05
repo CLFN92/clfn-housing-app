@@ -133,6 +133,10 @@ serve(async (req) => {
     const nationName = esc(brand.nation_name || 'Housing')
     const isRecovery = linkType === 'recovery'
     const btnColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(brand.brand_color || '').trim()) ? String(brand.brand_color).trim() : '#eab308'
+    let btnHex = btnColor.replace('#', '')
+    if (btnHex.length === 3) btnHex = btnHex.split('').map((c) => c + c).join('')
+    const btnLum = (0.299 * parseInt(btnHex.slice(0, 2), 16) + 0.587 * parseInt(btnHex.slice(2, 4), 16) + 0.114 * parseInt(btnHex.slice(4, 6), 16)) / 255
+    const btnText = btnLum > 0.6 ? '#111827' : '#ffffff'
     const expiryStr = fmtDate(t.access_expires_at)
     const inner =
       '<p style="font-size:14px;line-height:1.65;color:#374151;margin:0 0 20px;">' +
@@ -141,7 +145,7 @@ serve(async (req) => {
         : 'Click below to sign in to the ' + nationName + ' Housing system. This link is single-use and expires shortly - open it on the device you want to sign in on.') +
       '</p>' +
       '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:' + btnColor + ';">' +
-      '<a href="' + esc(actionLink) + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:#111827;text-decoration:none;border-radius:8px;">' + (isRecovery ? 'Reset password' : 'Sign in') + '</a>' +
+      '<a href="' + esc(actionLink) + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:' + btnText + ';text-decoration:none;border-radius:8px;">' + (isRecovery ? 'Reset password' : 'Sign in') + '</a>' +
       '</td></tr></table>' +
       (expiryStr
         ? '<p style="font-size:13px;line-height:1.6;color:#374151;margin:22px 0 0;"><strong>Your access is valid until ' + esc(expiryStr) +

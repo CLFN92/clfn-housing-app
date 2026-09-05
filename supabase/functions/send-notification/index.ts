@@ -203,30 +203,38 @@ function sanitizeHexColor(c: unknown): string {
   const s = String(c ?? "").trim();
   return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s) ? s : "";
 }
-// Pick black or white text for a given background so the header stays legible
-// whatever the nation's brand colour is (e.g. a yellow bar needs dark text).
-function readableTextColor(hex: string): string {
-  let h = hex.replace("#", "");
-  if (h.length === 3) h = h.split("").map((x) => x + x).join("");
-  const r = parseInt(h.slice(0, 2), 16) || 0;
-  const g = parseInt(h.slice(2, 4), 16) || 0;
-  const b = parseInt(h.slice(4, 6), 16) || 0;
-  // Relative luminance (sRGB) -> dark text on light backgrounds.
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? "#111827" : "#ffffff";
+
+// Give any <a> the template supplied WITHOUT its own style a brand-safe look
+// (near-black, bold, underlined) -- the Settings rich-text sanitizer strips
+// inline styles from edited templates, and unstyled anchors otherwise fall to
+// whatever colour the recipient's mail client invents (blue/green).
+function styleBareLinks(html: string): string {
+  return String(html || "").replace(/<a (?![^>]*style=)/gi,
+    '<a style="color:#111827;font-weight:700;text-decoration:underline;" ');
+}
+// Escape the contact line, then wrap email addresses in pre-styled mailto
+// anchors so mail clients' auto-linkers (which paint their own colours) find
+// them already linked and leave the footer on-palette.
+function contactLineHtml(text: string): string {
+  return escapeHtml(text).replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    (m) => '<a href="mailto:' + m + '" style="color:#6b7280;text-decoration:underline;">' + m + '</a>');
 }
 
 // Branded, email-client-safe HTML shell (tables + inline styles, mobile-fluid).
 // All branding is passed in from the client (nation config); safe fallbacks
 // keep it working if a field is missing. ASCII-only.
+// BRAND RULE: the accent appears as a RULE, never an area -- the header is a
+// white band with the nation name in black over a thick rule in the nation's
+// colour (a filled colour band violates the no-background-fills rule, and for
+// a yellow brand put yellow-adjacent text one client dark-mode filter away
+// from illegible). Fills are reserved for buttons (template CTAs).
 function brandedEmailShell(opts: {
   subject: string; innerHtml: string; nationName: string;
   brandColor: string; contactLine: string; brandFooter: string;
 }): string {
-  const bg      = opts.brandColor || "#1f2937";
-  const onBrand = readableTextColor(bg);
+  const rule    = opts.brandColor || "#1f2937";
   const name    = escapeHtml(opts.nationName || opts.brandFooter || "Housing");
-  const contact = opts.contactLine ? (escapeHtml(opts.contactLine) + "<br/>") : "";
+  const contact = opts.contactLine ? (contactLineHtml(opts.contactLine) + "<br/>") : "";
   return '' +
 '<!doctype html><html><head><meta charset="utf-8"/>' +
 '<meta name="viewport" content="width=device-width,initial-scale=1"/></head>' +
@@ -234,17 +242,17 @@ function brandedEmailShell(opts: {
 '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;">' +
 '<tr><td align="center" style="padding:24px 12px;">' +
 '<table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">' +
-// Header bar
-'<tr><td style="background:' + bg + ';padding:18px 28px;">' +
-'<span style="font-size:16px;font-weight:700;letter-spacing:.2px;color:' + onBrand + ';">' + name + '</span>' +
+// Header: white, name in black, brand-colour rule beneath
+'<tr><td style="background:#ffffff;padding:18px 28px;border-bottom:4px solid ' + rule + ';">' +
+'<span style="font-size:16px;font-weight:700;letter-spacing:.4px;color:#111827;">' + name + '</span>' +
 '</td></tr>' +
 // Body
 '<tr><td style="padding:26px 28px 8px;">' +
 '<h1 style="font-size:19px;line-height:1.3;margin:0 0 16px;color:#111827;font-weight:700;">' + escapeHtml(opts.subject) + '</h1>' +
-'<div style="font-size:14px;line-height:1.65;color:#374151;">' + opts.innerHtml + '</div>' +
+'<div style="font-size:14px;line-height:1.65;color:#374151;">' + styleBareLinks(opts.innerHtml) + '</div>' +
 '</td></tr>' +
-// Footer
-'<tr><td style="padding:18px 28px 22px;background:#f9fafb;border-top:1px solid #e5e7eb;">' +
+// Footer: white with a hairline rule (no filled block)
+'<tr><td style="padding:18px 28px 22px;background:#ffffff;border-top:1px solid #e5e7eb;">' +
 '<div style="font-size:12px;line-height:1.6;color:#6b7280;">' +
 '<strong style="color:#374151;">' + name + '</strong><br/>' + contact +
 'This is an automated notification. Reply to this email to reach the housing team.' +

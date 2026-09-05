@@ -40,7 +40,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>A new housing application has been submitted by <strong>{applicantName}</strong> ({applicantId}).</p>'
               + '<p>Score: <strong>{score}</strong> · Tier: <strong>{tier}</strong></p>'
               + '<p>Please log in to the {nationShort} Housing app to review and recommend.</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -54,7 +54,7 @@ var EMAIL_EVENT_REGISTRY = [
     defaults: {
       subject:  '{nationShort} Housing — File Update Requires Your Review: {applicantName}',
       bodyHtml: '<p>A file update has been submitted for <strong>{applicantName}</strong> ({applicantId}) and requires your review and approval in the {nationShort} Housing app.</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -71,7 +71,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Tenant: <strong>{applicantName}</strong> ({applicantId})<br/>'
               +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>Please log in to the {nationShort} Housing app to review and recommend.</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -87,7 +87,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>An existing housing application has been <strong>updated and re-submitted</strong> by <strong>{applicantName}</strong> ({applicantId}).</p>'
               + '<p>Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>This is a change to an application already in the system &mdash; not a new application. Please log in to the {nationShort} Housing app to review the updated details.</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -104,7 +104,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Total cost: <strong>{totalCost}</strong></p>'
               + '<p>Condition: <strong>{condition}</strong></p>'
               + '<p>Contractor: <strong>{contractor}</strong></p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -121,7 +121,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Contractor: <strong>{contractorName}</strong></p>'
               + '<p>Trade: <strong>{contractorTrade}</strong></p>'
               + '<p>Classification: <strong>{contractorClassification}</strong></p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -321,7 +321,7 @@ var EMAIL_EVENT_REGISTRY = [
               +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>{actionNotes}</p>'
               + '<p>Please log in to the {nationShort} Housing app to grant final approval or return the file.</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -337,7 +337,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>A file update has been reviewed and approved by the Housing Manager.</p>'
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
               + '<p>{actionNotes}</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -354,7 +354,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})<br/>'
               +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -370,7 +370,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>The following application has been declined.</p>'
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
               + '<p>{actionNotes}</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -386,7 +386,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>The following application has been returned for more information.</p>'
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
               + '<p>{actionNotes}</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
 
@@ -407,7 +407,7 @@ var EMAIL_EVENT_REGISTRY = [
               +    'Classification: <strong>{contractorClassification}</strong></p>'
               + '<p>{actionNotes}</p>'
               + '<p>Please log in to the {nationShort} Housing app to grant final approval or return the file.</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -425,7 +425,7 @@ var EMAIL_EVENT_REGISTRY = [
               +    'Trade: <strong>{contractorTrade}</strong><br/>'
               +    'Classification: <strong>{contractorClassification}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -442,7 +442,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Contractor: <strong>{contractorName}</strong><br/>'
               +    'Trade: <strong>{contractorTrade}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -459,7 +459,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Contractor: <strong>{contractorName}</strong><br/>'
               +    'Trade: <strong>{contractorTrade}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="{brandBtnStyle}">Open {nationShort} Housing &rarr;</a></p>'
     }
   }
 ];
@@ -493,6 +493,21 @@ function _emailEventConfig(eventKey) {
 // Per-event notify functions build the tokens map via _emailTokensForApp,
 // _emailTokensForSow, _emailTokensForContractor, etc. Adding a new
 // entity type = add a token builder + use it from the notify function.
+// CTA-button style for email templates, derived from the NATION's brand
+// colour (registry/theme via _resolveBrandColorHex) with a luminance-picked
+// text colour — per the brand rule that a button is the ONE surface a brand
+// fill is allowed on (a yellow brand needs black text, a dark one white).
+// Falls back to a neutral dark slate when no brand colour resolves.
+function _brandBtnStyle() {
+  var bg = (typeof _resolveBrandColorHex === 'function' ? _resolveBrandColorHex() : '') || '#1f2937';
+  var h = String(bg).replace('#', '');
+  if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+  var r = parseInt(h.slice(0, 2), 16) || 0, g = parseInt(h.slice(2, 4), 16) || 0, b = parseInt(h.slice(4, 6), 16) || 0;
+  var fg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255) > 0.6 ? '#111827' : '#ffffff';
+  return 'display:inline-block;background:' + bg + ';color:' + fg + ';text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;';
+}
+window._brandBtnStyle = _brandBtnStyle;
+
 function _renderEmailTemplate(eventKey, tokens) {
   var cfg = _emailEventConfig(eventKey);
   if (!cfg) {
@@ -505,9 +520,12 @@ function _renderEmailTemplate(eventKey, tokens) {
   var subject  = (saved.subject  != null && saved.subject  !== '') ? saved.subject  : cfg.defaults.subject;
   var bodyHtml = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : cfg.defaults.bodyHtml;
 
+  // Global tokens merged for every event (entity builders never need to
+  // remember them): {brandBtnStyle} styles CTA buttons in the brand colour.
+  var t = Object.assign({ brandBtnStyle: _brandBtnStyle() }, tokens || {});
   return {
-    subject:  _substitutePlaceholders(subject,  tokens || {}),
-    bodyHtml: _substitutePlaceholders(bodyHtml, tokens || {})
+    subject:  _substitutePlaceholders(subject,  t),
+    bodyHtml: _substitutePlaceholders(bodyHtml, t)
   };
 }
 

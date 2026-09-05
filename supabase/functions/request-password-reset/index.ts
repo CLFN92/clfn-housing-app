@@ -28,7 +28,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sendEmail, renderBrandedEmail, emailConfigured, isValidEmail, escapeHtml, isSafeRedirect } from '../_shared/email.ts'
+import { sendEmail, renderBrandedEmail, emailConfigured, isValidEmail, escapeHtml, isSafeRedirect, readableTextColor } from '../_shared/email.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -124,7 +124,7 @@ serve(async (req) => {
       'A password reset was requested for your ' + escapeHtml(nationName || 'Housing') +
       ' Housing account. Click below to choose a new password. This link is single-use and expires shortly.</p>' +
       '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:' + btnColor + ';">' +
-      '<a href="' + escapeHtml(actionLink) + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:#111827;text-decoration:none;border-radius:8px;">Reset password</a>' +
+      '<a href="' + escapeHtml(actionLink) + '" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:700;color:' + readableTextColor(btnColor) + ';text-decoration:none;border-radius:8px;">Reset password</a>' +
       '</td></tr></table>' +
       '<p style="font-size:12px;line-height:1.6;color:#6b7280;margin:18px 0 0;">If you did not request this, you can ignore this email - your password is unchanged and no one can use the link without access to this inbox.</p>'
 

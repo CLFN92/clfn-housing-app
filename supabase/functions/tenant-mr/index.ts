@@ -84,7 +84,7 @@ async function notifyMaintenanceRequest(admin: any, info: MrInfo): Promise<void>
   if (recipients.length) {
     const subject = mrSubject(info.urgency, info.address)
     const link = APP_URL
-      ? '<p style="font-size:13px;margin:14px 0 0;"><a href="' + APP_URL + '/housing.html" style="color:#0b6bcb;">Open the Housing app</a> and review it under <b>Tenant Requests</b>.</p>'
+      ? '<p style="font-size:13px;margin:14px 0 0;"><a href="' + APP_URL + '/housing.html" style="color:#111827;font-weight:700;text-decoration:underline;">Open the Housing app</a> and review it under <b>Tenant Requests</b>.</p>'
       : '<p style="font-size:13px;margin:14px 0 0;color:#666;">Review it in the Housing app under <b>Tenant Requests</b>.</p>'
     const inner = '<p style="font-size:14px;color:#333;margin:0 0 6px;">A tenant submitted a maintenance request via the unit QR code.</p>'
       + mrDetailsBlock(info) + link
