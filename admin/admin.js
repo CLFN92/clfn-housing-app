@@ -27,25 +27,28 @@
   ];
 
   // Home Land Homes fee schedule for the invoice builder. EXACT prices -- do not
-  // alter. g=group, d=line description, p=unit price (CAD), q=default qty;
-  // hours=qty is entered in hours (unit is per-hour); custom=price is free-entry.
+  // alter. Revised 2026-09-05 to match the schedule published on
+  // homelandhomes.ca. g=group, d=line description, p=unit price (CAD),
+  // q=default qty; hours=qty is entered in hours (unit is per-hour);
+  // custom=price is free-entry. NOTE: never edit the d strings — saved
+  // nation_billing rows re-select their line item by exact-description match.
   var FEE_SCHEDULE = [
     // Subscription -- billed annually in advance
-    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Small (up to 100 homes), annual', p: 4740, q: 1 },
-    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Mid-size (101-300 homes), annual', p: 8340, q: 1 },
-    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Large (301-600 homes), annual', p: 13140, q: 1 },
+    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Small (up to 100 homes), annual', p: 5400, q: 1 },
+    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Mid-size (101-300 homes), annual', p: 9540, q: 1 },
+    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Large (301-600 homes), annual', p: 15000, q: 1 },
     // Subscription -- monthly (higher rate, already includes +10%)
-    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Small (up to 100 homes), monthly', p: 435, q: 1 },
-    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Mid-size (101-300 homes), monthly', p: 765, q: 1 },
-    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Large (301-600 homes), monthly', p: 1205, q: 1 },
+    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Small (up to 100 homes), monthly', p: 495, q: 1 },
+    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Mid-size (101-300 homes), monthly', p: 875, q: 1 },
+    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Large (301-600 homes), monthly', p: 1375, q: 1 },
     // One-time setup (once per client)
-    { g: 'One-time setup (once per client)', d: 'One-time setup — Small', p: 2500, q: 1 },
-    { g: 'One-time setup (once per client)', d: 'One-time setup — Mid-size', p: 4500, q: 1 },
-    { g: 'One-time setup (once per client)', d: 'One-time setup — Large', p: 7500, q: 1 },
+    { g: 'One-time setup (once per client)', d: 'One-time setup — Small', p: 3500, q: 1 },
+    { g: 'One-time setup (once per client)', d: 'One-time setup — Mid-size', p: 6000, q: 1 },
+    { g: 'One-time setup (once per client)', d: 'One-time setup — Large', p: 9500, q: 1 },
     // Setup with the 50% discount (one-year term, prepaid) -- the only discount that exists
-    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Small (50% discount)', p: 1250, q: 1 },
-    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Mid-size (50% discount)', p: 2250, q: 1 },
-    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Large (50% discount)', p: 3750, q: 1 },
+    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Small (50% discount)', p: 1750, q: 1 },
+    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Mid-size (50% discount)', p: 3000, q: 1 },
+    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Large (50% discount)', p: 4750, q: 1 },
     // Add-on
     { g: 'Add-on', d: 'AI Staff Assistant (per month)', p: 95, q: 1 },
     // Additional services (hourly; written authorization required)
@@ -1474,9 +1477,9 @@
     '##Schedule A - Order Form',
     'Select one tier and one billing option. Prices are in Canadian dollars and match the Provider\'s published schedule as of the Effective Date.',
     '###Subscription tiers',
-    '-[ ] Small - up to 100 homes: $4,740/year ($395/mo) or $435/month; one-time setup $2,500.',
-    '-[ ] Mid-size - 101-300 homes: $8,340/year ($695/mo) or $765/month; one-time setup $4,500.',
-    '-[ ] Large - 301-600 homes: $13,140/year ($1,095/mo) or $1,205/month; one-time setup $7,500.',
+    '-[ ] Small - up to 100 homes: $5,400/year ($450/mo) or $495/month; one-time setup $3,500.',
+    '-[ ] Mid-size - 101-300 homes: $9,540/year ($795/mo) or $875/month; one-time setup $6,000.',
+    '-[ ] Large - 301-600 homes: $15,000/year ($1,250/mo) or $1,375/month; one-time setup $9,500.',
     '-[ ] 600+ / Tribal Council - custom: annual per quote; monthly per quote; setup per quote.',
     '###Billing and options',
     'Billing option selected: [ ] Annual (invoiced annually in advance)     [ ] Monthly (+10% rate above)',
